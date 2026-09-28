@@ -89,8 +89,6 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .idlehead{font:700 40px/1.05 var(--display);color:#fff;letter-spacing:.01em}
 @media (max-width:760px){.idlehead{font-size:32px}}
 .flashpick{display:flex;align-items:center;gap:10px;min-height:34px;color:#c9d7e0}
-#sessidlesub{min-height:34px;display:flex;align-items:center;justify-content:center}
-#sessidlesub[hidden]{display:none}
 .flashpick[hidden]{display:none}
 .fpseg{display:flex;border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:2px}
 .fpseg button{font-family:var(--body);font-weight:600;font-size:inherit;border:0;border-radius:999px;background:transparent;color:#c9d6de;padding:5px 14px;cursor:pointer}
@@ -281,9 +279,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
                 <button id="flash-750" data-set="flash" data-val="750">0.75 s</button>
               </div>
             </div>
-            <div class="sumsub" id="sessidlesub">Pick a length to start. Each session is scored on its own.</div>
             <div class="sumbtns"><button class="startbtn" data-sess="50">50 shots</button><button class="startbtn" data-sess="100">100 shots</button></div>
-            <div class="sumsub" id="sessidlelast"></div>
           </div>
         </div>
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
@@ -1021,10 +1017,6 @@ function showSessIdle(){
   if(idle){
     $('sessidlehead').textContent = t==='flash' ? 'Flash ⚡️' : 'Freeplay';
     $('flashpick').hidden = t!=='flash';
-    $('sessidlesub').textContent = t==='flash' ? '' : 'Each session is scored on its own.';
-    $('sessidlesub').hidden = t==='flash';
-    const last = (stats.sessions||[]).filter(x=>x.task===t).slice(-1)[0];
-    $('sessidlelast').textContent = last ? `Last session: ${pct(last.right,last.n)}% over ${last.size} shots.` : '';
   }
 }
 let flashArmed = false;
