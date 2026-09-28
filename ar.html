@@ -86,6 +86,13 @@ a{color:var(--accent)}
 import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, rigidFit, findBalls, clothColour, R, REFS} from './ar-core.js';
 
 const $ = id => document.getElementById(id);
+// Stay current: if the server has a newer version of this page than the one running, load it.
+const BUILD = '20260928220337';
+if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+fetch(location.pathname, {cache: 'no-store'}).then(r => r.text()).then(t => {
+  const m = t.match(/const BUILD = '20260928220337']+)'/);
+  if(m && m[1] !== BUILD && !sessionStorage.getItem('reloaded-' + m[1])){ sessionStorage.setItem('reloaded-' + m[1], '1'); location.reload(); }
+}).catch(()=>{});
 const DEBUG = new URLSearchParams(location.search).has('debug');
 
 // ---------- can this device do it? ----------
