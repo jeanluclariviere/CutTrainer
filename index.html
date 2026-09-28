@@ -1225,7 +1225,8 @@ function answer(id){
   if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);
   else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
   else thock(counted);
-  if(settings.animate !== '0') animateShot(ok ? outcome(shot, shot.theta) : oc, reveal, ok ? '#ffd34d' : MISS); else reveal(0);
+  if(settings.animate !== '0'){ animateShot(ok ? outcome(shot, shot.theta) : oc, reveal, ok ? '#ffd34d' : MISS); updateControls(); }   // Next shot works straight away
+  else reveal(0);
 }
 
 // ---------- shot animation: your call, played out. No spin or physics, just clean motion. ----------
@@ -1575,7 +1576,11 @@ $('answers').innerHTML = REFS.map((r,i)=>`<button data-id="${r.id}" id="ans-${r.
 $('answers').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) answer(b.dataset.id); });
 $('nudge-l').addEventListener('click', ()=>nudge(-1));
 $('nudge-r').addEventListener('click', ()=>nudge(1));
-$('next').addEventListener('click', ()=>{ if(anim){ finishAnim(); return; } if(isPlace() && !answered) shoot(); else deal(); });
+$('next').addEventListener('click', ()=>{
+  // mid-animation: wrap up the shot (scores, session count), then go straight to the next one
+  if(anim){ finishAnim(); if($('sesscover').hidden) deal(); return; }
+  if(isPlace() && !answered) shoot(); else deal();
+});
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
 const walkOn = () => settings.task==='call' || settings.task==='sess';
 function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
