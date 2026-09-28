@@ -64,7 +64,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:4px}
 .tab{font:600 14px var(--body);background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;margin-bottom:-1px;cursor:pointer}
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
-.tabpanel{display:flex;flex-direction:column;gap:16px;min-height:260px}
+.tabpanel{display:flex;flex-direction:column;gap:16px;min-height:260px;overflow-x:clip}   /* never scroll sideways; clip keeps the sticky Stats header working */
 .tabpanel > section{border:0;padding-top:0}
 .sessrow{min-height:34px;display:flex;align-items:center}
 .sesslive{display:flex;align-items:center;gap:8px;width:100%;font-size:13px;color:var(--muted)}
@@ -113,7 +113,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .subpanel[hidden]{display:none}
 .form .empty{color:var(--muted);font-size:13px;align-self:center}
 /* accuracy-over-time chart: one dot per finished session */
-.trend{position:relative;height:150px;margin:6px 0 18px 34px;touch-action:pan-y}
+.trend{position:relative;height:150px;margin:6px 8px 18px 38px;touch-action:pan-y}
 .trend .grid{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
 .trend .grid.base{border-top-color:color-mix(in srgb,var(--muted) 45%,transparent)}
 .trend .ylab{position:absolute;left:-34px;width:28px;text-align:right;transform:translateY(-50%);font:500 11px var(--mono);color:var(--muted)}
@@ -276,7 +276,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   .q{margin-top:0;line-height:1.1}
   .q small{line-height:1.35}
   .tabs{margin-top:0}
-  .tabpanel{flex:1;min-height:0;overflow:auto}
+  .tabpanel{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 }
 </style>
 </head>
