@@ -939,14 +939,13 @@ function draw(reveal){
 function overlapSVG(s){
   const right = [-s.v[1], s.v[0]];
   const lat = 2*dot(s.n, right);      // OB centre offset from ghost-ball centre, in ball radii
-  const f = 1 - Math.sin(s.theta*RAD);
   return `<svg viewBox="-3.3 -1.9 6.6 3.8" aria-label="Shooter's view of the overlap">
     <rect x="-3.3" y="-1.9" width="6.6" height="3.8" rx=".4" fill="#1f5f96"/>
     <circle cx="${f2(lat)}" cy="0" r="1" fill="${s.color[0]}"/>
     <circle cx="0" cy="0" r="1" fill="#ffffff" fill-opacity=".35" stroke="#ffffff" stroke-width=".07" stroke-dasharray=".18 .12"/>
     <line x1="0" y1="-1.55" x2="0" y2="1.55" stroke="#ffffff" stroke-opacity=".7" stroke-width=".05"/>
     <text x="0" y="1.78" font-size=".34" text-anchor="middle" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Sans, sans-serif">aim line</text>
-    <text x="-3.1" y="-1.55" font-size=".34" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Mono, monospace">${f.toFixed(2)} ball</text>
+    <text x="-3.1" y="-1.55" font-size=".34" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Sans, sans-serif" font-weight="600">${s.answer.id==='full' ? 'Full ball' : s.answer.label+' ball'}</text>
   </svg>`;
 }
 
