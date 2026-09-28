@@ -840,8 +840,8 @@ function perspSVG(s, reveal, view){
   if(reveal){
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[s.P.t[0],s.P.t[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
     if(s.pick && s.pick.far){
-      const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, J = s.final && s.final.jaw;
-      const pts = J ? [s.ob, J, s.final.ob] : [s.ob, add(s.ob, mul(pk.u2, s.L+3))];
+      const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
+      const pts = stop ? [s.ob, stop] : [s.ob, add(s.ob, mul(pk.u2, s.L+3))];
       for(let k=0;k<pts.length-1;k++) o += `<path d="${segD(cam,[pts[k][0],pts[k][1],.03],[pts[k+1][0],pts[k+1][1],.03])}" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
       const gc = cam.toCam([pk.g2[0],pk.g2[1],R]);
       if(gc[2] > NEAR){ const [gx,gy] = cam.proj(gc); o += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="${(cam.focal*R/gc[2]).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.125" stroke-dasharray="4 3"/>`; }
@@ -1246,17 +1246,13 @@ function animateShot(oc, done, obCol){
   const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
   const toPocket = dot(sub(s.P.t, ob0), oc.u2);
   const sink = oc.made;
-  // a near miss catches the jaw and kicks back out, so it never looks like it dropped
+  // a near miss stops dead on the jaw, short of the pocket; nothing rebounds
   const lat = Math.abs(oc.lat ?? 0);
-  const rattle = !sink && toPocket > 4 && lat < s.tol + 2.4;
-  let jaw = null, obEnd;
+  const jawHit = !sink && toPocket > 4 && lat < s.tol + 2.4;
+  const jaw = null;
+  let obEnd;
   if(sink) obEnd = add(ob0, mul(oc.u2, toPocket + 2.6));
-  else if(rattle){
-    jaw = rayToCushion(ob0, oc.u2, toPocket - (s.P.side ? 1.6 : 2.8));
-    const d = sub(jaw, s.P.t), latDir = sub(d, mul(oc.u2, dot(d, oc.u2)));
-    const out = len(latDir) > 1e-6 ? norm(latDir) : [-oc.u2[1], oc.u2[0]];
-    obEnd = rayToCushion(jaw, norm(add(mul(oc.u2, -1), mul(out, -0.6))), 6);   // off the jaw and back into the table
-  }
+  else if(jawHit) obEnd = rayToCushion(ob0, oc.u2, toPocket - (s.P.side ? 1.6 : 2.8));
   else obEnd = rayToCushion(ob0, oc.u2);
   const dJ = jaw ? len(sub(jaw, ob0)) : 0;
   const obAt = dist => !jaw || dist <= dJ ? add(ob0, mul(oc.u2, dist)) : add(jaw, mul(norm(sub(obEnd, jaw)), dist - dJ));
@@ -1286,7 +1282,7 @@ function animateShot(oc, done, obCol){
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
-  s.final = {cb: cbEnd, ob: sink ? null : obEnd, jaw, trail: {cb: [cb0, g2, cbEnd]}};
+  s.final = {cb: cbEnd, ob: sink ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, cbEnd]}};
   anim = {done, t0, raf: requestAnimationFrame(frame)};
 }
 function finishAnim(){
