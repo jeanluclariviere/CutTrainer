@@ -115,6 +115,9 @@ let target = null;            // target pocket index
 let shot = null, picked = null;
 let seen = [];                // balls found in the camera picture: {p (pinned), label, cue, t}
 let objLabel = '';
+let track = null;             // the object ball being followed: {ref (a seen ball), label}
+let manualPocket = false;     // you picked the pocket yourself: keep it until the balls move
+let settle = null;            // waiting for the balls to come to rest after they moved: {since, cue, obj}
 let camRowsDown = null;       // do the camera picture's rows run top-down? (worked out from the table itself)
 let lastScan = 0;
 let lastView = null;          // {proj, view}
@@ -232,18 +235,42 @@ function handleTap(tap, frame, view){
     const tx = (tap.x + 1) / 2 * innerWidth, ty = (1 - tap.y) / 2 * innerHeight;
     const near = shown().map(b => { const q = proj(b.p); return q ? {b, d: Math.hypot((q.x+1)/2*innerWidth - tx, (1-q.y)/2*innerHeight - ty)} : null; })
       .filter(o => o && o.d < 44).sort((a,b)=>a.d-b.d)[0];
+    // a pocket closer to your finger than any ball wins
+    let pocketTap = -1;
+    if(table && (step === 'call' || step === 'reveal') && balls.cue && balls.obj){
+      let pd = Infinity;
+      table.pockets.forEach((pk,i)=>{ const q = proj(pk.p); if(!q) return; const d = Math.hypot((q.x+1)/2*innerWidth - tx, (1-q.y)/2*innerHeight - ty); if(d < pd){ pd = d; pocketTap = i; } });
+      if(!(pd < 60 && (!near || pd < near.d))) pocketTap = -1;
+    }
+    if(pocketTap >= 0){
+      const g = shotGeometry(balls.cue, balls.obj, table.pockets[pocketTap].p, plane.n);
+      if(!g.possible){ toast('That pocket isn\'t makeable from here'); return; }
+      target = pocketTap; manualPocket = true; picked = null; setStep('call'); return;
+    }
     if(near){
       const prev = {...balls}, prevLabel = objLabel, prevTarget = target;
       history.push(()=>{ balls = prev; objLabel = prevLabel; target = prevTarget; picked = null; setStep(balls.cue && balls.obj ? 'pocket' : 'balls'); });
       if(near.b.cue) balls.cue = near.b.p;
       else {
         balls.obj = near.b.p; objLabel = near.b.label;
+        track = {ref: near.b, label: near.b.label, others: shown().filter(b => b !== near.b && !b.cue).map(b => b.p)};     // follow this ball from now on
         const cue = shown().find(b => b.cue);
         if(cue) balls.cue = cue.p;                      // the cue ball is picked for you
       }
-      picked = null; target = null;
-      setStep(balls.cue && balls.obj ? 'pocket' : 'balls');
+      picked = null; manualPocket = false; settle = null;
+      newShot();
       return;
+    }
+    // near a pocket: aim at that one instead
+    if(table && (step === 'call' || step === 'reveal') && balls.cue && balls.obj){
+      const p = rayPlane(pinnedRay(tap.x, tap.y), plane, 0);
+      let best = -1, bd = Infinity;
+      if(p) table.pockets.forEach((pk,i)=>{ const d = v3.len(v3.sub(pk.p, p)); if(d < bd){ bd = d; best = i; } });
+      if(best >= 0 && bd < 0.2){
+        const g = shotGeometry(balls.cue, balls.obj, table.pockets[best].p, plane.n);
+        if(!g.possible){ toast('That pocket isn\'t makeable from here'); return; }
+        target = best; manualPocket = true; picked = null; setStep('call'); return;
+      }
     }
     const c = findBall(tap, frame, view);
     if(!c) return;
@@ -255,7 +282,7 @@ function handleTap(tap, frame, view){
     history.push(()=>{ balls = prev; picked = null; setStep(balls.cue && balls.obj ? 'pocket' : 'balls'); });
     balls[slot] = c.p;
     picked = null;
-    if(balls.cue && balls.obj) setStep(target === null ? 'pocket' : 'call'); else setStep('balls');
+    if(balls.cue && balls.obj) newShot(); else setStep('balls');
     return;
   }
   if(step === 'realign'){
@@ -271,7 +298,7 @@ function handleTap(tap, frame, view){
     table.pockets.forEach((pk,i)=>{ const d = v3.len(v3.sub(pk.p, p)); if(d < bd){ bd = d; best = i; } });
     if(bd > 0.35){ toast('Tap a pocket'); return; }
     history.push(()=>{ target = null; picked = null; setStep('pocket'); });
-    target = best; setStep('call');
+    target = best; manualPocket = true; setStep('call');
   }
 }
 
@@ -403,6 +430,7 @@ function mergeSeen(found){
   const kept = [];
   for(const o of next.sort((a,c)=>c.hits-a.hits)) if(!kept.some(k => v3.len(v3.sub(k.p, o.p)) < 2*R*0.9)) kept.push(o);
   seen = kept;
+  followBalls();
   if(step === 'balls') setStep('balls');   // refresh the prompt (cue ball found or not)
 }
 const shown = () => seen.filter(b => b.hits >= 2);
@@ -470,8 +498,8 @@ const STEP_TEXT = {
   table: () => `Tap the <b>${['first','next','across'][corners.length]}</b> corner pocket` + (corners.length===0 ? ' (any one).' : corners.length===1 ? ', along the same rail.' : ', on the other side from that one.'),
   balls: () => (shown().some(b=>b.cue) && !balls.obj) ? 'Tap the <b>object ball</b>.' : (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
   pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
-  call: 'How full do you hit it?',
-  reveal: 'Move the balls and tap them again, or tap New shot.',
+  call: () => 'How full do you hit it?' + (target !== null ? ' <span style="color:var(--muted)">Tap another pocket to change it.</span>' : ''),
+  reveal: () => track ? 'Shoot it, then set up the next one. It follows the ball.' : 'Move the balls and tap them again, or tap New shot.',
   realign: 'Tap the <b>middle of any pocket</b> to snap the table back onto it.',
 };
 const STEP_N = {scan:0, table:1, balls:2, pocket:3, call:4, reveal:4, realign:4};
@@ -484,6 +512,57 @@ function setStep(s){
   $('readout').classList.toggle('on', s === 'reveal');
   $('newshot').disabled = !table; $('realign').disabled = !table; $('retable').disabled = step === 'scan';
   if(s === 'call'){ renderAnswers(); computeShot(); }
+}
+// The easiest makeable pocket for this layout: smallest cut, and for a side pocket, not coming in too flat.
+function autoPocket(){
+  let best = null;
+  table.pockets.forEach((pk, i) => {
+    const g = shotGeometry(balls.cue, balls.obj, pk.p, plane.n);
+    if(!g.possible || g.theta > 75) return;
+    if(pk.side){
+      const inward = v3.norm(v3.sub(table.pockets.filter(q=>q.side).find(q=>q!==pk).p, pk.p));
+      const approach = Math.acos(Math.max(-1, Math.min(1, v3.dot(v3.mul(g.u, -1), inward)))) * 180/Math.PI;
+      if(approach > 40) return;
+    }
+    if(!best || g.theta < best.theta) best = {i, theta: g.theta};
+  });
+  return best ? best.i : null;
+}
+function newShot(){
+  picked = null;
+  if(!balls.cue || !balls.obj){ setStep('balls'); return; }
+  if(!manualPocket || target === null) target = autoPocket();
+  if(target === null){ setStep('pocket'); toast('No easy pocket from here. Tap one.'); return; }
+  setStep('call');
+}
+// Called after every scan: keep following the chosen object ball and the cue ball, and start a new shot
+// on its own once they've been moved and come to rest.
+function followBalls(){
+  if(!track || !table) return;
+  const vis = shown();
+  let ob = vis.includes(track.ref) ? track.ref : null;
+  if(!ob && track.label && track.label !== '?') ob = vis.find(b => b.label === track.label) || null;       // same number, back on the table
+  if(!ob){
+    // a ball that wasn't on the table before: that's the one you put back (colours can read differently in a new spot)
+    const fresh = vis.filter(b => !b.cue && !(track.others || []).some(o => v3.len(v3.sub(o, b.p)) < 0.06));
+    if(fresh.length === 1) ob = fresh[0];
+  }
+  if(!ob){ const others = vis.filter(b => !b.cue); if(others.length === 1) ob = others[0]; }            // only one ball besides the cue
+  if(ob){ track.ref = ob; if(ob.label !== '?') track.label = ob.label; track.others = vis.filter(b => b !== ob && !b.cue).map(b => b.p); }
+  const cue = vis.find(b => b.cue);
+  const obP = ob ? ob.p : null, cueP = cue ? cue.p : null;
+  if(!obP || !cueP) return;                             // a ball is off the table (pocketed, in your hand): wait
+  const moved = (a, b) => !a || !b || v3.len(v3.sub(a, b)) > 0.04;
+  if(step === 'balls' || step === 'pocket' || step === 'call' || step === 'reveal'){
+    const changed = moved(obP, balls.obj) || moved(cueP, balls.cue);
+    if(!changed){ settle = null; return; }
+    // moved: wait until they've been still for a moment
+    const now = performance.now();
+    if(!settle || moved(obP, settle.obj) || moved(cueP, settle.cue)){ settle = {since: now, obj: obP, cue: cueP}; return; }
+    if(now - settle.since < 900) return;
+    balls = {cue: cueP, obj: obP}; objLabel = track.label; settle = null; manualPocket = false; history.length = 0;
+    newShot();
+  }
 }
 function computeShot(){
   shot = (balls.cue && balls.obj && target !== null) ? shotGeometry(balls.cue, balls.obj, table.pockets[target].p, plane.n) : null;
@@ -506,11 +585,11 @@ function call(id){
 }
 $('realign').addEventListener('click', ()=>{ if(!table) return; if(step !== 'realign') resumeStep = step; setStep('realign'); });
 $('undo').addEventListener('click', ()=>{ const f = history.pop(); if(f) f(); });
-$('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; objLabel = ''; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
+$('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; objLabel = ''; track = null; manualPocket = false; settle = null; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
 $('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchors.forEach(a=>{ try{ a.delete(); }catch(e){} }); anchors = []; anchorAt = []; pin = m4identity(); unpin = m4identity(); nudge = [0,0,0];
-  balls = {cue:null, obj:null}; seen = []; camRowsDown = null; scanBusy = false; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
+  balls = {cue:null, obj:null}; track = null; manualPocket = false; settle = null; seen = []; camRowsDown = null; scanBusy = false; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
 
-if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; }, get seen(){ return seen; }, get rows(){ return camRowsDown; } };
+if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; }, get seen(){ return seen; }, get rows(){ return camRowsDown; }, get track(){ return track && {label: track.label, p: track.ref && track.ref.p}; }, get balls(){ return balls; }, get step(){ return step; }, get settle(){ return settle; } };
 let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
 
@@ -556,7 +635,7 @@ function draw(){
     const d = devicePixelRatio || 1;
     ctx.font = `600 ${13*d}px system-ui, sans-serif`; ctx.textAlign = 'center';
     for(const b of shown()){
-      const chosen = balls.obj && v3.len(v3.sub(b.p, balls.obj)) < 0.03;
+      const chosen = track ? b === track.ref : (balls.obj && v3.len(v3.sub(b.p, balls.obj)) < 0.03);
       const onCloth = v3.sub(b.p, v3.mul(plane.n, R));
       path3(ringOnCloth(onCloth, R*1.45), b.cue ? '#ffffff' : chosen ? '#ffd34d' : 'rgba(255,255,255,.75)', chosen || b.cue ? 3 : 2);
       const q = proj(v3.add(b.p, v3.mul(plane.n, R*2.2))); if(!q) continue;
