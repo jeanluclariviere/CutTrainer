@@ -850,16 +850,17 @@ function perspSVG(s, reveal, view){
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[s.P.t[0],s.P.t[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
-      const pts = stop ? [s.ob, stop] : [s.ob, add(s.ob, mul(pk.u2, s.L+3))];
+      const into = dot(sub(s.P.t, s.ob), pk.u2);   // lines end at the cushion, or in the pocket if it drops
+      const pts = stop ? [s.ob, stop] : [s.ob, pk.made ? add(s.ob, mul(pk.u2, into)) : rayToCushion(s.ob, pk.u2)];
       for(let k=0;k<pts.length-1;k++) o += `<path d="${segD(cam,[pts[k][0],pts[k][1],.03],[pts[k+1][0],pts[k+1][1],.03])}" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
       const gc = cam.toCam([pk.g2[0],pk.g2[1],R]);
       if(gc[2] > NEAR){ const [gx,gy] = cam.proj(gc); o += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="${(cam.focal*R/gc[2]).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.125" stroke-dasharray="4 3"/>`; }
     }
-    const e = add(s.gb, mul(s.v, 7));
+    const e = rayToCushion(s.gb, s.v, 7);
     if(!s.final) o += `<path d="${segD(cam,[s.cb[0],s.cb[1],R],[e[0],e[1],R])}" stroke="#fff" stroke-opacity=".85" stroke-width="1.2"/>`;   // after an animation the dotted trail replaces it
   }
   if(!reveal && s.place){
-    const e2 = add(s.place, mul(norm(sub(s.place, s.cb)), 6));
+    const e2 = rayToCushion(s.place, norm(sub(s.place, s.cb)), 6);
     o += `<path d="${segD(cam,[s.cb[0],s.cb[1],R],[e2[0],e2[1],R])}" stroke="#fff" stroke-opacity=".6" stroke-width="1.05"/>`;
   }
   // trails: where the balls have travelled (during the animation, and the cue ball's path afterwards)
