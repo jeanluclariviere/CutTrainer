@@ -76,13 +76,14 @@ a{color:var(--accent)}
     <div class="row">
       <button class="btn ghost small" id="undo">Undo</button>
       <button class="btn ghost small" id="newshot">New shot</button>
+      <button class="btn ghost small" id="realign">Re-align</button>
       <button class="btn ghost small" id="retable">Redo table</button>
     </div>
   </div>
 </div>
 
 <script type="module">
-import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, R, REFS} from './ar-core.js';
+import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, rigidFit, R, REFS} from './ar-core.js';
 
 const $ = id => document.getElementById(id);
 const DEBUG = new URLSearchParams(location.search).has('debug');
@@ -106,7 +107,7 @@ let cameraAccess = false;
 let step = 'scan';            // scan → table → balls → pocket → call → reveal
 let lastHit = null;           // latest surface under the screen centre {p, n, result}
 let plane = null;             // the cloth {p, n} (pinned coordinates)
-let anchor = null, anchorInit = null, pin = m4identity(), unpin = m4identity();
+let anchors = [], anchorAt = [], pin = m4identity(), unpin = m4identity();   // one anchor per tapped corner, and where each was pinned
 let corners = [];             // tapped corner pockets (pinned)
 let table = null;
 let balls = {cue: null, obj: null};   // pinned centres
@@ -168,11 +169,18 @@ function onFrame(t, frame){
     }
   }
   // follow the tracking system's corrections of where the table is
-  if(anchor && frame.trackedAnchors && frame.trackedAnchors.has(anchor)){
-    const ap = frame.getPose(anchor.anchorSpace, refSpace);
-    if(ap){
-      if(!anchorInit) anchorInit = m4inv(ap.transform.matrix);
-      pin = m4mul(ap.transform.matrix, anchorInit); unpin = m4inv(pin) || m4identity();
+  // The table is rigid and never moves: tracking corrections may only slide or turn it as a whole.
+  // Fit that from the three corner anchors, and ignore any update that would bend the table.
+  if(anchors.length === 3 && frame.trackedAnchors){
+    const now = [];
+    for(const a of anchors){
+      if(!frame.trackedAnchors.has(a)) break;
+      const ap = frame.getPose(a.anchorSpace, refSpace); if(!ap) break;
+      const m = ap.transform.matrix; now.push([m[12], m[13], m[14]]);
+    }
+    if(now.length === 3){
+      const fit = rigidFit(anchorAt, now, plane.n);
+      if(fit.residual < 0.03){ pin = fit.m; unpin = m4inv(pin) || m4identity(); }
     }
   }
   if(view.camera && binding) cameraAccess = true;
@@ -181,8 +189,9 @@ function onFrame(t, frame){
 }
 
 // pinned ↔ world
-const toWorld = p => { const q = m4point(pin, p); return [q[0],q[1],q[2]]; };
-const toPinned = p => { const q = m4point(unpin, p); return [q[0],q[1],q[2]]; };
+let nudge = [0,0,0];   // a manual correction (Re-align), in pinned coordinates
+const toWorld = p => { const q = m4point(pin, v3.add(p, nudge)); return [q[0],q[1],q[2]]; };
+const toPinned = p => { const q = m4point(unpin, p); return v3.sub([q[0],q[1],q[2]], nudge); };
 function pinnedRay(ndcX, ndcY){
   const r = rayFromNDC(lastView.proj, lastView.view, ndcX, ndcY); if(!r) return null;
   const o = toPinned(r.o), e = toPinned(v3.add(r.o, r.d));
@@ -193,7 +202,6 @@ function handleTap(tap, frame, view){
   if(step === 'scan'){
     if(!lastHit){ toast('Keep moving the phone over the cloth'); return; }
     plane = {p: lastHit.p, n: lastHit.n};
-    if(lastHit.result.createAnchor) lastHit.result.createAnchor().then(a=>{ anchor = a; }).catch(()=>{});
     setStep('table'); return;
   }
   if(step === 'table'){
@@ -203,6 +211,7 @@ function handleTap(tap, frame, view){
     corners.push(p);
     if(corners.length === 3){
       table = tableFrom3(corners[0], corners[1], corners[2], plane.n);
+      pinCorners(frame);
       const g = guessTable(table.len, table.wid);
       toast(`Table ${table.len.toFixed(2)} × ${table.wid.toFixed(2)} m · looks like a ${g.name}`);
       setStep('balls');
@@ -223,6 +232,13 @@ function handleTap(tap, frame, view){
     if(balls.cue && balls.obj) setStep(target === null ? 'pocket' : 'call'); else setStep('balls');
     return;
   }
+  if(step === 'realign'){
+    const p = rayPlane(pinnedRay(tap.x, tap.y), plane, 0); if(!p) return;
+    let best = null, bd = Infinity;
+    table.pockets.forEach(pk=>{ const d = v3.len(v3.sub(pk.p, p)); if(d < bd){ bd = d; best = pk; } });
+    const d = v3.sub(p, best.p); nudge = v3.add(nudge, v3.sub(d, v3.mul(plane.n, v3.dot(d, plane.n))));
+    toast('Re-aligned'); setStep(resumeStep || 'balls'); return;
+  }
   if(step === 'pocket'){
     const p = rayPlane(pinnedRay(tap.x, tap.y), plane, 0); if(!p) return;
     let best = -1, bd = Infinity;
@@ -233,6 +249,14 @@ function handleTap(tap, frame, view){
   }
 }
 
+// Pin the table: a free-standing anchor at each tapped corner (not tied to a detected surface, which ARCore keeps reshaping).
+function pinCorners(frame){
+  if(!frame.createAnchor || typeof XRRigidTransform === 'undefined') return;
+  const pts = corners.map(toWorld);
+  Promise.all(pts.map(p => frame.createAnchor(new XRRigidTransform({x:p[0], y:p[1], z:p[2], w:1}), refSpace)))
+    .then(list => { anchors = list; anchorAt = corners.map(c=>c.slice()); })     // their positions in pinned coordinates
+    .catch(()=>{ anchors = []; });
+}
 // Find the ball under a tap: read the camera picture, look for a ball-sized blob that isn't cloth, and use its centre.
 function findBall(tap, frame, view){
   const ray = pinnedRay(tap.x, tap.y);
@@ -298,15 +322,17 @@ const STEP_TEXT = {
   pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
   call: 'How full do you hit it?',
   reveal: 'Move the balls and tap them again, or tap New shot.',
+  realign: 'Tap the <b>middle of any pocket</b> to snap the table back onto it.',
 };
-const STEP_N = {scan:0, table:1, balls:2, pocket:3, call:4, reveal:4};
+const STEP_N = {scan:0, table:1, balls:2, pocket:3, call:4, reveal:4, realign:4};
+let resumeStep = null;
 function setStep(s){
   step = s;
   const t = STEP_TEXT[s]; $('status').innerHTML = typeof t === 'function' ? t() : t;
   [...$('steps').children].forEach((el,i)=>el.classList.toggle('done', i < STEP_N[s]));
   $('answers').classList.toggle('on', s === 'call' || s === 'reveal');
   $('readout').classList.toggle('on', s === 'reveal');
-  $('newshot').disabled = !table; $('retable').disabled = step === 'scan';
+  $('newshot').disabled = !table; $('realign').disabled = !table; $('retable').disabled = step === 'scan';
   if(s === 'call'){ renderAnswers(); computeShot(); }
 }
 function computeShot(){
@@ -328,11 +354,13 @@ function call(id){
   setStep('reveal');
   navigator.vibrate && navigator.vibrate(ok ? 15 : [20, 40, 20]);
 }
+$('realign').addEventListener('click', ()=>{ if(!table) return; if(step !== 'realign') resumeStep = step; setStep('realign'); });
 $('undo').addEventListener('click', ()=>{ const f = history.pop(); if(f) f(); });
 $('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
-$('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchor = null; anchorInit = null; pin = m4identity(); unpin = m4identity();
+$('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchors.forEach(a=>{ try{ a.delete(); }catch(e){} }); anchors = []; anchorAt = []; pin = m4identity(); unpin = m4identity(); nudge = [0,0,0];
   balls = {cue:null, obj:null}; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
 
+if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; } };
 let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
 

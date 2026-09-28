@@ -177,3 +177,31 @@ export function detectBall(img, w, h, sx, sy, rExp){
   return {x: cx, y: cy, fill, seedHit, white: neutral && ml > Math.max(0.5, cloth.l*1.4),
     score: (seedHit ? 1 : 0.6) * (1 - Math.min(1, Math.abs(fill - 0.85)))};
 }
+
+// ---------- keeping the pinned table rigid ----------
+// The table never moves, so tracking corrections may only slide it and turn it about the vertical, never bend it.
+// Fit that rigid move from where the corner anchors were pinned (a) to where tracking says they are now (b).
+export function rotationAbout(n, ang){
+  const [x,y,z] = n, c = Math.cos(ang), s = Math.sin(ang), t = 1 - c;
+  return [t*x*x+c, t*x*y-s*z, t*x*z+s*y,  t*x*y+s*z, t*y*y+c, t*y*z-s*x,  t*x*z-s*y, t*y*z+s*x, t*z*z+c];   // row-major 3x3
+}
+export function rigidFit(a, b, n){
+  const k = a.length, ca = [0,0,0], cb = [0,0,0];
+  for(let i=0;i<k;i++){ for(let j=0;j<3;j++){ ca[j] += a[i][j]/k; cb[j] += b[i][j]/k; } }
+  const ex = v3.norm(Math.abs(n[0]) < 0.9 ? v3.cross(n, [1,0,0]) : v3.cross(n, [0,1,0])), ey = v3.cross(n, ex);
+  let sc = 0, ss = 0;
+  for(let i=0;i<k;i++){
+    const pa = v3.sub(a[i], ca), pb = v3.sub(b[i], cb);
+    const ax = v3.dot(pa, ex), ay = v3.dot(pa, ey), bx = v3.dot(pb, ex), by = v3.dot(pb, ey);
+    sc += ax*bx + ay*by; ss += ax*by - ay*bx;
+  }
+  const ang = Math.atan2(ss, sc);
+  // rotation that turns ex toward ey is +ang about n (n = ex × ey)
+  const Rm = rotationAbout(n, ang);
+  const rot = p => [Rm[0]*p[0]+Rm[1]*p[1]+Rm[2]*p[2], Rm[3]*p[0]+Rm[4]*p[1]+Rm[5]*p[2], Rm[6]*p[0]+Rm[7]*p[1]+Rm[8]*p[2]];
+  const t = v3.sub(cb, rot(ca));
+  const m = new Float32Array([Rm[0],Rm[3],Rm[6],0, Rm[1],Rm[4],Rm[7],0, Rm[2],Rm[5],Rm[8],0, t[0],t[1],t[2],1]);
+  let residual = 0;
+  for(let i=0;i<k;i++) residual = Math.max(residual, v3.len(v3.sub(v3.add(rot(a[i]), t), b[i])));
+  return {m, residual, angle: ang, shift: v3.len(t)};
+}
