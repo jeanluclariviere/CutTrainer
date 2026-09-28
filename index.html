@@ -40,6 +40,7 @@
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
 .wrap{max-width:1680px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.livelink{font:600 14px var(--body);color:var(--accent-ink);background:var(--accent);text-decoration:none;padding:8px 14px;border-radius:999px;white-space:nowrap}
 h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;letter-spacing:.01em;margin:0;text-wrap:balance}
 .sub{color:var(--muted);margin:4px 0 0;max-width:60ch}
 .seg{display:inline-flex;background:var(--chip);border-radius:8px;padding:3px;gap:3px;flex-wrap:wrap}
@@ -246,6 +247,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <h1>Cut Trainer</h1>
       <p class="sub">Read the layout and aim for the ringed pocket.</p>
     </div>
+    <a class="livelink" href="ar.html" id="livelink" hidden>Live AR ›</a>
   </header>
 
 
@@ -1684,6 +1686,8 @@ try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persis
 </script>
 <script>
 // Installable app: works offline and keeps its storage (scores, settings) like an app would.
+// the Live AR link only shows where the page is hosted on its own (not inside the claude.ai preview)
+if (location.protocol === 'https:' && window.top === window) document.getElementById('livelink').hidden = false;
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
