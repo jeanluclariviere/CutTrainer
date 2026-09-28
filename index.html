@@ -879,8 +879,10 @@ function perspSVG(s, reveal, view){
   const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
   o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
 
-  if(reveal){
+  // the correct path to the pocket appears at contact, together with the ghost ball and the trails
+  if(reveal || (s.anim && s.anim.trail.ob))
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[s.P.t[0],s.P.t[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
+  if(reveal){
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
       const into = dot(sub(s.P.t, s.ob), pk.u2);   // lines end at the cushion, or in the pocket if it drops
