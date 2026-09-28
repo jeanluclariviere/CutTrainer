@@ -1182,10 +1182,12 @@ function startSession(size){
 // Ending early asks: save what you've played (it counts like a finished session) or discard it (its shots are removed too).
 function endSession(){
   const a = stats.active; if(!a) return;
-  if(!a.n){ discardSession(); return; }                 // nothing played yet: nothing to decide
   if(anim) finishAnim();
   endFlash();
-  $('endsub').textContent = `${a.n} of ${a.size} shots · ${pct(a.right, a.n)}% called right`;
+  // no shots yet: there's nothing to save, so it's just End or Keep playing
+  $('endsave').hidden = !a.n;
+  $('enddiscard').textContent = a.n ? 'Discard' : 'End';
+  $('endsub').textContent = a.n ? `${a.n} of ${a.size} shots · ${pct(a.right, a.n)}% called right` : `No shots taken yet.`;
   $('endcover').hidden = false;
 }
 function closeEndPrompt(){ $('endcover').hidden = true; if(settings.task==='flash' && !answered && stats.active) startFlash(); }
