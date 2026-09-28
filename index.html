@@ -95,17 +95,35 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .fpseg button[aria-pressed="true"]{background:rgba(255,255,255,.92);color:#15222b}
 .sumdone{font:600 15px var(--body);background:transparent;color:#e6eef3;border:1.5px solid #6f8797;border-radius:10px;padding:10px 22px;cursor:pointer}
 .sesslist{display:flex;flex-direction:column;gap:4px;font-size:13px}
-.sesslist .srow{display:grid;grid-template-columns:1fr auto auto;gap:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sesslist .srow{display:grid;grid-template-columns:1fr auto;gap:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .sesslist .srow b{color:var(--ink);font-weight:600}
 .mblock{display:flex;flex-direction:column;gap:6px}
 .mblock h2{margin:0}
 .byfrac .row.thin{opacity:.5}
 .row .lab.wide{font:500 13px var(--body);color:var(--ink)}
-.byfrac.bins .row{grid-template-columns:64px 1fr 64px}
+.byfrac.bins .row{grid-template-columns:64px 1fr 76px}
 .form{display:flex;align-items:flex-end;gap:4px;height:64px;border-bottom:1px solid var(--line);background:linear-gradient(to top,transparent calc(50% - .5px),var(--line) calc(50% - .5px),var(--line) calc(50% + .5px),transparent calc(50% + .5px))}
 .form i{flex:1;max-width:28px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
 .form i.thin{opacity:.5}
+.stathead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stathead h2{margin:0}
+.subtabs button{padding:5px 12px}
+.subpanel{display:flex;flex-direction:column;gap:16px}
+.subpanel[hidden]{display:none}
 .form .empty{color:var(--muted);font-size:13px;align-self:center}
+/* accuracy-over-time chart: one dot per finished session */
+.trend{position:relative;height:150px;margin:6px 0 18px 34px;touch-action:pan-y}
+.trend .grid{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.trend .grid.base{border-top-color:color-mix(in srgb,var(--muted) 45%,transparent)}
+.trend .ylab{position:absolute;left:-34px;width:28px;text-align:right;transform:translateY(-50%);font:500 11px var(--mono);color:var(--muted)}
+.trend .xlab{position:absolute;top:calc(100% + 4px);font-size:11px;color:var(--muted);white-space:nowrap}
+.trend svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.trend .dot{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}
+.trend .dot.on{width:12px;height:12px;margin:-6px 0 0 -6px}
+.trend .xhair{position:absolute;top:0;bottom:0;border-left:1px dashed var(--muted);opacity:.6;pointer-events:none}
+.trend .tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--ink);color:var(--bg);font-size:12px;line-height:1.3;padding:5px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:2}
+.trend .tip b{font-size:13px}
+.trend .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center}
 .tabpanel .pgrid{grid-template-columns:1fr;gap:18px}
 .tabpanel .options{gap:12px 18px}
 .quick .ql{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
@@ -172,18 +190,19 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .stat b{display:block;font-family:var(--display);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
 .stat span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .byfrac{display:flex;flex-direction:column;gap:6px}
-.row{display:grid;grid-template-columns:38px 1fr 64px;gap:10px;align-items:center;font-size:13px}
+.row{display:grid;grid-template-columns:38px 1fr 76px;gap:10px;align-items:center;font-size:13px}
 .row .lab{font-family:var(--display);font-weight:700;font-size:18px}
 .bar{height:8px;background:var(--chip);border-radius:4px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
-.row .n,.lean .n{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.row .n,.lean .n{white-space:nowrap;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
 h3{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 4px;line-height:1.1}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .link{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .patterns{border-top:1px solid var(--line);padding-top:18px;display:flex;flex-direction:column;gap:14px}
-.insights{display:grid;grid-template-columns:1fr auto;margin:0;border-top:1px solid var(--line)}
-.insights dt,.insights dd{padding:9px 0;border-bottom:1px solid var(--line);margin:0}
+.insights{margin:0;border-top:1px solid var(--line)}
+.insights .irow{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.insights dt,.insights dd{margin:0}
 .insights dt{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);align-self:center}
 .insights dd{text-align:right;font:600 15px var(--body);font-variant-numeric:tabular-nums}
 .insights dd small{font-weight:400;font-size:12.5px;color:var(--muted);margin-left:6px}
@@ -317,58 +336,74 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-shot"><div class="result" id="result"></div></div>
       <div class="tabpanel" role="tabpanel" id="tab-stats" hidden>
-      <h2 id="scoremode">Normal mode</h2>
-      <div class="stats">
-        <div class="stat"><b id="s-acc">–</b><span id="s-l1">Called right</span></div>
-        <div class="stat" title="Called right over your last 20 shots in this mode"><b id="s-made">–</b><span>Last 20</span></div>
-        <div class="stat"><b id="s-streak">0</b><span>Streak</span></div>
-        <div class="stat"><b id="s-n">0</b><span>Shots</span></div>
-      </div>
-      <div class="mblock">
-        <h2>Patterns</h2>
-        <dl class="insights" id="insight"></dl>
-        <p class="cap" id="insightcap" hidden></p>
-      </div>
-      <div class="mblock">
-        <h2 id="byfrac-h">Called right, by real fraction</h2>
-        <div class="byfrac" id="byfrac"></div>
-      </div>
-      <div class="mblock">
-        <h2>Recent form</h2>
-        <div class="form" id="form"></div>
-        <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
-      </div>
-      <div class="mblock" id="sesshist">
-        <h2>Sessions</h2>
-        <div class="form" id="sessform"></div>
-        <p class="cap" id="sesscap"></p>
-        <div class="sesslist" id="sesslist"></div>
-      </div>
-      <div class="mblock">
-        <h2>By distance, cue ball to object ball</h2>
-        <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
-        <div class="byfrac" id="bin-dc"></div>
-      </div>
-      <div class="mblock">
-        <h2>By pocket</h2>
-        <div class="byfrac" id="bin-pt"></div>
-      </div>
-      <div class="mblock">
-        <h2>Walk-around</h2>
-        <div class="byfrac" id="bin-wk"></div>
-      </div>
-      <div class="pgrid">
-        <div id="confbox">
-          <h2>Real fraction vs. your call</h2>
-          <div class="grid-wrap"><table class="conf" id="conf"></table></div>
-        </div>
-        <div>
-          <h2>Where you lean</h2>
-          <div class="legend"><span></span><div><span>← too full</span><span>too thin →</span></div><span></span></div>
-          <div class="leans" id="leans"></div>
+      <div class="stathead">
+        <h2 id="scoremode">Normal mode</h2>
+        <div class="seg subtabs" role="tablist" aria-label="Stats sections">
+          <button data-sub="overview" role="tab">Overview</button>
+          <button data-sub="fractions" role="tab">Fractions</button>
+          <button data-sub="details" role="tab">Details</button>
         </div>
       </div>
-      <p class="cap" id="bincap"></p>
+      <div class="subpanel" data-sub="overview">
+        <div class="stats">
+          <div class="stat"><b id="s-acc">–</b><span id="s-l1">Called right</span></div>
+          <div class="stat" title="Called right over your last 20 shots in this mode"><b id="s-made">–</b><span>Last 20</span></div>
+          <div class="stat"><b id="s-streak">0</b><span>Streak</span></div>
+          <div class="stat"><b id="s-n">0</b><span>Shots</span></div>
+        </div>
+        <div class="mblock" id="sesshist">
+          <h2>Accuracy over time</h2>
+          <div class="trend" id="trend"></div>
+          <p class="cap" id="sesscap"></p>
+        </div>
+        <div class="mblock">
+          <h2>Patterns</h2>
+          <dl class="insights" id="insight"></dl>
+          <p class="cap" id="insightcap" hidden></p>
+        </div>
+      </div>
+      <div class="subpanel" data-sub="fractions">
+        <div class="mblock">
+          <h2 id="byfrac-h">Called right, by real fraction</h2>
+          <div class="byfrac" id="byfrac"></div>
+        </div>
+        <div class="pgrid">
+          <div id="confbox">
+            <h2>Real fraction vs. your call</h2>
+            <div class="grid-wrap"><table class="conf" id="conf"></table></div>
+          </div>
+          <div>
+            <h2>Where you lean</h2>
+            <div class="legend"><span></span><div><span>← too full</span><span>too thin →</span></div><span></span></div>
+            <div class="leans" id="leans"></div>
+          </div>
+        </div>
+      </div>
+      <div class="subpanel" data-sub="details">
+        <div class="mblock">
+          <h2>Recent form</h2>
+          <div class="form" id="form"></div>
+          <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
+        </div>
+        <div class="mblock">
+          <h2>By distance, cue ball to object ball</h2>
+          <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
+          <div class="byfrac" id="bin-dc"></div>
+        </div>
+        <div class="mblock">
+          <h2>By pocket</h2>
+          <div class="byfrac" id="bin-pt"></div>
+        </div>
+        <div class="mblock">
+          <h2>Walk-around</h2>
+          <div class="byfrac" id="bin-wk"></div>
+        </div>
+        <p class="cap" id="bincap"></p>
+        <div class="mblock">
+          <h2>Recent sessions</h2>
+          <div class="sesslist" id="sesslist"></div>
+        </div>
+      </div>
       <div class="foot"><span>Each mode keeps its own score. Best streak: <b id="s-best">0</b></span><button class="link" id="reset">Reset this mode</button></div>
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-settings" hidden>
@@ -1172,15 +1207,39 @@ function showSummary(rec){
 }
 function renderSessionHistory(){
   const S = (stats.sessions || []).filter(x=>x.task===settings.task);
-  const last = S.slice(-12);
-  $('sessform').innerHTML = last.length
-    ? last.map(x=>`<i style="height:${Math.max(3,pct(x.right,x.n))}%" title="${new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${x.size} shots · ${pct(x.right,x.n)}%"></i>`).join('')
-    : `<span class="empty">No finished sessions yet.</span>`;
+  const el = $('trend');
+  const fmt = x => new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  let h = [0,50,100].map(v=>`<div class="grid${v===0?' base':''}" style="top:${100-v}%"></div><span class="ylab" style="top:${100-v}%">${v}%</span>`).join('');
+  if(S.length < 2){
+    el.innerHTML = h + `<div class="empty">${S.length ? 'One more finished session and your trend shows up here.' : 'Finish a session and your trend shows up here.'}</div>`;
+  } else {
+    const pts = S.map((x,i)=>({x: S.length===1 ? 50 : i/(S.length-1)*100, y: pct(x.right,x.n), s:x}));
+    h += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map(p=>`${p.x.toFixed(2)},${(100-p.y).toFixed(2)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+    h += pts.map((p,i)=>`<span class="dot" data-i="${i}" style="left:${p.x}%;top:${100-p.y}%"></span>`).join('');
+    h += `<span class="xlab" style="left:0">${fmt(S[0])}</span><span class="xlab" style="right:0">${fmt(S[S.length-1])}</span>`;
+    el.innerHTML = h;
+    el._pts = pts;
+  }
   const best = {};
   S.forEach(x=>{ const p = pct(x.right,x.n); if(!best[x.size] || p > best[x.size]) best[x.size] = p; });
-  $('sesscap').textContent = last.length ? 'Each bar is one finished session, newest on the right. The line marks 50%.' + (Object.keys(best).length ? ' Best: ' + Object.entries(best).map(([k,v])=>`${v}% (${k})`).join(', ') + '.' : '') : '';
-  $('sesslist').innerHTML = S.slice(-8).reverse().map(x=>`<div class="srow"><span>${new Date(x.end).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${x.size} shots</span><b>${pct(x.right,x.n)}%</b><span>${pct(x.made,x.n)}% pocketed</span></div>`).join('');
+  $('sesscap').textContent = S.length ? `Each dot is a finished session, ${S.length} so far. ` + (Object.keys(best).length ? 'Best: ' + Object.entries(best).map(([k,v])=>`${v}% (${k} shots)`).join(', ') + '.' : '') : '';
+  $('sesslist').innerHTML = S.slice(-8).reverse().map(x=>`<div class="srow"><span>${new Date(x.end).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${x.size} shots</span><b>${pct(x.right,x.n)}%</b></div>`).join('') || `<span class="cap" style="margin:0">No finished sessions yet.</span>`;
 }
+// hover / touch: crosshair on the nearest session, with its date, length and score
+(function(){
+  const el = document.getElementById('trend');
+  const clear = ()=>{ el.querySelectorAll('.xhair,.tip').forEach(n=>n.remove()); el.querySelectorAll('.dot.on').forEach(d=>d.classList.remove('on')); };
+  el.addEventListener('pointermove', ev=>{
+    const pts = el._pts; if(!pts || !pts.length) return;
+    const r = el.getBoundingClientRect(), fx = (ev.clientX - r.left)/r.width*100;
+    let best = 0; pts.forEach((p,i)=>{ if(Math.abs(p.x-fx) < Math.abs(pts[best].x-fx)) best = i; });
+    const p = pts[best]; clear();
+    el.querySelector(`.dot[data-i="${best}"]`)?.classList.add('on');
+    const x = p.s, d = new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    el.insertAdjacentHTML('beforeend', `<div class="xhair" style="left:${p.x}%"></div><div class="tip" style="left:${Math.min(85,Math.max(15,p.x))}%;top:${100-p.y}%"><b>${p.y}%</b> · ${d} · ${x.size} shots</div>`);
+  });
+  el.addEventListener('pointerleave', clear);
+})();
 
 function answer(id){
   if(answered || !shot || isPlace() || !$('sessidlecover').hidden) return;
@@ -1472,7 +1531,7 @@ function renderPatterns(){
     : dash)]);
   rows.push(['Distance', ...(found.dist || dash)]);
   rows.push(['Trend', ...(found.trend || dash)]);
-  $('insight').innerHTML = rows.map(([k,v,t])=>`<dt>${k}</dt><dd class="${t}">${v}</dd>`).join('');
+  $('insight').innerHTML = rows.map(([k,v,t])=>`<div class="irow"><dt>${k}</dt><dd class="${t}">${v}</dd></div>`).join('');
   const cap = $('insightcap');
   cap.hidden = all.n >= 10;
   cap.textContent = all.n ? `${10-all.n} more shots in this mode before patterns mean much.` : 'Play a few shots in this mode and your patterns fill in here.';
@@ -1620,6 +1679,13 @@ function showTab(t){
   settings.tab = t; saveSettings();
 }
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click', ()=>showTab(b.dataset.tab)));
+function showSub(t){
+  document.querySelectorAll('.subtabs button').forEach(b=>{ b.setAttribute('aria-pressed', b.dataset.sub===t); b.setAttribute('aria-selected', b.dataset.sub===t); });
+  document.querySelectorAll('.subpanel').forEach(p=>p.hidden = p.dataset.sub!==t);
+  settings.sub = t; saveSettings();
+}
+document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('click', ()=>showSub(b.dataset.sub)));
+showSub(['overview','fractions','details'].includes(settings.sub) ? settings.sub : 'overview');
 showTab(settings.tab==='misses' ? 'stats' : ['shot','stats','settings'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
 $('reset').addEventListener('click', ()=>{ stats.log = stats.log.filter(e=>taskOf(e)!==settings.task); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==settings.task); if(stats.active && stats.active.task===settings.task) stats.active = null; save(); renderStats(); });
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
