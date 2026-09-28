@@ -157,6 +157,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .result{min-height:0}
 .result svg{width:100%;max-width:440px;height:auto;margin:0 auto;display:block}
 
+.replay[hidden]{display:none}
 .replay{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font:600 14px var(--body);letter-spacing:0;background:transparent;color:#ffd34d;border:1.5px solid #ffd34d;border-radius:999px;padding:7px 16px;cursor:pointer}
 .startbtn{font:700 24px var(--display);letter-spacing:.04em;background:#ffd34d;color:#10283d;border:0;border-radius:10px;padding:10px 34px;cursor:pointer}
 .flashtrack{height:4px;margin-top:6px;border-radius:2px;overflow:hidden}
@@ -292,7 +293,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="tablecol">
       <div class="table-box">
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
-        <div class="cover" id="cover" hidden>Call it<small>What fraction was that?</small><button class="replay" id="replay" aria-label="Replay the shot"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.6 4.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4.2 4.5v5.2h5.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Replay</button></div>
+        <div class="cover" id="cover" hidden>Call it<small>What fraction was that?</small><button class="replay" id="replay" aria-label="Replay the shot"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.6 4.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4.2 4.5v5.2h5.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">Replay</span></button></div>
         <div class="cover sumcover" id="sesscover" hidden>
           <div class="sumcard">
             <small id="sumhead"></small>
@@ -1033,7 +1034,7 @@ function startFlash(){
   const ms = +settings.flash || 1500;
   bar.style.setProperty('--dur', ms+'ms');
   bar.style.animation = 'none'; bar.hidden = false; void bar.offsetWidth; bar.style.animation = '';
-  flashTimer = setTimeout(()=>{ bar.hidden = true; if(!answered) cov.hidden = false; }, ms);
+  flashTimer = setTimeout(()=>{ bar.hidden = true; if(!answered){ syncReplay(); cov.hidden = false; } }, ms);
 }
 function endFlash(){ clearTimeout(flashTimer); $('cover').hidden = true; $('flashbar').hidden = true; }
 
@@ -1714,7 +1715,14 @@ svgEl.addEventListener('pointerup', walkRelease);
 svgEl.addEventListener('pointercancel', walkRelease);
 tableBox.addEventListener('click', ()=>{ if(anim){ finishAnim(); return; } if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) deal(); });
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
-function replay(){ if(!shot || answered || settings.task!=='flash') return; shot.replays = (shot.replays||0)+1; startFlash(); }
+const MAX_REPLAYS = 5;   // per Flash session
+function replaysLeft(){ const a = stats.active; return a && a.task==='flash' ? Math.max(0, MAX_REPLAYS - (a.replays||0)) : 0; }
+function syncReplay(){ const n = replaysLeft(); $('replay').hidden = n <= 0; $('replaytext').textContent = `Replay · ${n} left`; }
+function replay(){
+  if(!shot || answered || settings.task!=='flash' || replaysLeft() <= 0) return;
+  shot.replays = (shot.replays||0)+1; stats.active.replays = (stats.active.replays||0) + 1; save();
+  syncReplay(); startFlash();
+}
 $('replay').addEventListener('click', e=>{ e.stopPropagation(); replay(); });
 // Desktop: the table fills the column down to the bottom of the window; the drawing matches the box shape.
 const mqDesk = matchMedia('(min-width: 900px)');
