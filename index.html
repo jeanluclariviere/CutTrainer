@@ -106,7 +106,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .form{display:flex;align-items:flex-end;gap:4px;height:64px;border-bottom:1px solid var(--line);background:linear-gradient(to top,transparent calc(50% - .5px),var(--line) calc(50% - .5px),var(--line) calc(50% + .5px),transparent calc(50% + .5px))}
 .form i{flex:1;max-width:28px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
 .form i.thin{opacity:.5}
-.stathead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stathead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:3;background:var(--bg);padding:8px 0;margin:-8px 0 0;border-bottom:1px solid var(--line)}
 .stathead h2{margin:0}
 .subtabs button{padding:5px 12px}
 .subpanel{display:flex;flex-direction:column;gap:16px}
@@ -189,6 +189,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .answers button{position:relative}
 /* keyboard hints: small keycaps, only on devices with a mouse/trackpad (so, a keyboard) */
 .key{display:none}
+@media (hover:hover) and (pointer:fine){.touchonly{display:none}}
 @media (hover:hover) and (pointer:fine){
   .key{display:inline-block;font:600 10px/1 var(--mono);color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:2px 4px;background:var(--bg)}
   .answers .key{margin-bottom:2px}
@@ -284,7 +285,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   <header>
     <div>
       <h1>Cut Trainer</h1>
-      <p class="sub">Read the layout and aim for the ringed pocket.</p>
     </div>
     <a class="livelink" href="ar.html" id="livelink" hidden>Live AR ›</a>
   </header>
@@ -294,7 +294,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="tablecol">
       <div class="table-box">
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
-        <div class="cover" id="cover" hidden>Call it<small>What fraction was that?</small><button class="replay" id="replay" aria-label="Replay the shot"><svg class="replayicon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.5 13.5a8.5 8.5 0 1 0 2.4-7.4L3 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3.5V9h5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">5 left</span></button></div>
+        <div class="cover" id="cover" hidden>Call it<button class="replay" id="replay" aria-label="Replay the shot"><svg class="replayicon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.5 13.5a8.5 8.5 0 1 0 2.4-7.4L3 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3.5V9h5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">5 left</span></button></div>
         <div class="cover sumcover" id="sesscover" hidden>
           <div class="sumcard">
             <small id="sumhead"></small>
@@ -377,12 +377,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="mblock" id="sesshist">
           <h2>Accuracy over time</h2>
           <div class="trend" id="trend"></div>
-          <p class="cap" id="sesscap"></p>
         </div>
         <div class="mblock">
           <h2>Patterns</h2>
           <dl class="insights" id="insight"></dl>
-          <p class="cap" id="insightcap" hidden></p>
         </div>
       </div>
       <div class="subpanel" data-sub="fractions">
@@ -405,7 +403,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="subpanel" data-sub="details">
         <div class="mblock">
           <h2>By distance, cue ball to object ball</h2>
-          <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
           <div class="byfrac" id="bin-dc"></div>
         </div>
         <div class="mblock">
@@ -416,7 +413,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <h2>Walk-around</h2>
           <div class="byfrac" id="bin-wk"></div>
         </div>
-        <p class="cap" id="bincap"></p>
         <div class="mblock">
           <h2>Recent sessions</h2>
           <div class="sesslist" id="sesslist"></div>
@@ -1052,7 +1048,7 @@ function deal(){
   answered = false;
   draw(false);
   document.querySelectorAll('#answers button').forEach(b=>{b.disabled=false;b.className='';});
-  $('result').innerHTML = `<p class="placeholder">The overlap from behind the cue ball appears here after you answer.</p>`;
+  $('result').innerHTML = '';
   $('quick').innerHTML = `<div class="ql hint">${isPlace() ? PLACE_HINT : PLACEHOLDER}</div>`;
   tableBox.classList.remove('tappable');
   tableBox.classList.toggle('placing', isPlace());
@@ -1255,7 +1251,7 @@ function renderSessionHistory(){
   const fmt = x => new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   let h = [0,50,100].map(v=>`<div class="grid${v===0?' base':''}" style="top:${100-v}%"></div><span class="ylab" style="top:${100-v}%">${v}%</span>`).join('');
   if(S.length < 2){
-    el.innerHTML = h + `<div class="empty">${S.length ? 'One more finished session and your trend shows up here.' : 'Finish a session and your trend shows up here.'}</div>`;
+    el.innerHTML = h + `<div class="empty">${S.length ? 'One session so far' : 'No sessions yet'}</div>`;
   } else {
     const pts = S.map((x,i)=>({x: S.length===1 ? 50 : i/(S.length-1)*100, y: pct(x.right,x.n), s:x}));
     h += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map(p=>`${p.x.toFixed(2)},${(100-p.y).toFixed(2)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
@@ -1264,9 +1260,6 @@ function renderSessionHistory(){
     el.innerHTML = h;
     el._pts = pts;
   }
-  const best = {};
-  S.forEach(x=>{ const p = pct(x.right,x.n); if(!best[x.size] || p > best[x.size]) best[x.size] = p; });
-  $('sesscap').textContent = S.length ? `Each dot is a finished session, ${S.length} so far. ` + (Object.keys(best).length ? 'Best: ' + Object.entries(best).map(([k,v])=>`${v}% (${k} shots)`).join(', ') + '.' : '') : '';
   $('sesslist').innerHTML = S.slice(-8).reverse().map(x=>`<div class="srow"><span>${new Date(x.end).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${x.size} shots</span><b>${pct(x.right,x.n)}%</b></div>`).join('') || `<span class="cap" style="margin:0">No finished sessions yet.</span>`;
 }
 // hover / touch: crosshair on the nearest session, with its date, length and score
@@ -1308,7 +1301,7 @@ function answer(id){
     if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
     if(jumpingAhead){ sessionTick(ok, counted); return; }   // going straight to the next shot: just count it, draw nothing
     draw(true);
-    $('quick').innerHTML = quickHTML + `<div class="ql tap">${settings.ghost==='1' ? 'Ghost ball on: practice shot, not scored. ' : ''}Tap the table for the next shot</div>`;
+    $('quick').innerHTML = quickHTML + `<div class="ql tap">${settings.ghost==='1' ? 'Ghost ball on: practice shot, not scored. ' : ''}<span class="touchonly">Tap the table for the next shot</span></div>`;
     finishRound();
     sessionTick(ok, counted);
   };
@@ -1330,7 +1323,7 @@ function answer(id){
     + `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`
     + (tip ? `<div class="ql"><span class="tipq">Hit it a touch ${adjust}</span><span>A pure ${lbl(picked)} misses ${Math.abs(oc.lat).toFixed(1)}″</span></div>` : '');
   // the verdict lands on the call, not after the animation: sound, result, button colours, streak
-  $('quick').innerHTML = quickHTML + `<div class="ql tap">Tap the table to skip</div>`;
+  $('quick').innerHTML = quickHTML;
   document.querySelectorAll('#answers button').forEach(b=>{
     if(b.dataset.id===shot.answer.id) b.className='right';
     else if(b.dataset.id===id) b.className='wrong';
@@ -1589,9 +1582,6 @@ function renderPatterns(){
   rows.push(['Distance', ...(found.dist || dash)]);
   rows.push(['Trend', ...(found.trend || dash)]);
   $('insight').innerHTML = rows.map(([k,v,t])=>`<div class="irow"><dt>${k}</dt><dd class="${t}">${v}</dd></div>`).join('');
-  const cap = $('insightcap');
-  cap.hidden = all.n >= 10;
-  cap.textContent = all.n ? `${10-all.n} more shots in this mode before patterns mean much.` : 'Play a few shots in this mode and your patterns fill in here.';
 }
 
 // ---------- breakdowns: distance, angle, pocket, recent form ----------
@@ -1616,9 +1606,6 @@ function renderBreakdowns(log){
   binRows('bin-dc', dc);
   binRows('bin-wk', [{label:'Walked', ...stat(log.filter(e=>e.wk===1))}, {label:'Didn’t', ...stat(log.filter(e=>e.wk===0))}]);
   binRows('bin-pt', [{label:'Corner', ...stat(withDist.filter(e=>e.pt==='c'))}, {label:'Side', ...stat(withDist.filter(e=>e.pt==='s'))}]);
-  $('bincap').textContent = withDist.length < log.length
-    ? `Distance and pocket breakdowns count ${withDist.length} of your ${log.length} shots; older shots didn’t record them. Faded rows have fewer than 5 shots.`
-    : 'Faded rows have fewer than 5 shots.';
   // blocks of 10 shots (last 120), used for the Trend line in Patterns
   const blocks = [];
   for(let i = Math.max(0, log.length - 120); i < log.length; i += 10){ const b = log.slice(i, i+10); blocks.push({from:i+1, to:i+b.length, ...stat(b)}); }
