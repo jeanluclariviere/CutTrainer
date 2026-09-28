@@ -183,6 +183,15 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .detail{margin:6px 0 0;color:var(--muted);font-size:14px}
 .detail b{color:var(--ink);font-family:var(--mono);font-weight:500}
 .placeholder{color:var(--muted);font-size:14px;grid-column:1/-1;margin:0}
+.answers button{position:relative}
+/* keyboard hints: small keycaps, only on devices with a mouse/trackpad (so, a keyboard) */
+.key{display:none}
+@media (hover:hover) and (pointer:fine){
+  .key{display:inline-block;font:600 10px/1 var(--mono);color:var(--muted);border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:2px 4px;background:var(--bg)}
+  .answers .key{margin-bottom:2px}
+  .answers button{padding-top:8px}
+  .next .key{margin-left:8px;vertical-align:1px;color:var(--accent-ink);border-color:color-mix(in srgb,var(--accent-ink) 35%,transparent);background:transparent}
+}
 .next{font:600 15px var(--body);background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 16px;cursor:pointer;width:100%}
 .next:disabled{opacity:.4;cursor:default}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
@@ -328,7 +337,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <button id="nudge-r" aria-label="Move ghost ball right">Right ▶</button>
       </div>
       <div class="quick" id="quick" aria-live="polite"></div>
-      <button class="next" id="next" disabled>Next shot</button>
+      <button class="next" id="next" disabled>Next shot <kbd class="key" aria-hidden="true">Enter</kbd></button>
       <div class="tabs" role="tablist" aria-label="Details">
         <button class="tab" role="tab" data-tab="shot" id="tabbtn-shot">Shot</button>
         <button class="tab" role="tab" data-tab="stats" id="tabbtn-stats">Stats</button>
@@ -1014,7 +1023,7 @@ function startFlash(){
 function endFlash(){ clearTimeout(flashTimer); $('cover').hidden = true; $('flashbar').hidden = true; }
 
 // ---------- round ----------
-const PLACEHOLDER = `Pick a fraction, or press 1–5. Then tap the table or press Enter for the next shot.`;
+const PLACEHOLDER = `How full do you hit the object ball?`;
 const PLACE_HINT = `Tap or drag around the object ball to set the ghost ball. Fine-tune with the arrows, then Shoot. Keys <kbd>←</kbd> <kbd>→</kbd> nudge, <kbd>Enter</kbd> shoots.`;
 const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?'};
 const tableBox = document.querySelector('.table-box');
@@ -1062,7 +1071,7 @@ function updateControls(){
   $('nudge').hidden = !place || answered;
   $('nudge').querySelectorAll('button').forEach(b=>b.disabled = !shot || !shot.place);
   if(place && !answered){ nb.textContent = 'Shoot'; nb.disabled = !shot || !shot.place; }
-  else { nb.textContent = 'Next shot'; nb.disabled = !answered; }
+  else { nb.innerHTML = 'Next shot <kbd class="key" aria-hidden="true">Enter</kbd>'; nb.disabled = !answered; }
   $('question').firstChild.textContent = QUESTION[settings.task];
 }
 
@@ -1605,7 +1614,7 @@ function applySetting(key, val){
 }
 document.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click', ()=>applySetting(b.dataset.set, b.dataset.val)));
 
-$('answers').innerHTML = REFS.map((r,i)=>`<button data-id="${r.id}" id="ans-${r.id}" aria-label="${r.label} ball, key ${i+1}">${r.label}<span>${r.deg.toFixed(r.deg%1?1:0)}°</span></button>`).join('');
+$('answers').innerHTML = REFS.map((r,i)=>`<button data-id="${r.id}" id="ans-${r.id}" aria-label="${r.label} ball, key ${i+1}"><kbd class="key" aria-hidden="true">${i+1}</kbd>${r.label}<span>${r.deg.toFixed(r.deg%1?1:0)}°</span></button>`).join('');
 $('answers').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) answer(b.dataset.id); });
 $('nudge-l').addEventListener('click', ()=>nudge(-1));
 $('nudge-r').addEventListener('click', ()=>nudge(1));
