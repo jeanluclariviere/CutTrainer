@@ -421,13 +421,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <button id="table-9" data-set="table" data-val="9">9 ft</button>
       </div>
     </div>
-    <div class="opt">Pockets
-      <div class="seg" role="group" aria-label="Pocket size">
-        <button id="pk-bar" data-set="pockets" data-val="bar">5&Prime;</button>
-        <button id="pk-std" data-set="pockets" data-val="std">4.5&Prime;</button>
-        <button id="pk-pro" data-set="pockets" data-val="pro">4&Prime;</button>
-      </div>
-    </div>
     <div class="opt">Distance
       <div class="seg" role="group" aria-label="Distance">
         <button id="len-short" data-set="len" data-val="short">Short</button>
@@ -1715,7 +1708,7 @@ if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 settings.throw='0';   // throw option removed
 if(!TABLES[settings.table]) settings.table='9';
-if(!['bar','std','pro'].includes(settings.pockets)) settings.pockets='std';
+settings.pockets = 'std';   // pockets fixed at 4.5″: with reference cuts only, pocket size never changed a result
 setTable(settings.table, settings.pockets);
 if(!settings.sv){ settings.full='1'; settings.sv=2; }   // full-ball shots are now on by default
 if(settings.task==='call') settings.task = 'sess';   // Freeplay and Sessions merged: Freeplay is now played in sessions
