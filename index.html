@@ -93,6 +93,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .fpseg{display:flex;border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:2px}
 .fpseg button{font-family:var(--body);font-weight:600;font-size:inherit;border:0;border-radius:999px;background:transparent;color:#c9d6de;padding:5px 14px;cursor:pointer}
 .fpseg button[aria-pressed="true"]{background:rgba(255,255,255,.92);color:#15222b}
+.endkeep{color:#c9d7e0;margin-top:8px;font-size:14px}
 .sumdone{font:600 15px var(--body);background:transparent;color:#e6eef3;border:1.5px solid #6f8797;border-radius:10px;padding:10px 22px;cursor:pointer}
 .sesslist{display:flex;flex-direction:column;gap:4px;font-size:13px}
 .sesslist .srow{display:grid;grid-template-columns:1fr auto;gap:12px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -312,6 +313,14 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
               </div>
             </div>
             <div class="sumbtns"><button class="startbtn" data-sess="50">50 shots</button><button class="startbtn" data-sess="100">100 shots</button></div>
+          </div>
+        </div>
+        <div class="cover sumcover" id="endcover" hidden>
+          <div class="sumcard">
+            <div class="idlehead">End session?</div>
+            <div class="sumsub" id="endsub"></div>
+            <div class="sumbtns"><button class="startbtn" id="endsave">Save</button><button class="sumdone" id="enddiscard">Discard</button></div>
+            <button class="link endkeep" id="endkeep">Keep playing</button>
           </div>
         </div>
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
@@ -1165,7 +1174,22 @@ function startSession(size){
   stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now()};
   save(); $('sesscover').hidden = true; $('sessidlecover').hidden = true; renderSession(); syncStreakPill(); deal();
 }
-function endSession(){ stats.active = null; save(); renderSession(); showSessIdle(); syncStreakPill(); }
+// Ending early asks: save what you've played (it counts like a finished session) or discard it (its shots are removed too).
+function endSession(){
+  const a = stats.active; if(!a) return;
+  if(!a.n){ discardSession(); return; }                 // nothing played yet: nothing to decide
+  if(anim) finishAnim();
+  endFlash();
+  $('endsub').textContent = `${a.n} of ${a.size} shots · ${pct(a.right, a.n)}% called right`;
+  $('endcover').hidden = false;
+}
+function closeEndPrompt(){ $('endcover').hidden = true; if(settings.task==='flash' && !answered && stats.active) startFlash(); }
+function discardSession(){
+  const a = stats.active; $('endcover').hidden = true;
+  if(a) stats.log = stats.log.filter(e=>e.sid !== a.id);
+  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); deal();
+}
+function saveSessionEarly(){ $('endcover').hidden = true; finishSession(); }
 function sessionTick(ok, made){
   const a = stats.active; if(!a || a.task !== settings.task) return;
   a.n++; if(ok) a.right++; if(made) a.made++;
@@ -1173,7 +1197,7 @@ function sessionTick(ok, made){
 }
 function finishSession(){
   const a = stats.active;
-  const rec = {id:a.id, task:a.task, size:a.size, n:a.n, right:a.right, made:a.made, start:a.start + (a.pause||0), end:Date.now(),
+  const rec = {id:a.id, task:a.task, size:a.size, n:a.n, early: a.n < a.size ? 1 : undefined, right:a.right, made:a.made, start:a.start + (a.pause||0), end:Date.now(),
     md:settings.mode, v:settings.view, ln:settings.len, tb:settings.table, pk:settings.pockets};
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
   stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
@@ -1187,7 +1211,7 @@ function renderSession(){
 function showSummary(rec){
   const L = stats.log.filter(e=>e.sid === rec.id);
   const score = pct(rec.right, rec.n);
-  $('sumhead').textContent = `Session complete · ${rec.size} shots · ${MODE_LABEL[rec.task]}`;
+  $('sumhead').textContent = rec.early ? `Session ended early · ${rec.n} of ${rec.size} shots · ${MODE_LABEL[rec.task]}` : `Session complete · ${rec.size} shots · ${MODE_LABEL[rec.task]}`;
   $('sumbig').textContent = score + '%';
   $('sumsub').textContent = 'called right';
   const rows = [];   // [label, value, tone]
@@ -1255,7 +1279,7 @@ function renderSessionHistory(){
 })();
 
 function answer(id){
-  if(answered || !shot || isPlace() || !$('sessidlecover').hidden) return;
+  if(answered || !shot || isPlace() || !$('sessidlecover').hidden || !$('endcover').hidden) return;
   answered = true;
   endFlash();
   const picked = REFS.find(r=>r.id===id);
@@ -1646,7 +1670,7 @@ $('nudge-r').addEventListener('click', ()=>nudge(1));
 // Next shot: always straight to a new shot. A running animation is simply dropped (the shot still counts).
 let jumpingAhead = false;
 function nextShot(){
-  if(!answered) return;
+  if(!answered || !$('endcover').hidden) return;
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
   if($('sesscover').hidden) deal();
 }
@@ -1718,6 +1742,10 @@ $('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Re
 document.querySelectorAll('.statmode button').forEach(b=>b.addEventListener('click', ()=>{ settings.statTask = b.dataset.stat; saveSettings(); renderStats(); }));
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
+$('endsave').addEventListener('click', e=>{ e.stopPropagation(); saveSessionEarly(); });
+$('enddiscard').addEventListener('click', e=>{ e.stopPropagation(); discardSession(); });
+$('endkeep').addEventListener('click', e=>{ e.stopPropagation(); closeEndPrompt(); });
+$('endcover').addEventListener('click', e=>e.stopPropagation());
 $('sessagain').addEventListener('click', e=>{ e.stopPropagation(); startSession(+e.currentTarget.dataset.size); });
 $('sessdone').addEventListener('click', e=>{ e.stopPropagation(); $('sesscover').hidden = true; deal(); });
 document.querySelectorAll('#sessidlecover [data-sess]').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); startSession(+b.dataset.sess); }));
@@ -1726,6 +1754,7 @@ $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
+  if(!$('endcover').hidden){ if(e.key==='Escape'){ closeEndPrompt(); e.preventDefault(); } return; }
   if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ startSession(50); e.preventDefault(); } return; }
   if(!$('sesscover').hidden){ if(e.key==='Enter'){ startSession(+$('sessagain').dataset.size); e.preventDefault(); } else if(e.key==='Escape'){ $('sesscover').hidden = true; deal(); } return; }
   if(!$('startcover').hidden){ if(e.key==='Enter' || e.key===' '){ startFlashMode(); e.preventDefault(); } return; }
