@@ -129,9 +129,9 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 @keyframes sparkpulse{0%,100%{opacity:1}50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.streakpill.pop,.streakpill .spark{animation:none!important}}
 /* shot breakdown: one fixed-size box, scrolls inside if a long explanation ever overflows */
-.result{height:236px;overflow:auto;align-content:start}
+.result{min-height:0}
 .result svg{width:100%;max-width:440px;height:auto;margin:0 auto;display:block}
-@media (max-width:420px){.result{height:auto}}
+
 .replay{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font:600 14px var(--body);letter-spacing:0;background:transparent;color:#ffd34d;border:1.5px solid #ffd34d;border-radius:999px;padding:7px 16px;cursor:pointer}
 .startbtn{font:700 24px var(--display);letter-spacing:.04em;background:#ffd34d;color:#10283d;border:0;border-radius:10px;padding:10px 34px;cursor:pointer}
 .flashtrack{height:4px;margin-top:6px;border-radius:2px;overflow:hidden}
@@ -148,7 +148,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .answers button.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
 .answers button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.result{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
+.result{display:block;padding-top:4px}
 .verdict{font-family:var(--display);font-weight:700;font-size:22px;margin:0;line-height:1.1}
 .verdict.ok{color:var(--good)} .verdict.no{color:var(--bad)}
 .badge{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--body);padding:3px 10px;border-radius:999px;margin-top:6px}
@@ -235,7 +235,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   .q small{line-height:1.35}
   .tabs{margin-top:0}
   .tabpanel{flex:1;min-height:0;overflow:auto}
-  #tab-shot .result{flex:1;height:auto;min-height:0}
 }
 </style>
 </head>
