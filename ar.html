@@ -12,316 +12,391 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .intro{max-width:560px;margin:0 auto;padding:28px 16px 40px}
-h1{font-size:28px;margin:0 0 6px}
+h1{font-size:28px;margin:0 0 14px}
 .intro p{color:var(--muted);margin:8px 0}
-.intro ol{color:var(--muted);padding-left:20px}
-.intro li{margin:6px 0}
-.intro b{color:var(--ink)}
 .btn{font:600 16px system-ui,sans-serif;border:0;border-radius:12px;padding:14px 18px;background:var(--accent);color:#08131b;cursor:pointer}
 .btn:disabled{opacity:.45}
-.btn.ghost{background:rgba(21,33,42,.85);color:var(--ink);border:1px solid var(--line)}
-#support{margin-top:14px;font-size:14px}
+.btn.ghost{background:rgba(13,21,27,.8);color:var(--ink);border:1px solid rgba(255,255,255,.18)}
+.btn.small{padding:9px 12px;font-size:14px}
+#support{margin-top:14px;font-size:14px;color:var(--muted)}
 #support.bad{color:var(--bad)}
 a{color:var(--accent)}
 
-/* AR overlay (shown over the camera view) */
-#overlay{position:fixed;inset:0;display:none;pointer-events:none}
+/* AR overlay, drawn over the camera view */
+#overlay{position:fixed;inset:0;display:none}
 #overlay.on{display:block}
-#overlay .top,#overlay .bottom{position:absolute;left:0;right:0;padding:12px 12px calc(12px + env(safe-area-inset-bottom));pointer-events:auto}
-#overlay .top{top:0;padding-top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:flex-start}
-#overlay .bottom{bottom:0;display:flex;flex-direction:column;gap:8px}
-.status{flex:1;background:rgba(13,21,27,.78);border-radius:12px;padding:10px 12px;font-size:14px}
+#draw{position:absolute;inset:0;width:100%;height:100%}
+#taplayer{position:absolute;inset:0}
+.top,.bottom{position:absolute;left:0;right:0;padding:10px 12px;display:flex;gap:8px;pointer-events:none}
+.top{top:0;padding-top:calc(10px + env(safe-area-inset-top));align-items:flex-start}
+.bottom{bottom:0;padding-bottom:calc(12px + env(safe-area-inset-bottom));flex-direction:column}
+.top > *,.bottom > *{pointer-events:auto}
+.status{flex:1;background:rgba(13,21,27,.8);border-radius:12px;padding:10px 12px;font-size:15px;line-height:1.35}
 .status b{color:var(--gold)}
-.readout{background:rgba(13,21,27,.82);border-radius:12px;padding:10px 12px;font:500 14px ui-monospace,Menlo,monospace;display:none}
+.steps{display:flex;gap:4px;margin-top:6px}
+.steps i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.18)}
+.steps i.done{background:var(--accent)}
+.readout{background:rgba(13,21,27,.85);border-radius:12px;padding:10px 12px;display:none}
 .readout.on{display:block}
-.readout .big{font:700 20px system-ui,sans-serif}
+.readout .big{font:700 22px system-ui,sans-serif}
 .readout .ok{color:var(--good)} .readout .no{color:var(--bad)}
-.row{display:flex;gap:8px}
-.row .btn{flex:1}
+.readout .sub{color:var(--muted);font-size:14px}
 .answers{display:none;grid-template-columns:repeat(5,1fr);gap:6px}
 .answers.on{display:grid}
-.answers button{font:700 22px system-ui,sans-serif;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:rgba(21,33,42,.9);color:var(--ink)}
-.answers button.right{border-color:var(--good);background:rgba(92,194,124,.25)}
-.answers button.wrong{border-color:var(--bad);background:rgba(239,122,99,.25)}
-#cross{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;pointer-events:none}
-#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
-#cross:before{left:16px;top:0;width:2px;height:34px}
-#cross:after{top:16px;left:0;height:2px;width:34px}
-#cross.nohit{opacity:.35}
+.answers button{font:700 22px system-ui,sans-serif;padding:12px 0;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(21,33,42,.92);color:var(--ink)}
+.answers button.right{border-color:var(--good);background:rgba(92,194,124,.3)}
+.answers button.wrong{border-color:var(--bad);background:rgba(239,122,99,.3)}
+.row{display:flex;gap:8px}
+.row .btn{flex:1}
+.toast{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);background:rgba(13,21,27,.88);padding:10px 14px;border-radius:10px;font-size:14px;pointer-events:none;opacity:0;transition:opacity .2s;max-width:80%;text-align:center}
+.toast.on{opacity:1}
+#dbg{position:absolute;right:10px;top:90px;width:120px;height:120px;border:1px solid #fff;display:none;image-rendering:pixelated}
 </style>
 </head>
 <body>
 <div class="intro" id="intro">
   <h1>Cut Trainer Live</h1>
-  <p>A first test of live AR at a real table: can your phone find the table and keep marks pinned to the balls while you move?</p>
-  <ol>
-    <li>Set up a cue ball and an object ball on the table.</li>
-    <li>Press <b>Start AR</b>, then slowly sweep the phone over the table until the crosshair turns solid.</li>
-    <li>Aim the crosshair at the <b>centre of the cue ball</b> and press <b>Mark</b>. Then the <b>object ball</b>, then the <b>middle of the pocket</b>.</li>
-    <li>Call the fraction. The ghost ball, aim line and path appear on the table.</li>
-    <li>Walk around the shot: the marks should stay on the balls. If they slide, note where and how much.</li>
-  </ol>
-  <button class="btn" id="start" disabled>Start AR</button>
-  <div id="support">Checking whether this device supports AR…</div>
-  <p style="margin-top:22px"><a href="./">← Back to the trainer</a></p>
+  <button class="btn" id="start" disabled>Start</button>
+  <div id="support">Checking this device…</div>
+  <p style="margin-top:22px"><a href="./">← Trainer</a></p>
 </div>
 
 <div id="overlay">
+  <canvas id="draw"></canvas>
+  <div id="taplayer"></div>
+  <canvas id="dbg" width="120" height="120"></canvas>
+  <div class="toast" id="toast"></div>
   <div class="top">
-    <div class="status" id="status">Starting…</div>
-    <button class="btn ghost" id="exit">Exit</button>
+    <div class="status"><div id="status">Starting…</div><div class="steps" id="steps"><i></i><i></i><i></i><i></i></div></div>
+    <button class="btn ghost small" id="exit">Exit</button>
   </div>
-  <div id="cross" class="nohit"></div>
   <div class="bottom">
     <div class="readout" id="readout"></div>
     <div class="answers" id="answers"></div>
     <div class="row">
-      <button class="btn ghost" id="undo">Undo</button>
-      <button class="btn" id="mark" disabled>Mark</button>
-      <button class="btn ghost" id="reset">Reset</button>
+      <button class="btn ghost small" id="undo">Undo</button>
+      <button class="btn ghost small" id="newshot">New shot</button>
+      <button class="btn ghost small" id="retable">Redo table</button>
     </div>
   </div>
 </div>
 
 <script type="module">
-import * as THREE from './vendor/three.module.min.js';
+import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, R, REFS} from './ar-core.js';
 
 const $ = id => document.getElementById(id);
-const R = 0.028575;                       // ball radius in metres (2¼" ball)
-const RAD = Math.PI/180;
-const REFS = [{id:'full',label:'Full',f:1},{id:'34',label:'¾',f:.75},{id:'12',label:'½',f:.5},{id:'14',label:'¼',f:.25},{id:'18',label:'⅛',f:.125}]
-  .map(r => ({...r, deg: Math.asin(1-r.f)/RAD}));
-const STEPS = ['cue ball', 'object ball', 'pocket'];
+const DEBUG = new URLSearchParams(location.search).has('debug');
 
-// ---------- support check ----------
-async function checkSupport(){
+// ---------- can this device do it? ----------
+(async function(){
   const el = $('support');
-  if(!window.isSecureContext){ el.textContent = 'AR needs the page opened over HTTPS.'; el.className='bad'; return; }
-  if(!navigator.xr){ el.innerHTML = 'This browser has no WebXR. Use <b>Chrome on an Android phone</b> with Google Play Services for AR installed.'; el.className='bad'; return; }
+  if(!window.isSecureContext){ el.textContent = 'Open this page over HTTPS.'; el.className='bad'; return; }
   let ok = false;
-  try{ ok = await navigator.xr.isSessionSupported('immersive-ar'); }catch(e){}
-  if(!ok){ el.innerHTML = 'AR isn\'t available here. Use <b>Chrome on an Android phone</b> with Google Play Services for AR installed.'; el.className='bad'; return; }
-  el.textContent = 'AR is supported on this device.';
+  try{ ok = !!navigator.xr && await navigator.xr.isSessionSupported('immersive-ar'); }catch(e){}
+  if(!ok){ el.innerHTML = 'Needs Chrome on an Android phone with Google Play Services for AR.'; el.className='bad'; return; }
+  el.textContent = '';
   $('start').disabled = false;
-}
-checkSupport();
+})();
 
-// ---------- three.js scene ----------
-const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.xr.enabled = true;
-renderer.domElement.style.display = 'none';
-document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 30);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.2));
-
-// reticle: a flat ring on the surface under the crosshair
-const reticle = new THREE.Mesh(new THREE.RingGeometry(R*0.9, R*1.15, 40).rotateX(-Math.PI/2),
-  new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8}));
-reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
-
-const marks = [];                         // {kind, anchor?, pos: Vector3, obj}
-let plane = null;                         // {point, normal} of the cloth, from the first mark
-const ballMat = c => new THREE.MeshStandardMaterial({color:c, transparent:true, opacity:.55, roughness:.4});
-function markObject(kind){
-  if(kind === 2){   // pocket: a gold ring on the cloth
-    return new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.004, 8, 48).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color:0xffd34d}));
-  }
-  return new THREE.Mesh(new THREE.SphereGeometry(R*1.02, 32, 16), ballMat(kind === 0 ? 0xffffff : 0xf2b705));
-}
-const overlayGroup = new THREE.Group(); scene.add(overlayGroup);
-
-// ---------- session ----------
-let session = null, hitSource = null, refSpace = null, viewerSpace = null;
-let lastHit = null;                       // {matrix, point, normal, result}
-let lastViewer = null;                    // viewer pose transform
-let picked = null;
+// ---------- state ----------
+// Everything is stored in the coordinates of the moment the table was pinned; `pin` maps those to the current world,
+// so when tracking corrects itself, the table and the marks move with the real one.
+let session, gl, xrLayer, refSpace, viewerSpace, hitSource, binding;
+let cameraAccess = false;
+let step = 'scan';            // scan → table → balls → pocket → call → reveal
+let lastHit = null;           // latest surface under the screen centre {p, n, result}
+let plane = null;             // the cloth {p, n} (pinned coordinates)
+let anchor = null, anchorInit = null, pin = m4identity(), unpin = m4identity();
+let corners = [];             // tapped corner pockets (pinned)
+let table = null;
+let balls = {cue: null, obj: null};   // pinned centres
+let target = null;            // target pocket index
+let shot = null, picked = null;
+let lastView = null;          // {proj, view}
+const taps = [];              // screen taps waiting for the next frame (they need its camera image)
+const history = [];           // for Undo
 
 $('start').addEventListener('click', start);
 async function start(){
   try{
     session = await navigator.xr.requestSession('immersive-ar', {
       requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay', 'anchors', 'local-floor'],
+      optionalFeatures: ['dom-overlay', 'anchors', 'camera-access'],
       domOverlay: {root: $('overlay')}
     });
   }catch(e){ $('support').textContent = 'Couldn\'t start AR: ' + e.message; $('support').className='bad'; return; }
   $('overlay').classList.add('on'); $('intro').style.display = 'none';
-  renderer.domElement.style.display = 'block';
-  renderer.xr.setReferenceSpaceType('local');
-  await renderer.xr.setSession(session);
-  refSpace = renderer.xr.getReferenceSpace();
+  const canvas = document.createElement('canvas');
+  gl = canvas.getContext('webgl', {xrCompatible: true, alpha: true, antialias: false});
+  xrLayer = new XRWebGLLayer(session, gl);
+  session.updateRenderState({baseLayer: xrLayer});
+  refSpace = await session.requestReferenceSpace('local');
   viewerSpace = await session.requestReferenceSpace('viewer');
   hitSource = await session.requestHitTestSource({space: viewerSpace});
-  // taps on our buttons shouldn't also count as AR "select" taps
+  try{ binding = new XRWebGLBinding(session, gl); }catch(e){ binding = null; }
   $('overlay').addEventListener('beforexrselect', e => e.preventDefault());
-  session.addEventListener('end', ()=>{
-    hitSource = null; session = null;
-    $('overlay').classList.remove('on'); $('intro').style.display = ''; renderer.domElement.style.display = 'none';
-  });
-  resetAll();
-  renderer.setAnimationLoop(onFrame);
+  session.addEventListener('end', ()=>{ session = null; $('overlay').classList.remove('on'); $('intro').style.display = ''; });
+  setStep('scan');
+  session.requestAnimationFrame(onFrame);
 }
 $('exit').addEventListener('click', ()=>{ if(session) session.end(); });
 
+// ---------- taps ----------
+$('taplayer').addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  taps.push({x: e.clientX / innerWidth * 2 - 1, y: 1 - e.clientY / innerHeight * 2});
+});
+
+// ---------- the frame loop ----------
 function onFrame(t, frame){
-  if(!frame) return;
+  if(!session) return;
+  session.requestAnimationFrame(onFrame);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, xrLayer.framebuffer);
+  gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
   const pose = frame.getViewerPose(refSpace);
-  lastViewer = pose ? pose.transform : null;
+  if(!pose) return;
+  const view = pose.views[0];
+  lastView = {proj: view.projectionMatrix, view: view.transform.inverse.matrix};
+
+  // the surface under the screen centre, while scanning
   lastHit = null;
   if(hitSource){
     const hits = frame.getHitTestResults(hitSource);
     if(hits.length){
       const hp = hits[0].getPose(refSpace);
-      if(hp){
-        const m = new THREE.Matrix4().fromArray(hp.transform.matrix);
-        const p = new THREE.Vector3().setFromMatrixPosition(m);
-        const n = new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(m)).normalize();
-        lastHit = {matrix:m, point:p, normal:n, result:hits[0]};
-      }
+      if(hp){ const m = hp.transform.matrix; lastHit = {p: [m[12],m[13],m[14]], n: v3.norm([m[4],m[5],m[6]]), result: hits[0]}; }
     }
   }
-  // anchored marks follow the tracking system's corrections
-  for(const mk of marks){
-    if(mk.anchor && frame.trackedAnchors && frame.trackedAnchors.has(mk.anchor)){
-      const ap = frame.getPose(mk.anchor.anchorSpace, refSpace);
-      if(ap){ mk.pos.set(ap.transform.position.x, ap.transform.position.y, ap.transform.position.z).add(mk.offset); }
+  // follow the tracking system's corrections of where the table is
+  if(anchor && frame.trackedAnchors && frame.trackedAnchors.has(anchor)){
+    const ap = frame.getPose(anchor.anchorSpace, refSpace);
+    if(ap){
+      if(!anchorInit) anchorInit = m4inv(ap.transform.matrix);
+      pin = m4mul(ap.transform.matrix, anchorInit); unpin = m4inv(pin) || m4identity();
     }
-    mk.obj.position.copy(mk.pos);
   }
-  if(marks.length === 3 && picked){ const key = marks.map(m => m.pos.toArray().map(x => Math.round(x*2000)).join(',')).join(';'); if(key !== overlayKey){ overlayKey = key; drawOverlay(); } }
-
-  const want = marks.length < 3;
-  reticle.visible = !!lastHit && want;
-  if(lastHit){ reticle.matrix.copy(lastHit.matrix); }
-  $('cross').className = lastHit ? '' : 'nohit';
-  $('mark').disabled = !lastHit || !want;
-  updateStatus();
-  renderer.render(scene, camera);
+  if(view.camera && binding) cameraAccess = true;
+  while(taps.length) handleTap(taps.shift(), frame, view);
+  draw();
 }
 
-function updateStatus(){
-  const s = $('status');
-  if(marks.length < 3){
-    s.innerHTML = !lastHit ? 'Looking for the table… sweep the phone slowly over the cloth.'
-      : `Aim at the ${marks.length===2 ? '<b>middle of the pocket</b>' : `<b>centre of the ${STEPS[marks.length]}</b>`} and press Mark.`;
-  } else if(!picked){
-    s.innerHTML = 'Call it: how full do you hit the object ball?';
-  } else {
-    s.innerHTML = 'Walk around the shot. The marks should stay on the balls.';
+// pinned ↔ world
+const toWorld = p => { const q = m4point(pin, p); return [q[0],q[1],q[2]]; };
+const toPinned = p => { const q = m4point(unpin, p); return [q[0],q[1],q[2]]; };
+function pinnedRay(ndcX, ndcY){
+  const r = rayFromNDC(lastView.proj, lastView.view, ndcX, ndcY); if(!r) return null;
+  const o = toPinned(r.o), e = toPinned(v3.add(r.o, r.d));
+  return {o, d: v3.norm(v3.sub(e, o))};
+}
+
+function handleTap(tap, frame, view){
+  if(step === 'scan'){
+    if(!lastHit){ toast('Keep moving the phone over the cloth'); return; }
+    plane = {p: lastHit.p, n: lastHit.n};
+    if(lastHit.result.createAnchor) lastHit.result.createAnchor().then(a=>{ anchor = a; }).catch(()=>{});
+    setStep('table'); return;
+  }
+  if(step === 'table'){
+    const p = rayPlane(pinnedRay(tap.x, tap.y), plane, 0);
+    if(!p){ toast('Tap on the table'); return; }
+    history.push(()=>{ corners.pop(); table = null; setStep('table'); });
+    corners.push(p);
+    if(corners.length === 3){
+      table = tableFrom3(corners[0], corners[1], corners[2], plane.n);
+      const g = guessTable(table.len, table.wid);
+      toast(`Table ${table.len.toFixed(2)} × ${table.wid.toFixed(2)} m · looks like a ${g.name}`);
+      setStep('balls');
+    } else setStep('table');
+    return;
+  }
+  if(step === 'balls' || step === 'call' || step === 'reveal'){
+    const c = findBall(tap, frame, view);
+    if(!c) return;
+    // the cue ball is the white one; otherwise the first ball you tap
+    let slot = c.white === true ? 'cue' : c.white === false ? 'obj' : (!balls.cue ? 'cue' : 'obj');
+    const other = slot === 'cue' ? 'obj' : 'cue';
+    if(balls[slot] && !balls[other]) slot = other;     // colour guess already used: fill the empty one
+    const prev = {...balls};
+    history.push(()=>{ balls = prev; picked = null; setStep(balls.cue && balls.obj ? 'pocket' : 'balls'); });
+    balls[slot] = c.p;
+    picked = null;
+    if(balls.cue && balls.obj) setStep(target === null ? 'pocket' : 'call'); else setStep('balls');
+    return;
+  }
+  if(step === 'pocket'){
+    const p = rayPlane(pinnedRay(tap.x, tap.y), plane, 0); if(!p) return;
+    let best = -1, bd = Infinity;
+    table.pockets.forEach((pk,i)=>{ const d = v3.len(v3.sub(pk.p, p)); if(d < bd){ bd = d; best = i; } });
+    if(bd > 0.35){ toast('Tap a pocket'); return; }
+    history.push(()=>{ target = null; picked = null; setStep('pocket'); });
+    target = best; setStep('call');
   }
 }
 
-// Where the crosshair ray meets the cloth, raised by h (a ball's centre sits one radius above the cloth).
-function aimPoint(h){
-  if(!lastHit) return null;
-  const pl = plane || {point: lastHit.point, normal: lastHit.normal};
-  if(!lastViewer || h === 0){
-    // pocket: the crosshair's own hit is right
-    return lastHit.point.clone();
+// Find the ball under a tap: read the camera picture, look for a ball-sized blob that isn't cloth, and use its centre.
+function findBall(tap, frame, view){
+  const ray = pinnedRay(tap.x, tap.y);
+  const guess = rayPlane(ray, plane, R);        // where the tap would be if it hit a ball's centre
+  if(!guess){ toast('Tap on the table'); return null; }
+  if(!(view.camera && binding)){
+    toast('Placed where you tapped (this phone doesn\'t share the camera picture)');
+    return {p: guess, white: null};
   }
-  const o = new THREE.Vector3(lastViewer.position.x, lastViewer.position.y, lastViewer.position.z);
-  const q = new THREE.Quaternion(lastViewer.orientation.x, lastViewer.orientation.y, lastViewer.orientation.z, lastViewer.orientation.w);
-  const d = new THREE.Vector3(0,0,-1).applyQuaternion(q).normalize();
-  const p0 = pl.point.clone().addScaledVector(pl.normal, h);
-  const den = d.dot(pl.normal);
-  if(Math.abs(den) < 1e-4) return null;
-  const t = p0.clone().sub(o).dot(pl.normal) / den;
-  if(t <= 0) return null;
-  return o.clone().addScaledVector(d, t);
+  let img, w, h;
+  try{
+    const tex = binding.getCameraImage(view.camera);
+    w = view.camera.width; h = view.camera.height;
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    img = new Uint8Array(w*h*4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, img);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, xrLayer.framebuffer);
+    gl.deleteFramebuffer(fb);
+    let any = 0; for(let i=0;i<img.length;i+=4096) any |= img[i] | img[i+1] | img[i+2];
+    if(!any) throw new Error('blank camera image');
+  }catch(e){
+    toast('Placed where you tapped (camera picture unavailable)');
+    return {p: guess, white: null};
+  }
+  // expected size of a ball there, in camera pixels
+  const P = lastView.proj;
+  const eye = m4point(lastView.view, toWorld(guess)); const depth = -eye[2];
+  const rExp = (P[5] * h / 2) * R / depth;
+  // The picture's rows may run bottom-up or top-down; try both and keep the one that finds a ball.
+  const col = (tap.x + 1) / 2 * w;
+  const cands = [
+    {row: (tap.y + 1) / 2 * h, toNdcY: y => y / h * 2 - 1},
+    {row: (1 - tap.y) / 2 * h, toNdcY: y => 1 - y / h * 2},
+  ].map(o => ({...o, d: detectBall(img, w, h, col, o.row, rExp)})).filter(o => o.d);
+  if(!cands.length){ toast('No ball found there. Tap right on the ball.'); return null; }
+  const best = cands.sort((a,b)=>b.d.score - a.d.score)[0];
+  if(DEBUG) showDebug(img, w, h, best, rExp);
+  const r2 = pinnedRay(best.d.x / w * 2 - 1, best.toNdcY(best.d.y));
+  const p = rayPlane(r2, plane, R);
+  if(!p) return {p: guess, white: best.d.white};
+  return {p, white: best.d.white};
+}
+function showDebug(img, w, h, best, rExp){
+  const c = $('dbg'), ctx = c.getContext('2d'); c.style.display = 'block';
+  const half = Math.ceil(rExp*3), im = ctx.createImageData(120, 120);
+  for(let j=0;j<120;j++) for(let i=0;i<120;i++){
+    const x = Math.round(best.d.x - half + i/120*2*half), y = Math.round(best.d.y - half + j/120*2*half);
+    const o = (j*120+i)*4;
+    if(x<0||y<0||x>=w||y>=h) continue;
+    const s = (y*w+x)*4; im.data[o]=img[s]; im.data[o+1]=img[s+1]; im.data[o+2]=img[s+2]; im.data[o+3]=255;
+  }
+  ctx.putImageData(im, 0, 0);
+  ctx.strokeStyle = '#ff0'; ctx.beginPath(); ctx.arc(60, 60, rExp/(2*half)*120, 0, Math.PI*2); ctx.stroke();
 }
 
-$('mark').addEventListener('click', async ()=>{
-  if(!lastHit || marks.length >= 3) return;
-  const kind = marks.length;
-  if(!plane) plane = {point: lastHit.point.clone(), normal: lastHit.normal.clone()};
-  const pos = aimPoint(kind === 2 ? 0 : R);
-  if(!pos) return;
-  const obj = markObject(kind); obj.position.copy(pos); scene.add(obj);
-  const mk = {kind, pos, obj, anchor:null, offset:new THREE.Vector3()};
-  marks.push(mk);
-  // pin it to the real world, so tracking corrections move it with the table
-  if(lastHit.result && lastHit.result.createAnchor){
-    try{
-      const a = await lastHit.result.createAnchor();
-      if(a){ mk.anchor = a; mk.offset = pos.clone().sub(lastHit.point); }
-    }catch(e){}
-  }
-  if(marks.length === 3) showAnswers();
-  navigator.vibrate && navigator.vibrate(15);
-});
-$('undo').addEventListener('click', ()=>{
-  if(picked){ picked = null; clearOverlay(); showAnswers(); return; }
-  const mk = marks.pop(); if(!mk) return;
-  scene.remove(mk.obj); if(mk.anchor && mk.anchor.delete) mk.anchor.delete();
-  if(!marks.length) plane = null;
-  $('answers').classList.remove('on'); $('readout').classList.remove('on');
-});
-$('reset').addEventListener('click', resetAll);
-function resetAll(){
-  for(const mk of marks){ scene.remove(mk.obj); if(mk.anchor && mk.anchor.delete) mk.anchor.delete(); }
-  marks.length = 0; plane = null; picked = null; clearOverlay();
-  $('answers').classList.remove('on'); $('readout').classList.remove('on');
+// ---------- steps ----------
+const STEP_TEXT = {
+  scan: 'Move the phone slowly over the table. When the ring sits flat on the cloth, <b>tap</b>.',
+  table: () => `Tap the <b>${['first','next','across'][corners.length]}</b> corner pocket` + (corners.length===0 ? ' (any one).' : corners.length===1 ? ', along the same rail.' : ', on the other side from that one.'),
+  balls: () => (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
+  pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
+  call: 'How full do you hit it?',
+  reveal: 'Move the balls and tap them again, or tap New shot.',
+};
+const STEP_N = {scan:0, table:1, balls:2, pocket:3, call:4, reveal:4};
+function setStep(s){
+  step = s;
+  const t = STEP_TEXT[s]; $('status').innerHTML = typeof t === 'function' ? t() : t;
+  [...$('steps').children].forEach((el,i)=>el.classList.toggle('done', i < STEP_N[s]));
+  $('answers').classList.toggle('on', s === 'call' || s === 'reveal');
+  $('readout').classList.toggle('on', s === 'reveal');
+  $('newshot').disabled = !table; $('retable').disabled = step === 'scan';
+  if(s === 'call'){ renderAnswers(); computeShot(); }
 }
-
-// ---------- the shot ----------
-function flat(v){ const n = plane.normal; return v.clone().sub(n.clone().multiplyScalar(v.dot(n))); }
-function shotGeometry(){
-  const [cb, ob, pk] = marks.map(m => m.pos);
-  const u = flat(pk.clone().sub(ob)).normalize();                // object ball to pocket
-  const gb = ob.clone().addScaledVector(u, -2*R);                  // ghost ball: touching the object ball, opposite the pocket
-  const v = flat(gb.clone().sub(cb)).normalize();                  // cue ball to ghost ball
-  const theta = Math.acos(Math.max(-1, Math.min(1, v.dot(u)))) / RAD;
-  const f = 1 - Math.sin(Math.min(90, theta)*RAD);
-  const nearest = REFS.reduce((a,b)=> Math.abs(b.f-f) < Math.abs(a.f-f) ? b : a);
-  return {cb, ob, pk, gb, u, v, theta, f, nearest,
-    dCO: flat(ob.clone().sub(cb)).length(), dOP: flat(pk.clone().sub(ob)).length()};
+function computeShot(){
+  shot = (balls.cue && balls.obj && target !== null) ? shotGeometry(balls.cue, balls.obj, table.pockets[target].p, plane.n) : null;
+  if(shot && !shot.possible){ toast('That cut isn\'t makeable. Pick another pocket.'); target = null; setStep('pocket'); }
 }
-function showAnswers(){
-  const el = $('answers');
-  el.innerHTML = REFS.map(r => `<button data-id="${r.id}">${r.label}</button>`).join('');
-  el.classList.add('on');
-  el.querySelectorAll('button').forEach(b => b.addEventListener('click', ()=> call(b.dataset.id)));
+function renderAnswers(){
+  $('answers').innerHTML = REFS.map(r => `<button data-id="${r.id}">${r.label}</button>`).join('');
+  $('answers').querySelectorAll('button').forEach(b => b.addEventListener('click', ()=>call(b.dataset.id)));
 }
 function call(id){
-  if(picked || marks.length < 3) return;
-  const g = shotGeometry();
+  if(step !== 'call' || !shot) return;
   picked = id;
-  const ok = id === g.nearest.id;
-  $('answers').querySelectorAll('button').forEach(b => { b.className = b.dataset.id===g.nearest.id ? 'right' : b.dataset.id===id ? 'wrong' : ''; });
-  const cm = x => (x*100).toFixed(0)+' cm';
-  $('readout').innerHTML = g.theta >= 89
-    ? `<span class="big no">Can't be cut to that pocket</span><br>The cut is past 90°.`
-    : `<span class="big ${ok?'ok':'no'}">${ok ? 'Right' : 'Wrong'}</span> · ${g.nearest.label} ball<br>`
-    + `Cut ${g.theta.toFixed(1)}° · ${g.f.toFixed(2)} ball<br>`
-    + `Cue→object ${cm(g.dCO)} · object→pocket ${cm(g.dOP)}`;
-  $('readout').classList.add('on');
-  drawOverlay();
+  const ok = id === shot.nearest.id;
+  $('answers').querySelectorAll('button').forEach(b => { b.className = b.dataset.id===shot.nearest.id ? 'right' : b.dataset.id===id ? 'wrong' : ''; });
+  $('readout').innerHTML = `<span class="big ${ok?'ok':'no'}">${ok ? 'Right' : 'Wrong'}</span> · ${shot.nearest.label} ball`
+    + `<div class="sub">${shot.theta.toFixed(1)}° · ${shot.f.toFixed(2)} ball · ${Math.round(v3.len(v3.sub(shot.ob, shot.cb))*100)} cm apart</div>`;
+  history.push(()=>{ picked = null; setStep('call'); });
+  setStep('reveal');
+  navigator.vibrate && navigator.vibrate(ok ? 15 : [20, 40, 20]);
 }
+$('undo').addEventListener('click', ()=>{ const f = history.pop(); if(f) f(); });
+$('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
+$('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchor = null; anchorInit = null; pin = m4identity(); unpin = m4identity();
+  balls = {cue:null, obj:null}; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
 
-// ghost ball, aim line and object-ball path, drawn on the cloth
-let overlayMeshes = [], overlayKey = '';
-function clearOverlay(){ overlayMeshes.forEach(m => { overlayGroup.remove(m); m.geometry && m.geometry.dispose(); m.material && m.material.dispose(); }); overlayMeshes = []; overlayKey = ''; }
-function line(a, b, color, dashed){
-  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
-  const mat = dashed ? new THREE.LineDashedMaterial({color, dashSize:0.02, gapSize:0.015}) : new THREE.LineBasicMaterial({color});
-  const l = new THREE.Line(geo, mat); if(dashed) l.computeLineDistances(); return l;
-}
-function drawOverlay(){
-  clearOverlay();
-  const g = shotGeometry();
-  const ghost = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 16), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.3}));
-  ghost.position.copy(g.gb);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(R, 0.0015, 6, 48).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color:0xffffff}));
-  ring.position.copy(g.gb);
-  const aimEnd = g.gb.clone().addScaledVector(g.v, 0.25);
-  overlayMeshes = [ghost, ring, line(g.cb, aimEnd, 0xffffff, false), line(g.ob, g.pk, 0xffd34d, true)];
-  overlayMeshes.forEach(m => overlayGroup.add(m));
-}
+let toastT = 0;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
 
-window.addEventListener('resize', ()=>{ if(!session){ renderer.setSize(window.innerWidth, window.innerHeight); } });
+// ---------- drawing (2D, over the camera view) ----------
+const cv = $('draw'), ctx = cv.getContext('2d');
+function sizeCanvas(){ const d = devicePixelRatio || 1; if(cv.width !== Math.round(innerWidth*d)){ cv.width = Math.round(innerWidth*d); cv.height = Math.round(innerHeight*d); } }
+const S = ndc => [(ndc.x + 1) / 2 * cv.width, (1 - ndc.y) / 2 * cv.height];
+function proj(pPinned){ return projectToNDC(lastView.proj, lastView.view, toWorld(pPinned)); }
+function path3(points, style, width, dash){
+  ctx.beginPath(); let started = false;
+  for(const p of points){ const q = proj(p); if(!q){ started = false; continue; } const [x,y] = S(q); if(!started){ ctx.moveTo(x,y); started = true; } else ctx.lineTo(x,y); }
+  ctx.strokeStyle = style; ctx.lineWidth = width * (devicePixelRatio||1); ctx.setLineDash(dash ? dash.map(d=>d*(devicePixelRatio||1)) : []); ctx.stroke();
+}
+function segment(a, b, n = 24){ const out = []; for(let i=0;i<=n;i++) out.push(v3.add(a, v3.mul(v3.sub(b,a), i/n))); return out; }
+function ringOnCloth(c, r, lift = 0.002){
+  const ex = table ? table.ex : v3.norm(v3.cross(plane.n, [1,0,0])), ey = v3.norm(v3.cross(plane.n, ex));
+  const out = []; for(let i=0;i<=36;i++){ const a = i/36*Math.PI*2; out.push(v3.add(v3.add(c, v3.mul(plane.n, lift)), v3.add(v3.mul(ex, Math.cos(a)*r), v3.mul(ey, Math.sin(a)*r)))); }
+  return out;
+}
+function sphere(c, fill, stroke, dash){
+  const q = proj(c); if(!q) return;
+  const [x,y] = S(q), r = (lastView.proj[5] * cv.height/2) * R / q.depth;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2); ctx.setLineDash(dash ? dash.map(d=>d*(devicePixelRatio||1)) : []);
+  if(fill){ ctx.fillStyle = fill; ctx.fill(); }
+  if(stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = 2*(devicePixelRatio||1); ctx.stroke(); }
+}
+function draw(){
+  sizeCanvas(); ctx.clearRect(0, 0, cv.width, cv.height);
+  if(!lastView) return;
+  if(step === 'scan' && lastHit){
+    const n = lastHit.n, ex = v3.norm(v3.cross(n, [0,0,1])), ey = v3.norm(v3.cross(n, ex)), out = [];
+    for(let i=0;i<=36;i++){ const a = i/36*Math.PI*2; out.push(v3.add(lastHit.p, v3.add(v3.mul(ex, Math.cos(a)*0.08), v3.mul(ey, Math.sin(a)*0.08)))); }
+    // the scanning ring lives in world space (no table pinned yet)
+    const keep = pin; pin = m4identity(); path3(out, '#ffffff', 3); pin = keep;
+  }
+  if(plane && !table) for(const c of corners) path3(ringOnCloth(c, 0.06), '#ffd34d', 3);
+  if(table){
+    const cs = table.corners.map(c => v3.add(c, v3.mul(plane.n, 0.002)));
+    path3([...segment(cs[0],cs[1]), ...segment(cs[1],cs[2]), ...segment(cs[2],cs[3]), ...segment(cs[3],cs[0])], 'rgba(255,255,255,.55)', 1.5);
+    table.pockets.forEach((pk,i) => path3(ringOnCloth(pk.p, 0.06), i === target ? '#ffd34d' : 'rgba(255,255,255,.7)', i === target ? 4 : 2));
+  }
+  if(balls.cue) sphere(balls.cue, null, '#ffffff');
+  if(balls.obj) sphere(balls.obj, null, '#ffd34d');
+  if(step === 'reveal' && shot){
+    const lift = v => v3.add(v3.sub(v, v3.mul(plane.n, v3.dot(v3.sub(v, plane.p), plane.n))), v3.mul(plane.n, 0.003));   // down onto the cloth
+    path3(segment(lift(shot.ob), lift(shot.pk)), '#ffd34d', 3, [2, 7]);
+    path3(segment(lift(shot.cb), lift(v3.add(shot.gb, v3.mul(shot.v, 0.25)))), '#ffffff', 2);
+    sphere(shot.gb, 'rgba(255,255,255,.25)', '#ffffff', [6, 5]);
+    if(picked && picked !== shot.nearest.id){
+      // where your call would have sent the cue ball in
+      const ref = REFS.find(r=>r.id===picked);
+      const d = (ref.deg - shot.theta) * Math.PI/180;
+      const ang = u => Math.acos(Math.max(-1, Math.min(1, v3.dot(shot.v, u)))) * 180/Math.PI;
+      const cands = [rotAround(shot.u, plane.n, d), rotAround(shot.u, plane.n, -d)];
+      const u2 = Math.abs(ang(cands[0]) - ref.deg) < Math.abs(ang(cands[1]) - ref.deg) ? cands[0] : cands[1], g2 = v3.sub(shot.ob, v3.mul(u2, 2*R));
+      sphere(g2, null, '#d9c2ff', [6, 5]);
+      path3(segment(lift(shot.ob), lift(v3.add(shot.ob, v3.mul(u2, v3.len(v3.sub(shot.pk, shot.ob)))))), '#d9c2ff', 3, [2, 7]);
+    }
+  }
+}
+function rotAround(v, axis, a){   // Rodrigues
+  const c = Math.cos(a), s = Math.sin(a);
+  return v3.add(v3.add(v3.mul(v, c), v3.mul(v3.cross(axis, v), s)), v3.mul(axis, v3.dot(axis, v)*(1-c)));
+}
 </script>
 </body>
 </html>
