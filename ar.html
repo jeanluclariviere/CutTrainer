@@ -87,7 +87,7 @@ import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlan
 
 const $ = id => document.getElementById(id);
 // Stay current: if the server has a newer version of this page than the one running, load it.
-const BUILD = '20260928221841';
+const BUILD = '20260928222407';
 if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 fetch(location.pathname, {cache: 'no-store'}).then(r => r.text()).then(t => {
   const m = t.match(/^const BUILD\s*=\s*'([^']+)'/m);
@@ -494,7 +494,7 @@ const STEP_TEXT = {
   balls: () => `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
   pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
   call: () => 'How full do you hit it?' + (target !== null ? ' <span style="color:var(--muted)">Tap another pocket to change it.</span>' : ''),
-  reveal: () => track ? 'Shoot it, then set up the next one. It follows both balls. Mixed up? Tap the cue ball.' : 'Move the balls and tap them again, or tap New shot.',
+  reveal: () => track ? '<b>Move one or both balls</b> for the next shot. Mixed up? Tap the cue ball.' : 'Move the balls and tap them again, or tap New shot.',
   realign: 'Tap the <b>middle of any pocket</b> to snap the table back onto it.',
 };
 const STEP_N = {scan:0, table:1, balls:2, pocket:3, call:4, reveal:4, realign:4};
@@ -508,20 +508,20 @@ function setStep(s){
   $('newshot').disabled = !table; $('realign').disabled = !table; $('retable').disabled = step === 'scan';
   if(s === 'call'){ renderAnswers(); computeShot(); }
 }
-// The easiest makeable pocket for this layout: smallest cut, and for a side pocket, not coming in too flat.
+// A pocket for this layout, picked at random among the makeable ones (cut up to 70°; a side pocket only if the ball can get in).
 function autoPocket(){
   let best = null;
   table.pockets.forEach((pk, i) => {
     const g = shotGeometry(balls.cue, balls.obj, pk.p, plane.n);
-    if(!g.possible || g.theta > 75) return;
+    if(!g.possible || g.theta > 70) return;
     if(pk.side){
       const inward = v3.norm(v3.sub(table.pockets.filter(q=>q.side).find(q=>q!==pk).p, pk.p));
       const approach = Math.acos(Math.max(-1, Math.min(1, v3.dot(v3.mul(g.u, -1), inward)))) * 180/Math.PI;
       if(approach > 40) return;
     }
-    if(!best || g.theta < best.theta) best = {i, theta: g.theta};
+    (best = best || []).push(i);
   });
-  return best ? best.i : null;
+  return best ? best[Math.floor(Math.random() * best.length)] : null;
 }
 function newShot(){
   picked = null;
