@@ -88,10 +88,12 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .sumbtns{display:flex;gap:12px;align-items:center;margin-top:8px}
 .idlehead{font:700 40px/1.05 var(--display);color:#fff;letter-spacing:.01em}
 @media (max-width:760px){.idlehead{font-size:32px}}
-.flashpick{display:flex;align-items:center;gap:10px;margin:4px 0 2px;font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:#9fb2bf}
+.flashpick{display:flex;align-items:center;gap:10px;min-height:34px;color:#c9d7e0}
+#sessidlesub{min-height:34px;display:flex;align-items:center;justify-content:center}
+#sessidlesub[hidden]{display:none}
 .flashpick[hidden]{display:none}
 .fpseg{display:flex;border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:2px}
-.fpseg button{font:600 14px var(--body);letter-spacing:0;text-transform:none;border:0;border-radius:999px;background:transparent;color:#c9d6de;padding:5px 14px;cursor:pointer}
+.fpseg button{font-family:var(--body);font-weight:600;font-size:inherit;border:0;border-radius:999px;background:transparent;color:#c9d6de;padding:5px 14px;cursor:pointer}
 .fpseg button[aria-pressed="true"]{background:rgba(255,255,255,.92);color:#15222b}
 .sumdone{font:600 15px var(--body);background:transparent;color:#e6eef3;border:1.5px solid #6f8797;border-radius:10px;padding:10px 22px;cursor:pointer}
 .sesslist{display:flex;flex-direction:column;gap:4px;font-size:13px}
@@ -1019,7 +1021,7 @@ function showSessIdle(){
   if(idle){
     $('sessidlehead').textContent = t==='flash' ? 'Flash ⚡️' : 'Freeplay';
     $('flashpick').hidden = t!=='flash';
-    $('sessidlesub').textContent = t==='flash' ? '' : 'Pick a length to start. Each session is scored on its own.';
+    $('sessidlesub').textContent = t==='flash' ? '' : 'Each session is scored on its own.';
     $('sessidlesub').hidden = t==='flash';
     const last = (stats.sessions||[]).filter(x=>x.task===t).slice(-1)[0];
     $('sessidlelast').textContent = last ? `Last session: ${pct(last.right,last.n)}% over ${last.size} shots.` : '';
