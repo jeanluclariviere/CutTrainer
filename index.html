@@ -347,14 +347,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
     </div>
     <div class="mblock">
-      <h2>By cue ball to object ball distance</h2>
+      <h2>By distance, cue ball to object ball</h2>
       <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
       <div class="byfrac" id="bin-dc"></div>
-    </div>
-    <div class="mblock">
-      <h2>By object ball to pocket distance</h2>
-      <p class="cap" style="margin:0">Short under 2 ft · Medium 2–4 ft · Long 4 ft +</p>
-      <div class="byfrac" id="bin-dp"></div>
     </div>
     <div class="mblock">
       <h2>By cut angle</h2>
@@ -1505,7 +1500,6 @@ function renderPatterns(){
 // ---------- breakdowns: distance, angle, pocket, recent form ----------
 const BINS = {
   dc: [[0,24,'Short','under 2 ft'],[24,42,'Medium','2 to 3½ ft'],[42,1e9,'Long','3½ ft or more']],
-  dp: [[0,24,'Short','under 2 ft'],[24,48,'Medium','2 to 4 ft'],[48,1e9,'Long','4 ft or more']],
   ag: [[0,7.5,'0–7°'],[7.5,20,'8–20°'],[20,35,'20–35°'],[35,50,'35–50°'],[50,90,'50° +']],
 };
 function binRows(id, rows){
@@ -1522,8 +1516,8 @@ function renderBreakdowns(log){
   const withDist = log.filter(e=>typeof e.dc === 'number');
   const stat = rec => ({n: rec.length, ok: rec.filter(place ? e=>e.m : success).length});
   const binned = key => BINS[key].map(([lo,hi,label,range])=>({label, range, ...stat(withDist.filter(e=>e[key]>=lo && e[key]<hi))}));
-  const dc = binned('dc'), dp = binned('dp'), ag = binned('ag');
-  binRows('bin-dc', dc); binRows('bin-dp', dp); binRows('bin-ag', ag);
+  const dc = binned('dc'), ag = binned('ag');
+  binRows('bin-dc', dc); binRows('bin-ag', ag);
   binRows('bin-wk', [{label:'Walked', ...stat(log.filter(e=>e.wk===1))}, {label:'Didn’t', ...stat(log.filter(e=>e.wk===0))}]);
   binRows('bin-pt', [{label:'Corner', ...stat(withDist.filter(e=>e.pt==='c'))}, {label:'Side', ...stat(withDist.filter(e=>e.pt==='s'))}]);
   $('bincap').textContent = withDist.length < log.length
