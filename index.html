@@ -67,8 +67,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .tabpanel{display:flex;flex-direction:column;gap:16px;min-height:260px}
 .tabpanel > section{border:0;padding-top:0}
 .sessrow{min-height:34px;display:flex;align-items:center}
-.sessidle,.sesslive{display:flex;align-items:center;gap:8px;width:100%;font-size:13px;color:var(--muted)}
-.sessidle > span{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:12px;margin-right:4px}
+.sesslive{display:flex;align-items:center;gap:8px;width:100%;font-size:13px;color:var(--muted)}
 .sesschip{font:600 13px var(--body);background:var(--chip);color:var(--ink);border:0;border-radius:999px;padding:5px 14px;cursor:pointer}
 .sesschip:hover{background:color-mix(in srgb,var(--accent) 18%,var(--chip))}
 .sesslive #sesstext{font-weight:600;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -298,8 +297,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <p class="q" id="question" hidden>How full do you hit the object ball?<small id="modehint"></small></p>
       <div class="sessrow" id="sessrow" hidden>
-        <div class="sessidle" id="sessidle"><span>Session</span> Pick 50 or 100 on the table.
-        </div>
         <div class="sesslive" id="sesslive" hidden>
           <span id="sesstext"></span><div class="sesstrack"><i id="sessfill"></i></div><button class="link" id="sessend">End</button>
         </div>
@@ -1151,7 +1148,7 @@ function finishSession(){
 function syncStreakPill(){ if(!$('streakpill')) return; const c = runs(modeLog()).cur; showStreak(c >= STREAK_HOT ? c : 0, 0); }
 function renderSession(){
   const a = stats.active && stats.active.task === settings.task ? stats.active : null;
-  $('sessidle').hidden = !!a; $('sesslive').hidden = !a;
+  $('sessrow').hidden = !a; $('sesslive').hidden = !a;   // the progress row only shows during a session
   if(a){ $('sesstext').textContent = `Session · ${a.n} / ${a.size}` + (a.n ? ` · ${pct(a.right, a.n)}%` : ''); $('sessfill').style.width = pct(a.n, a.size) + '%'; }
 }
 function showSummary(rec){
@@ -1562,7 +1559,6 @@ const HINTS = {
 };
 function syncPressed(){
   tableBox.classList.toggle('walkable', settings.task==='call' || settings.task==='sess');
-  $('sessrow').hidden = !sessTask(settings.task);
   $('sesshist').hidden = !sessTask(settings.task);
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
   $('modehint').textContent = isPlace()
