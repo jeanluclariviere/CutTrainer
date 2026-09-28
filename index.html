@@ -182,8 +182,12 @@ h3{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 4px;line
 .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px}
 .link{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .patterns{border-top:1px solid var(--line);padding-top:18px;display:flex;flex-direction:column;gap:14px}
-.insight{margin:0;max-width:70ch;font-size:15px}
-.insight span{display:block}
+.insights{display:grid;grid-template-columns:1fr auto;margin:0;border-top:1px solid var(--line)}
+.insights dt,.insights dd{padding:9px 0;border-bottom:1px solid var(--line);margin:0}
+.insights dt{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);align-self:center}
+.insights dd{text-align:right;font:600 15px var(--body);font-variant-numeric:tabular-nums}
+.insights dd small{font-weight:400;font-size:12.5px;color:var(--muted);margin-left:6px}
+.insights dd.up{color:var(--good)} .insights dd.down{color:var(--bad)} .insights dd.none{color:var(--muted);font-weight:400}
 .pgrid{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:28px;align-items:start}
 @media (max-width:760px){.pgrid{grid-template-columns:1fr}}
 .grid-wrap{overflow-x:auto}
@@ -309,7 +313,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="tabs" role="tablist" aria-label="Details">
         <button class="tab" role="tab" data-tab="shot" id="tabbtn-shot">Shot</button>
         <button class="tab" role="tab" data-tab="stats" id="tabbtn-stats">Stats</button>
-        <button class="tab" role="tab" data-tab="misses" id="tabbtn-misses">Misses</button>
         <button class="tab" role="tab" data-tab="settings" id="tabbtn-settings">Settings</button>
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-shot"><div class="result" id="result"></div></div>
@@ -321,9 +324,19 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="stat"><b id="s-streak">0</b><span>Streak</span></div>
         <div class="stat"><b id="s-n">0</b><span>Shots</span></div>
       </div>
-      <div>
+      <div class="mblock">
+        <h2>Patterns</h2>
+        <dl class="insights" id="insight"></dl>
+        <p class="cap" id="insightcap" hidden></p>
+      </div>
+      <div class="mblock">
         <h2 id="byfrac-h">Called right, by real fraction</h2>
         <div class="byfrac" id="byfrac"></div>
+      </div>
+      <div class="mblock">
+        <h2>Recent form</h2>
+        <div class="form" id="form"></div>
+        <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
       </div>
       <div class="mblock" id="sesshist">
         <h2>Sessions</h2>
@@ -331,45 +344,32 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <p class="cap" id="sesscap"></p>
         <div class="sesslist" id="sesslist"></div>
       </div>
+      <div class="mblock">
+        <h2>By distance, cue ball to object ball</h2>
+        <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
+        <div class="byfrac" id="bin-dc"></div>
+      </div>
+      <div class="mblock">
+        <h2>By pocket</h2>
+        <div class="byfrac" id="bin-pt"></div>
+      </div>
+      <div class="mblock">
+        <h2>Walk-around</h2>
+        <div class="byfrac" id="bin-wk"></div>
+      </div>
+      <div class="pgrid">
+        <div id="confbox">
+          <h2>Real fraction vs. your call</h2>
+          <div class="grid-wrap"><table class="conf" id="conf"></table></div>
+        </div>
+        <div>
+          <h2>Where you lean</h2>
+          <div class="legend"><span></span><div><span>← too full</span><span>too thin →</span></div><span></span></div>
+          <div class="leans" id="leans"></div>
+        </div>
+      </div>
+      <p class="cap" id="bincap"></p>
       <div class="foot"><span>Each mode keeps its own score. Best streak: <b id="s-best">0</b></span><button class="link" id="reset">Reset this mode</button></div>
-      </div>
-      <div class="tabpanel" role="tabpanel" id="tab-misses" hidden>
-  <section class="patterns">
-    <div>
-      <h3 id="patterns-h" hidden>Your misses</h3>
-      <p class="insight" id="insight"></p>
-    </div>
-    <div class="mblock">
-      <h2>Recent form</h2>
-      <div class="form" id="form"></div>
-      <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
-    </div>
-    <div class="mblock">
-      <h2>By distance, cue ball to object ball</h2>
-      <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
-      <div class="byfrac" id="bin-dc"></div>
-    </div>
-    <div class="mblock">
-      <h2>By pocket</h2>
-      <div class="byfrac" id="bin-pt"></div>
-    </div>
-    <div class="mblock">
-      <h2>Walk-around</h2>
-      <div class="byfrac" id="bin-wk"></div>
-    </div>
-    <p class="cap" id="bincap"></p>
-    <div class="pgrid">
-      <div id="confbox">
-        <h2>Real fraction vs. your call</h2>
-        <div class="grid-wrap"><table class="conf" id="conf"></table></div>
-      </div>
-      <div>
-        <h2>Where you lean</h2>
-        <div class="legend"><span></span><div><span>← too full</span><span>too thin →</span></div><span></span></div>
-        <div class="leans" id="leans"></div>
-      </div>
-    </div>
-  </section>
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-settings" hidden>
   <section class="settings">
@@ -1175,7 +1175,7 @@ function renderSessionHistory(){
   const last = S.slice(-12);
   $('sessform').innerHTML = last.length
     ? last.map(x=>`<i style="height:${Math.max(3,pct(x.right,x.n))}%" title="${new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${x.size} shots · ${pct(x.right,x.n)}%"></i>`).join('')
-    : `<span class="empty">No finished sessions yet. Start one above the answer buttons.</span>`;
+    : `<span class="empty">No finished sessions yet.</span>`;
   const best = {};
   S.forEach(x=>{ const p = pct(x.right,x.n); if(!best[x.size] || p > best[x.size]) best[x.size] = p; });
   $('sesscap').textContent = last.length ? 'Each bar is one finished session, newest on the right. The line marks 50%.' + (Object.keys(best).length ? ' Best: ' + Object.entries(best).map(([k,v])=>`${v}% (${k})`).join(', ') + '.' : '') : '';
@@ -1421,7 +1421,6 @@ function groupStats(rec){
 
 function renderPatterns(){
   const log = modeLog(), place = isPlace();
-  $('patterns-h').textContent = `Your misses · ${MODE_LABEL[settings.task]}`;
   $('confbox').hidden = place;
   const M = REFS.map(()=>REFS.map(()=>0));
   if(!place){
@@ -1441,10 +1440,9 @@ function renderPatterns(){
   const groups = [
     ['All shots', ()=>true],
     ['Left cuts', e=>e.s==='L'], ['Right cuts', e=>e.s==='R'],
-    ['Overhead', e=>e.v==='top'], ['Standing', e=>e.v==='stand'], ['Down on the ball', e=>e.v==='down'],
+    ['Standing', e=>e.v==='stand'], ['Down on the ball', e=>e.v==='down'],
     ['Ball line', e=>e.v!=='top' && e.c==='line'], ['Aim line', e=>e.v!=='top' && e.c==='aim'],
     ['Short shots', e=>e.ln==='short'], ['Long shots', e=>e.ln==='long'],
-    ['Reference cuts', e=>e.md==='ref'], ['Any angle', e=>e.md==='any'],
   ];
   $('leans').innerHTML = groups.map(([name,fn],gi)=>{
     const g = groupStats(log.filter(fn));
@@ -1455,36 +1453,29 @@ function renderPatterns(){
     return `<div class="lean"><span>${name}</span><div class="dbar" title="${g.thin} too thin, ${g.full} too full">${bar}</div><span class="n">${g.acc}% · ${g.n}</span></div>`;
   }).join('');
 
-  const notes = renderBreakdowns(log);
-  const all = groupStats(log);
-  if(all.n < 10){ $('insight').textContent = all.n ? `${10-all.n} more shots in this mode before patterns mean much.` : 'Play a few shots in this mode and your patterns show up here.'; return; }
-  const noun = place ? 'misses' : 'wrong calls';
-  const parts = [];
+  const found = renderBreakdowns(log);
+  const all = groupStats(log), rows = [];   // [label, value, tone]
+  const dash = ['—','none'];
   const wrong = all.thin + all.full;
-  if(wrong === 0) parts.push(place ? 'No misses yet. Try Any angle or a lower view.' : 'No wrong calls yet. Try long shots, Down on the ball, or Flash mode.');
-  else if(wrong >= 4 && all.thin/wrong >= .65) parts.push(`Most of your ${noun} are too thin, so you’d overcut (${all.thin} of ${wrong}).`);
-  else if(wrong >= 4 && all.full/wrong >= .65) parts.push(`Most of your ${noun} are too full, so you’d undercut (${all.full} of ${wrong}).`);
-  else if(wrong >= 4) parts.push(`Your ${noun} split fairly evenly: ${all.thin} too thin, ${all.full} too full.`);
-  if(place){
-    parts.push(`Your typical (median) ghost-ball error is ${median(log.map(e=>Math.abs(e.e||0))).toFixed(1)}°.`);
-  }
+  rows.push(['Misses lean', ...(wrong < 4 ? (all.n && !wrong ? ['No misses','up'] : dash)
+    : all.thin/wrong >= .65 ? [`Too thin <small>${all.thin} of ${wrong}</small>`,'']
+    : all.full/wrong >= .65 ? [`Too full <small>${all.full} of ${wrong}</small>`,'']
+    : [`Even <small>${all.thin} thin · ${all.full} full</small>`,''])]);
+  let top = null;
+  if(!place) M.forEach((row,i)=>row.forEach((c,j)=>{ if(i!==j && c>=3 && (!top || c>top.c)) top={i,j,c}; }));
+  rows.push(['Common mix-up', ...(top ? [`${REFS[top.j].label} when it’s ${REFS[top.i].label} <small>${top.c}×</small>`,''] : dash)]);
+  rows.push(['Weakest cut', ...(found.worst ? [`${found.worst.label} <small>${pct(found.worst.ok,found.worst.n)}%</small>`,'down'] : dash)]);
+  rows.push(['Strongest cut', ...(found.best ? [`${found.best.label} <small>${pct(found.best.ok,found.best.n)}%</small>`,'up'] : dash)]);
   const L = groupStats(log.filter(e=>e.s==='L')), Rr = groupStats(log.filter(e=>e.s==='R'));
-  if(L.n>=6 && Rr.n>=6 && Math.abs(L.acc-Rr.acc)>=12){
-    const worse = L.acc<Rr.acc ? ['left',L.acc,Rr.acc] : ['right',Rr.acc,L.acc];
-    parts.push(`You do worse on ${worse[0]} cuts (${worse[1]}% vs ${worse[2]}%).`);
-  }
-  const vs = ['top','stand','down'].map(v=>({v, g:groupStats(log.filter(e=>e.v===v))})).filter(x=>x.g.n>=6);
-  if(vs.length>=2){
-    vs.sort((a,b)=>a.g.acc-b.g.acc);
-    if(vs[vs.length-1].g.acc - vs[0].g.acc >= 12) parts.push(`Your weakest view is ${VIEW_LABEL[vs[0].v]} (${vs[0].g.acc}%).`);
-  }
-  if(!place){
-    let top = null;
-    M.forEach((row,i)=>row.forEach((c,j)=>{ if(i!==j && c>=3 && (!top || c>top.c)) top={i,j,c}; }));
-    if(top) parts.push(`Most common mix-up: calling ${REFS[top.j].label} when it’s ${REFS[top.i].label} (${top.c}×).`);
-  }
-  parts.push(...notes);
-  $('insight').innerHTML = parts.map(p=>`<span>${p}</span>`).join('');
+  rows.push(['Left vs. right cuts', ...(L.n>=6 && Rr.n>=6
+    ? (Math.abs(L.acc-Rr.acc) >= 12 ? [`Weaker on ${L.acc<Rr.acc?'left':'right'} <small>${Math.min(L.acc,Rr.acc)}% vs ${Math.max(L.acc,Rr.acc)}%</small>`,'down'] : [`Even <small>${L.acc}% · ${Rr.acc}%</small>`,''])
+    : dash)]);
+  rows.push(['Distance', ...(found.dist || dash)]);
+  rows.push(['Trend', ...(found.trend || dash)]);
+  $('insight').innerHTML = rows.map(([k,v,t])=>`<dt>${k}</dt><dd class="${t}">${v}</dd>`).join('');
+  const cap = $('insightcap');
+  cap.hidden = all.n >= 10;
+  cap.textContent = all.n ? `${10-all.n} more shots in this mode before patterns mean much.` : 'Play a few shots in this mode and your patterns fill in here.';
 }
 
 // ---------- breakdowns: distance, angle, pocket, recent form ----------
@@ -1501,7 +1492,7 @@ function binRows(id, rows){
   }).join('');
 }
 function renderBreakdowns(log){
-  const place = isPlace(), notes = [];
+  const place = isPlace(), notes = {};
   const withDist = log.filter(e=>typeof e.dc === 'number');
   const stat = rec => ({n: rec.length, ok: rec.filter(place ? e=>e.m : success).length});
   const binned = key => BINS[key].map(([lo,hi,label,range])=>({label, range, ...stat(withDist.filter(e=>e[key]>=lo && e[key]<hi))}));
@@ -1518,19 +1509,24 @@ function renderBreakdowns(log){
   $('form').innerHTML = blocks.length
     ? blocks.map(b=>`<i class="${b.n<10?'thin':''}" style="height:${Math.max(3,pct(b.ok,b.n))}%" title="Shots ${b.from}–${b.to}: ${pct(b.ok,b.n)}%${b.n<10?' (block in progress)':''}"></i>`).join('')
     : `<span class="empty">No shots yet</span>`;
-  // plain-language findings
+  // findings for the Patterns list
   const acc = rows => { const n = rows.reduce((a,r)=>a+r.n,0), ok = rows.reduce((a,r)=>a+r.ok,0); return {n, p: pct(ok,n)}; };
   const nearD = acc(dc.slice(0,1)), farD = acc(dc.slice(2));
-  if(nearD.n>=6 && farD.n>=6 && nearD.p - farD.p >= 12) notes.push(`Accuracy drops with distance: ${nearD.p}% on short shots, ${farD.p}% on long ones.`);
-  else if(nearD.n>=6 && farD.n>=6 && Math.abs(nearD.p - farD.p) < 8) notes.push(`Distance isn’t hurting you: ${nearD.p}% on short shots, ${farD.p}% on long ones.`);
-  const angs = REFS.map(r=>({label: r.label, ...stat(log.filter(e=>e.a===r.id))})).filter(r=>r.n>=5);   // by fraction
-  if(angs.length>=2){
-    const worst = angs.reduce((a,b)=>pct(b.ok,b.n)<pct(a.ok,a.n)?b:a), best = angs.reduce((a,b)=>pct(b.ok,b.n)>pct(a.ok,a.n)?b:a);
-    if(pct(best.ok,best.n) - pct(worst.ok,worst.n) >= 15) notes.push(`Weakest cuts: ${worst.label} (${pct(worst.ok,worst.n)}%). Strongest: ${best.label} (${pct(best.ok,best.n)}%).`);
+  if(nearD.n>=6 && farD.n>=6){
+    const d = nearD.p - farD.p;
+    notes.dist = d >= 12 ? [`Drops when long <small>${nearD.p}% → ${farD.p}%</small>`,'down']
+      : d <= -12 ? [`Better when long <small>${nearD.p}% → ${farD.p}%</small>`,'up']
+      : [`Steady <small>${nearD.p}% short · ${farD.p}% long</small>`,''];
   }
-  if(blocks.length>=4){
-    const full = blocks.filter(b=>b.n===10), first = full.slice(0,2), last = full.slice(-2);
-    if(full.length>=4){ const a = acc(first), z = acc(last); if(z.p - a.p >= 15) notes.push(`You’re improving: ${a.p}% → ${z.p}% across your recent blocks.`); else if(a.p - z.p >= 15) notes.push(`Your last 20 shots (${z.p}%) are below your earlier ones (${a.p}%). Fatigue, or harder settings?`); }
+  const fr = REFS.map(r=>({label: r.label, ...stat(log.filter(e=>e.a===r.id))})).filter(r=>r.n>=5);   // by fraction
+  if(fr.length>=2){
+    const worst = fr.reduce((a,b)=>pct(b.ok,b.n)<pct(a.ok,a.n)?b:a), best = fr.reduce((a,b)=>pct(b.ok,b.n)>pct(a.ok,a.n)?b:a);
+    if(pct(best.ok,best.n) > pct(worst.ok,worst.n)){ notes.worst = worst; notes.best = best; }
+  }
+  const full = blocks.filter(b=>b.n===10);
+  if(full.length>=4){
+    const a = acc(full.slice(0,2)), z = acc(full.slice(-2)), d = z.p - a.p;
+    notes.trend = d >= 15 ? [`Improving <small>${a.p}% → ${z.p}%</small>`,'up'] : d <= -15 ? [`Slipping <small>${a.p}% → ${z.p}%</small>`,'down'] : [`Steady <small>${a.p}% → ${z.p}%</small>`,''];
   }
   return notes;
 }
@@ -1624,7 +1620,7 @@ function showTab(t){
   settings.tab = t; saveSettings();
 }
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click', ()=>showTab(b.dataset.tab)));
-showTab(['shot','stats','misses','settings'].includes(settings.tab) ? settings.tab : 'shot');
+showTab(settings.tab==='misses' ? 'stats' : ['shot','stats','settings'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
 $('reset').addEventListener('click', ()=>{ stats.log = stats.log.filter(e=>taskOf(e)!==settings.task); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==settings.task); if(stats.active && stats.active.task===settings.task) stats.active = null; save(); renderStats(); });
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
