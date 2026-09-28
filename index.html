@@ -140,7 +140,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
-.table-box svg{display:block;width:100%;height:100%}
+.table-box > svg{display:block;width:100%;height:100%}
 .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#10283d;color:#ffd34d;font:700 30px var(--display);letter-spacing:.04em}
 .cover small{font:400 13px var(--body);color:#b9cad6;letter-spacing:0}
 .tablecol{min-width:0}
@@ -158,6 +158,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .result svg{width:100%;max-width:440px;height:auto;margin:0 auto;display:block}
 
 .replay[hidden]{display:none}
+.replay .replayicon{width:18px;height:18px;flex:none;display:block}
 .replay{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font:600 14px var(--body);letter-spacing:0;background:transparent;color:#ffd34d;border:1.5px solid #ffd34d;border-radius:999px;padding:7px 16px;cursor:pointer}
 .startbtn{font:700 24px var(--display);letter-spacing:.04em;background:#ffd34d;color:#10283d;border:0;border-radius:10px;padding:10px 34px;cursor:pointer}
 .flashtrack{height:4px;margin-top:6px;border-radius:2px;overflow:hidden}
@@ -293,7 +294,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="tablecol">
       <div class="table-box">
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
-        <div class="cover" id="cover" hidden>Call it<small>What fraction was that?</small><button class="replay" id="replay" aria-label="Replay the shot"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.6 4.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4.2 4.5v5.2h5.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">Replay</span></button></div>
+        <div class="cover" id="cover" hidden>Call it<small>What fraction was that?</small><button class="replay" id="replay" aria-label="Replay the shot"><svg class="replayicon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.5 13.5a8.5 8.5 0 1 0 2.4-7.4L3 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3.5V9h5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">5 left</span></button></div>
         <div class="cover sumcover" id="sesscover" hidden>
           <div class="sumcard">
             <small id="sumhead"></small>
@@ -1717,7 +1718,7 @@ tableBox.addEventListener('click', ()=>{ if(anim){ finishAnim(); return; } if(pe
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
 const MAX_REPLAYS = 5;   // per Flash session
 function replaysLeft(){ const a = stats.active; return a && a.task==='flash' ? Math.max(0, MAX_REPLAYS - (a.replays||0)) : 0; }
-function syncReplay(){ const n = replaysLeft(); $('replay').hidden = n <= 0; $('replaytext').textContent = `Replay · ${n} left`; }
+function syncReplay(){ const n = replaysLeft(); $('replay').hidden = n <= 0; $('replaytext').textContent = `${n} left`; $('replay').setAttribute('aria-label', `Replay the shot, ${n} left`); }
 function replay(){
   if(!shot || answered || settings.task!=='flash' || replaysLeft() <= 0) return;
   shot.replays = (shot.replays||0)+1; stats.active.replays = (stats.active.replays||0) + 1; save();
