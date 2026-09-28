@@ -1163,9 +1163,9 @@ function thock(good){ playSound(good ? 'made' : 'miss'); }
 // ---------- sessions ----------
 function startSession(size){
   stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now()};
-  save(); $('sesscover').hidden = true; $('sessidlecover').hidden = true; renderSession(); deal();
+  save(); $('sesscover').hidden = true; $('sessidlecover').hidden = true; renderSession(); syncStreakPill(); deal();
 }
-function endSession(){ stats.active = null; save(); renderSession(); showSessIdle(); }
+function endSession(){ stats.active = null; save(); renderSession(); showSessIdle(); syncStreakPill(); }
 function sessionTick(ok, made){
   const a = stats.active; if(!a || a.task !== settings.task) return;
   a.n++; if(ok) a.right++; if(made) a.made++;
@@ -1176,9 +1176,9 @@ function finishSession(){
   const rec = {id:a.id, task:a.task, size:a.size, n:a.n, right:a.right, made:a.made, start:a.start + (a.pause||0), end:Date.now(),
     md:settings.mode, v:settings.view, ln:settings.len, tb:settings.table, pk:settings.pockets};
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
-  stats.active = null; save(); renderSession(); renderStats(); showSummary(rec);
+  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
 }
-function syncStreakPill(){ if(!$('streakpill')) return; const c = runs(modeLog()).cur; showStreak(c >= STREAK_HOT ? c : 0, 0); }
+function syncStreakPill(){ if(!$('streakpill')) return; const c = curStreak(); showStreak(c >= STREAK_HOT ? c : 0, 0); }
 function renderSession(){
   const a = stats.active && stats.active.task === settings.task ? stats.active : null;
   $('sessrow').hidden = !a; $('sesslive').hidden = !a;   // the progress row only shows during a session
@@ -1265,7 +1265,7 @@ function answer(id){
   const counted = oc.made || ok;                             // a right call never counts against your pocket rate
   shot.pick = {...oc, id, far: Math.abs(picked.deg - shot.theta) > 0.3 && (!ok || tip)};
   const aided = settings.ghost === '1';
-  const prevStreak = aided ? 0 : runs(modeLog()).cur;
+  const prevStreak = aided ? 0 : curStreak();
   const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
   // sound first: nothing else runs before it
   if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);
@@ -1458,10 +1458,20 @@ function shoot(){
 // ---------- stats & patterns ----------
 function pct(a,b){ return b ? Math.round(100*a/b) : 0; }
 function median(xs){ if(!xs.length) return 0; const a=[...xs].sort((x,y)=>x-y), m=a.length>>1; return a.length%2 ? a[m] : (a[m-1]+a[m])/2; }
+// Streaks live inside one session: a new session always starts from zero.
 function runs(L){
-  let cur = 0, best = 0;
-  for(const e of L){ if(success(e)){ cur++; best = Math.max(best,cur); } else cur = 0; }
+  let cur = 0, best = 0, sid;
+  for(const e of L){
+    if(e.sid !== sid){ cur = 0; sid = e.sid; }
+    if(success(e)){ cur++; best = Math.max(best,cur); } else cur = 0;
+  }
   return {cur, best};
+}
+function curStreak(){   // the streak you're on right now, in the session being played
+  const L = modeLog(), last = L[L.length-1];
+  const a = stats.active && stats.active.task===settings.task ? stats.active : null;
+  if(!last || !a || last.sid !== a.id) return 0;
+  return runs(L).cur;
 }
 function renderStats(){
   const L = statLog(), n = L.length, place = isPlace();
