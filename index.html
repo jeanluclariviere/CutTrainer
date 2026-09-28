@@ -888,9 +888,12 @@ function perspSVG(s, reveal, view){
   const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
   o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
 
-  // the correct path to the pocket appears at contact, together with the ghost ball and the trails
-  if(reveal || (s.anim && s.anim.trail.ob))
-    o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[s.P.t[0],s.P.t[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
+  // the correct path to the pocket draws itself from contact on, as if the object ball were rolling along it
+  if(reveal || (s.anim && s.anim.run > 0)){
+    const full = len(sub(s.P.t, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed
+    const end = add(s.ob, mul(sub(s.P.t, s.ob), k));
+    if(k > 0.002) o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[end[0],end[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
+  }
   if(reveal){
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
@@ -1381,7 +1384,7 @@ function animateShot(oc, done, obCol){
       cb = add(g2, mul(sub(cbEnd, g2), easeOut(u3)));
       if(sink){ const past = len(sub(ob, ob0)) - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
     }
-    s.anim = {cb, ob: obScale > 0.02 ? ob : null, obScale,
+    s.anim = {cb, ob: obScale > 0.02 ? ob : null, obScale, run: t < T1 ? 0 : V*(t-T1),   // run: how far the object ball has travelled since contact
       trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : (jaw && len(sub(ob, ob0)) > dJ ? [ob0, jaw, ob] : [ob0, ob]), obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
