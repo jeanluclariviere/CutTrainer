@@ -869,9 +869,7 @@ function perspSVG(s, reveal, view){
   const A = s.anim, F = reveal && !A ? s.final : null;
   const items = [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];
   if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A ? A.obScale : 1});
-  // start-position references: each appears as soon as its ball leaves the spot
-  if(F || (A && len(sub(A.cb, s.cb)) > 0.2)) items.push({p:s.cb, kind:'refcb'});
-  if(F || (A && (!A.ob || len(sub(A.ob, s.ob)) > 0.2))) items.push({p:s.ob, kind:'refob'});
+  // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
   if(A ? (contact || settings.ghost==='1') : (reveal || settings.ghost==='1')) items.push({p:s.gb, kind:'ghost'});   // ghost-ball aid shows it before you answer
   if(contact && s.pick && s.pick.far) items.push({p:s.pick.g2, kind:'callghost'});   // where your call made contact; the reveal draws it once the balls stop
