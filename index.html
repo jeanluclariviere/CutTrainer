@@ -1075,13 +1075,15 @@ function updateControls(){
   $('question').firstChild.textContent = QUESTION[settings.task];
 }
 
+let laterT = 0;
+function laterSave(){ clearTimeout(laterT); laterT = setTimeout(()=>{ save(); renderStats(); }, 30); }   // after the answer has painted
 function logEntry(extra){
   const act = stats.active && stats.active.task===settings.task ? stats.active.id : undefined;
   stats.log.push({sid:act, t:settings.task, a:shot.answer.id, s:shot.side, v:settings.view,
     c: settings.view==='top' ? '-' : (isPlace() ? 'line' : settings.cam),
     md:settings.mode, th:settings.throw, ln:shot.len, rp:shot.replays||0, wk: shot.walked ? 1 : 0, dc:Math.round(len(sub(shot.ob,shot.cb))), dp:Math.round(shot.L), ag:+shot.theta.toFixed(1), pt:shot.P.side?'s':'c', gh: settings.ghost==='1' ? 1 : 0, tb:settings.table, pk:settings.pockets, ...extra});
   if(stats.log.length > 3000) stats.log = stats.log.slice(-3000);
-  save(); renderStats();
+  laterSave();
 }
 function finishRound(){
   tableBox.classList.add('tappable');
@@ -1093,9 +1095,15 @@ const lbl = r => r.id==='full' ? 'full' : r.label;
 
 // ---------- sounds: soft, clean UI tones ----------
 let actx = null;
-function audioOut(level){
-  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+function audioCtx(){
+  if(!actx){ const AC = window.AudioContext || window.webkitAudioContext; try{ actx = new AC({latencyHint:'interactive'}); }catch(e){ actx = new AC(); } }
   if(actx.state === 'suspended') actx.resume();
+  return actx;
+}
+// browsers only allow audio after a user gesture: wake it on the first touch or key, so the first answer isn't late
+['pointerdown','keydown'].forEach(t=>window.addEventListener(t, ()=>{ if(settings.sound !== '0') try{ audioCtx(); }catch(e){} }, {capture:true, passive:true}));
+function audioOut(level){
+  audioCtx();
   const out = actx.createGain(); out.gain.value = level;
   const dly = actx.createDelay(); dly.delayTime.value = 0.09;          // a touch of short echo
   const fb = actx.createGain(); fb.gain.value = 0.18;
@@ -1255,8 +1263,12 @@ function answer(id){
   shot.pick = {...oc, id, far: Math.abs(picked.deg - shot.theta) > 0.3 && (!ok || tip)};
   const aided = settings.ghost === '1';
   const prevStreak = aided ? 0 : runs(modeLog()).cur;
-  logEntry({p:id, m:counted?1:0});
   const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
+  // sound first: nothing else runs before it
+  if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);
+  else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
+  else thock(counted);
+  logEntry({p:id, m:counted?1:0});
   document.querySelectorAll('#answers button').forEach(b=>{ b.disabled = true; });
   const reveal = (animMs)=>{
     if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
@@ -1289,9 +1301,6 @@ function answer(id){
     else if(b.dataset.id===id) b.className='wrong';
   });
   if(!aided) showStreak(newStreak, !ok && prevStreak >= STREAK_HOT ? prevStreak : 0);
-  if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);
-  else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
-  else thock(counted);
   if(settings.animate !== '0'){ animateShot(ok ? outcome(shot, shot.theta) : oc, reveal, ok ? '#ffd34d' : MISS); updateControls(); }   // Next shot works straight away
   else reveal(0);
 }
@@ -1615,7 +1624,9 @@ function applySetting(key, val){
 document.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click', ()=>applySetting(b.dataset.set, b.dataset.val)));
 
 $('answers').innerHTML = REFS.map((r,i)=>`<button data-id="${r.id}" id="ans-${r.id}" aria-label="${r.label} ball, key ${i+1}"><kbd class="key" aria-hidden="true">${i+1}</kbd>${r.label}<span>${r.deg.toFixed(r.deg%1?1:0)}°</span></button>`).join('');
-$('answers').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) answer(b.dataset.id); });
+// answer on press (pointerdown), not on release: a tap's click lands ~100 ms later
+$('answers').addEventListener('pointerdown', e=>{ if(e.button !== 0) return; const b=e.target.closest('button'); if(b && !b.disabled){ e.preventDefault(); answer(b.dataset.id); } });
+$('answers').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b && e.detail === 0) answer(b.dataset.id); });   // keyboard activation (Enter/Space on a focused button)
 $('nudge-l').addEventListener('click', ()=>nudge(-1));
 $('nudge-r').addEventListener('click', ()=>nudge(1));
 $('next').addEventListener('click', ()=>{
