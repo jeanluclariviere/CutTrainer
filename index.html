@@ -1,0 +1,1674 @@
+<title>Cut Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{
+  --bg:#edf1f3; --surface:#ffffff; --ink:#15222b; --muted:#5a6b76; --line:#d3dce1;
+  --accent:#1d6fa5; --accent-ink:#ffffff; --good:#2c8249; --bad:#bf3f2b; --chip:#e3eaee;
+  --thin:#c46a1f; --full:#1d6fa5;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0d151b; --surface:#15212a; --ink:#e2eaef; --muted:#8fa1ad; --line:#26343e;
+    --accent:#5aaee6; --accent-ink:#08131b; --good:#5cc27c; --bad:#ef7a63; --chip:#1d2b35;
+    --thin:#e89a55; --full:#5aaee6;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0d151b; --surface:#15212a; --ink:#e2eaef; --muted:#8fa1ad; --line:#26343e;
+  --accent:#5aaee6; --accent-ink:#08131b; --good:#5cc27c; --bad:#ef7a63; --chip:#1d2b35;
+  --thin:#e89a55; --full:#5aaee6;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
+.wrap{max-width:1680px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;letter-spacing:.01em;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:60ch}
+.seg{display:inline-flex;background:var(--chip);border-radius:8px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{font:500 13px var(--body);border:0;background:transparent;color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.controls{display:flex;flex-wrap:wrap;gap:8px}
+.settings{border-top:1px solid var(--line);padding-top:16px}
+.options{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center}
+.quick{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:14px;color:var(--muted);min-height:22px}
+.quick b{font-family:var(--display);font-size:19px;font-weight:700}
+.quick b.ok{color:var(--good)} .quick b.no{color:var(--bad)}
+.quick .in{color:var(--good);font-weight:600} .quick .out{color:var(--ink);font-weight:600}
+.table-box.tappable{cursor:pointer}
+.table-box.walkable svg{touch-action:pan-y;cursor:grab}
+.table-box.walkable svg:active{cursor:grabbing}
+.table-box.placing svg{touch-action:none;cursor:crosshair}
+.modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
+.modes button{font-size:15px;padding:9px 14px}
+.quick{flex-direction:column;align-items:flex-start;gap:2px;min-height:66px}
+.quick .hint{color:var(--muted);font-size:14px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:4px}
+.tab{font:600 14px var(--body);background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;margin-bottom:-1px;cursor:pointer}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabpanel{display:flex;flex-direction:column;gap:16px;min-height:260px}
+.tabpanel > section{border:0;padding-top:0}
+.sessrow{min-height:34px;display:flex;align-items:center}
+.sessidle,.sesslive{display:flex;align-items:center;gap:8px;width:100%;font-size:13px;color:var(--muted)}
+.sessidle > span{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:12px;margin-right:4px}
+.sesschip{font:600 13px var(--body);background:var(--chip);color:var(--ink);border:0;border-radius:999px;padding:5px 14px;cursor:pointer}
+.sesschip:hover{background:color-mix(in srgb,var(--accent) 18%,var(--chip))}
+.sesslive #sesstext{font-weight:600;color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sesstrack{flex:1;height:6px;background:var(--chip);border-radius:3px;overflow:hidden}
+.sesstrack i{display:block;height:100%;width:0;background:var(--accent);border-radius:3px;transition:width .2s}
+.sumcover{background:rgba(9,20,31,.94);cursor:default;padding:16px;z-index:6;overflow:auto;justify-content:flex-start}
+.sumcover .sumcard{margin:auto}
+@media (max-width:760px){#sesscover{position:fixed;inset:0;z-index:50;border-radius:0}.sumcover{padding:10px}.sumcard{gap:2px;font-size:12.5px}.sumcard small{font-size:11px}.sumbig{font-size:38px}.sumgrid{margin:8px 0 4px;padding:8px 12px;gap:5px 18px}.sumgrid dd{font-size:14px}.sumbtns{margin-top:4px;gap:8px}.sumbtns .startbtn{font-size:17px;padding:6px 16px}.sumdone{font-size:13px;padding:6px 14px}}
+.sumcard{display:flex;flex-direction:column;align-items:center;gap:6px;max-width:420px;text-align:center;color:#e6eef3;font:400 14px var(--body);letter-spacing:0}
+.sumcard small{color:#9fb3c1;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+.sumbig{font:700 64px/1 var(--display);color:#ffd34d}
+.sumsub{color:#c9d7e0}
+.sumgrid{display:grid;grid-template-columns:auto auto;gap:7px 28px;margin:14px 0 6px;padding:12px 18px;border-top:1px solid #2c3d4a;border-bottom:1px solid #2c3d4a;text-align:left;min-width:260px}
+.sumgrid dt{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.08em;color:#8fa3b1;align-self:center}
+.sumgrid dd{margin:0;text-align:right;font:600 16px var(--body);color:#eef4f7;font-variant-numeric:tabular-nums}
+.sumgrid dd small{font-weight:400;font-size:12px;color:#9fb3c1;margin-left:4px;text-transform:none;letter-spacing:0}
+.sumgrid dd.up{color:#7fe0a0} .sumgrid dd.down{color:#ff9b87}
+.sumbtns{display:flex;gap:12px;align-items:center;margin-top:8px}
+.sumdone{font:600 15px var(--body);background:transparent;color:#e6eef3;border:1.5px solid #6f8797;border-radius:10px;padding:10px 22px;cursor:pointer}
+.sesslist{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.sesslist .srow{display:grid;grid-template-columns:1fr auto auto;gap:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sesslist .srow b{color:var(--ink);font-weight:600}
+.mblock{display:flex;flex-direction:column;gap:6px}
+.mblock h2{margin:0}
+.byfrac .row.thin{opacity:.5}
+.row .lab.wide{font:500 13px var(--body);color:var(--ink)}
+.byfrac.bins .row{grid-template-columns:64px 1fr 64px}
+.form{display:flex;align-items:flex-end;gap:4px;height:64px;border-bottom:1px solid var(--line);background:linear-gradient(to top,transparent calc(50% - .5px),var(--line) calc(50% - .5px),var(--line) calc(50% + .5px),transparent calc(50% + .5px))}
+.form i{flex:1;max-width:28px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+.form i.thin{opacity:.5}
+.form .empty{color:var(--muted);font-size:13px;align-self:center}
+.tabpanel .pgrid{grid-template-columns:1fr;gap:18px}
+.tabpanel .options{gap:12px 18px}
+.quick .ql{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.quick .ql.tap{font-size:13px}
+.nudge{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.nudge button{font:600 15px var(--body);padding:12px 0;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.nudge button:disabled{opacity:.4;cursor:default}
+#scoremode{margin:4px 0 -8px}
+.opt{display:flex;align-items:center;gap:8px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.opt .seg button{padding:4px 10px;text-transform:none;letter-spacing:0}
+.main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
+.main.persp{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
+.table-box.persp{aspect-ratio:3/2;width:100%}
+@media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
+.table-box svg{display:block;width:100%;height:100%}
+.cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#10283d;color:#ffd34d;font:700 30px var(--display);letter-spacing:.04em}
+.cover small{font:400 13px var(--body);color:#b9cad6;letter-spacing:0}
+.tablecol{min-width:0}
+.streakpill{position:absolute;top:12px;left:12px;z-index:5;display:flex;align-items:center;gap:8px;padding:6px 14px 6px 10px;border-radius:999px;font:600 14px var(--body);letter-spacing:.02em;pointer-events:none}
+.streakpill b{font:700 20px/1 var(--display);font-variant-numeric:tabular-nums}
+.streakpill.hot{background:#ffd34d;color:#2a1c00;box-shadow:0 0 0 3px rgba(255,211,77,.25),0 0 24px rgba(255,211,77,.55)}
+.streakpill.hot .spark{width:10px;height:10px;border-radius:50%;background:#fff6d1;box-shadow:0 0 10px 3px #fff0a8;animation:sparkpulse 1.1s ease-in-out infinite}
+.streakpill.pop{animation:streakpop .35s cubic-bezier(.2,1.6,.4,1)}
+.streakpill.over{background:rgba(9,20,31,.85);color:#c9d7e0;border:1px solid #3a4a56}
+@keyframes streakpop{0%{transform:scale(.7)}100%{transform:scale(1)}}
+@keyframes sparkpulse{0%,100%{opacity:1}50%{opacity:.45}}
+@media (prefers-reduced-motion:reduce){.streakpill.pop,.streakpill .spark{animation:none!important}}
+/* shot breakdown: one fixed-size box, scrolls inside if a long explanation ever overflows */
+.result{height:236px;overflow:auto;align-content:start}
+.result svg{width:120px;height:72px}
+@media (max-width:420px){.result{height:268px}}
+.replay{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font:600 14px var(--body);letter-spacing:0;background:transparent;color:#ffd34d;border:1.5px solid #ffd34d;border-radius:999px;padding:7px 16px;cursor:pointer}
+.startbtn{font:700 24px var(--display);letter-spacing:.04em;background:#ffd34d;color:#10283d;border:0;border-radius:10px;padding:10px 34px;cursor:pointer}
+.flashtrack{height:4px;margin-top:6px;border-radius:2px;overflow:hidden}
+.flashbar{height:100%;width:100%;background:var(--accent);transform-origin:left;animation:shrink var(--dur,1500ms) linear forwards}
+@keyframes shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.panel{display:flex;flex-direction:column;gap:16px}
+.q{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.15;margin:0}
+.q small{display:block;font-family:var(--body);font-weight:400;font-size:14px;color:var(--muted);margin-top:4px}
+.answers{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.answers button{font-family:var(--display);font-weight:700;font-size:28px;line-height:1;padding:12px 0 8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:border-color .12s,background .12s}
+.answers button span{font:500 11px var(--mono);color:var(--muted);letter-spacing:.02em}
+.answers button:hover:not(:disabled){border-color:var(--accent)}
+.answers button:disabled{cursor:default}
+.answers button.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
+.answers button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.result{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+.result svg{width:132px;height:80px;display:block}
+.verdict{font-family:var(--display);font-weight:700;font-size:22px;margin:0;line-height:1.1}
+.verdict.ok{color:var(--good)} .verdict.no{color:var(--bad)}
+.badge{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--body);padding:3px 10px;border-radius:999px;margin-top:6px}
+.badge.in{color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
+.badge.tip{color:var(--thin);background:color-mix(in srgb,var(--thin) 13%,var(--surface))}
+.quick .tipq{color:var(--accent);font-weight:600}
+.badge.out{color:var(--ink);background:var(--chip)}
+.detail{margin:6px 0 0;color:var(--muted);font-size:14px}
+.detail b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.placeholder{color:var(--muted);font-size:14px;grid-column:1/-1;margin:0}
+.next{font:600 15px var(--body);background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 16px;cursor:pointer;width:100%}
+.next:disabled{opacity:.4;cursor:default}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.stat{background:var(--chip);border-radius:10px;padding:8px 4px}
+.stat b{display:block;font-family:var(--display);font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.byfrac{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:38px 1fr 64px;gap:10px;align-items:center;font-size:13px}
+.row .lab{font-family:var(--display);font-weight:700;font-size:18px}
+.bar{height:8px;background:var(--chip);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.row .n,.lean .n{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
+h3{font-family:var(--display);font-size:26px;font-weight:700;margin:0 0 4px;line-height:1.1}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:13px}
+.link{background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font:inherit;padding:0}
+.patterns{border-top:1px solid var(--line);padding-top:18px;display:flex;flex-direction:column;gap:14px}
+.insight{margin:0;max-width:70ch;font-size:15px}
+.insight span{display:block}
+.pgrid{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:760px){.pgrid{grid-template-columns:1fr}}
+.grid-wrap{overflow-x:auto}
+table.conf{border-collapse:separate;border-spacing:3px;font-variant-numeric:tabular-nums}
+table.conf th{font:700 17px var(--display);color:var(--ink);padding:0 4px;text-align:center}
+table.conf th.rowh{text-align:right;padding-right:8px}
+table.conf th.axis{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+table.conf td{width:44px;height:36px;text-align:center;border-radius:6px;font:500 13px var(--mono);background:var(--chip);color:var(--ink)}
+.cap{font-size:12px;color:var(--muted);margin:6px 0 0}
+.leans{display:flex;flex-direction:column;gap:8px}
+.lean{display:grid;grid-template-columns:128px 1fr 78px;gap:10px;align-items:center;font-size:13px}
+.dbar{position:relative;height:10px;background:var(--chip);border-radius:5px}
+.dbar::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:var(--muted)}
+.dbar i{position:absolute;top:0;bottom:0;border-radius:5px}
+.dbar i.thin{background:var(--thin);left:50%}
+.dbar i.full{background:var(--full);right:50%}
+.legend{display:grid;grid-template-columns:128px 1fr 78px;gap:10px;font-size:11px;color:var(--muted)}
+.legend div{display:flex;justify-content:space-between}
+.notes{border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:14px;max-width:70ch}
+.notes p{margin:0 0 8px}
+kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:4px;padding:1px 5px}
+@media (max-width:760px){
+  body{padding-block:10px 32px}
+  .wrap{gap:12px}
+  h1{font-size:28px}
+  .sub{display:none}
+  .panel{gap:10px}
+  .q{font-size:17px}
+  .q small{display:none}
+  .table-box{width:min(100%, 44vh)}
+  .answers button{padding:10px 0 6px}
+  .next{padding:11px 16px}
+  .opt{flex-wrap:wrap}
+}
+@media (max-width:420px){.answers button{font-size:24px}.result{grid-template-columns:1fr}.result svg{margin:0 auto}.lean,.legend{grid-template-columns:96px 1fr 64px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.pulse{animation:none!important}}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.95}50%{opacity:.35}}
+
+/* Desktop: one screen, two columns on a shared grid.
+   Header row: title and mode switch share a centre line.
+   Body row: table and panel share top and bottom edges; the panel's detail box stretches to meet the table's bottom. */
+@media (min-width:900px){
+  body{padding-block:16px}
+  .wrap{height:calc(100vh - 32px);height:calc(100dvh - 32px);min-height:620px;gap:16px}
+  header{flex:none;align-items:center;flex-wrap:nowrap}
+  header h1{font-size:36px}
+  .sub{display:none}
+  .main,.main.persp{flex:1;min-height:0;grid-template-columns:minmax(0,1fr) clamp(360px,31vw,440px);gap:24px;align-items:stretch}
+  .tablecol{display:flex;flex-direction:column;gap:6px;min-height:0}
+  .table-box,.table-box.persp{flex:1;min-height:0;width:100%;height:auto;aspect-ratio:auto;margin:0}
+  .flashtrack{flex:none;margin-top:0}
+  .panel{min-height:0;display:flex;flex-direction:column;gap:16px;padding-bottom:10px}
+  .q{margin-top:0;line-height:1.1}
+  .q small{line-height:1.35}
+  .tabs{margin-top:0}
+  .tabpanel{flex:1;min-height:0;overflow:auto}
+  #tab-shot .result{flex:1;height:auto;min-height:0}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Cut Trainer</h1>
+      <p class="sub">Read the layout and aim for the ringed pocket.</p>
+    </div>
+  </header>
+
+
+  <div class="main">
+    <div class="tablecol">
+      <div class="table-box">
+        <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
+        <div class="cover" id="cover" hidden>Call it<small>What fraction was that?</small><button class="replay" id="replay" aria-label="Replay the shot"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5a7 7 0 1 1-6.6 4.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4.2 4.5v5.2h5.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Replay</button></div>
+        <div class="cover sumcover" id="sesscover" hidden>
+          <div class="sumcard">
+            <small id="sumhead"></small>
+            <div class="sumbig" id="sumbig"></div>
+            <div class="sumsub" id="sumsub"></div>
+            <dl class="sumgrid" id="sumnotes"></dl>
+            <div class="sumbtns"><button class="startbtn" id="sessagain"></button><button class="sumdone" id="sessdone">Done</button></div>
+          </div>
+        </div>
+        <div class="cover sumcover" id="sessidlecover" hidden>
+          <div class="sumcard">
+            <small>Sessions</small>
+            <div class="sumsub">Pick a length to start. Each session is scored on its own.</div>
+            <div class="sumbtns"><button class="startbtn" data-sess="50">50 shots</button><button class="startbtn" data-sess="100">100 shots</button></div>
+            <div class="sumsub" id="sessidlelast"></div>
+          </div>
+        </div>
+        <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
+        <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
+      </div>
+      <div class="flashtrack"><div class="flashbar" id="flashbar" hidden></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="seg modes" role="group" aria-label="Mode">
+        <button id="task-call" data-set="task" data-val="call">Freeplay</button>
+        <button id="task-sess" data-set="task" data-val="sess">Sessions</button>
+        <button id="task-flash" data-set="task" data-val="flash">Flash</button>
+      </div>
+      <p class="q" id="question" hidden>How full do you hit the object ball?<small id="modehint"></small></p>
+      <div class="sessrow" id="sessrow" hidden>
+        <div class="sessidle" id="sessidle"><span>Session</span> Pick 50 or 100 on the table.
+        </div>
+        <div class="sesslive" id="sesslive" hidden>
+          <span id="sesstext"></span><div class="sesstrack"><i id="sessfill"></i></div><button class="link" id="sessend">End</button>
+        </div>
+      </div>
+      <div class="answers" id="answers"></div>
+      <div class="nudge" id="nudge" hidden>
+        <button id="nudge-l" aria-label="Move ghost ball left">◀ Left</button>
+        <button id="nudge-r" aria-label="Move ghost ball right">Right ▶</button>
+      </div>
+      <div class="quick" id="quick" aria-live="polite"></div>
+      <button class="next" id="next" disabled>Next shot</button>
+      <div class="tabs" role="tablist" aria-label="Details">
+        <button class="tab" role="tab" data-tab="shot" id="tabbtn-shot">Shot</button>
+        <button class="tab" role="tab" data-tab="stats" id="tabbtn-stats">Stats</button>
+        <button class="tab" role="tab" data-tab="misses" id="tabbtn-misses">Misses</button>
+        <button class="tab" role="tab" data-tab="settings" id="tabbtn-settings">Settings</button>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tab-shot"><div class="result" id="result"></div></div>
+      <div class="tabpanel" role="tabpanel" id="tab-stats" hidden>
+      <h2 id="scoremode">Normal mode</h2>
+      <div class="stats">
+        <div class="stat"><b id="s-acc">–</b><span id="s-l1">Called right</span></div>
+        <div class="stat" title="Called right over your last 20 shots in this mode"><b id="s-made">–</b><span>Last 20</span></div>
+        <div class="stat"><b id="s-streak">0</b><span>Streak</span></div>
+        <div class="stat"><b id="s-n">0</b><span>Shots</span></div>
+      </div>
+      <div>
+        <h2 id="byfrac-h">Called right, by real fraction</h2>
+        <div class="byfrac" id="byfrac"></div>
+      </div>
+      <div class="mblock" id="sesshist">
+        <h2>Sessions</h2>
+        <div class="form" id="sessform"></div>
+        <p class="cap" id="sesscap"></p>
+        <div class="sesslist" id="sesslist"></div>
+      </div>
+      <div class="foot"><span>Each mode keeps its own score. Best streak: <b id="s-best">0</b></span><button class="link" id="reset">Reset this mode</button></div>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tab-misses" hidden>
+  <section class="patterns">
+    <div>
+      <h3 id="patterns-h" hidden>Your misses</h3>
+      <p class="insight" id="insight"></p>
+    </div>
+    <div class="mblock">
+      <h2>Recent form</h2>
+      <div class="form" id="form"></div>
+      <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
+    </div>
+    <div class="mblock">
+      <h2>By cue ball to object ball distance</h2>
+      <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
+      <div class="byfrac" id="bin-dc"></div>
+    </div>
+    <div class="mblock">
+      <h2>By object ball to pocket distance</h2>
+      <p class="cap" style="margin:0">Short under 2 ft · Medium 2–4 ft · Long 4 ft +</p>
+      <div class="byfrac" id="bin-dp"></div>
+    </div>
+    <div class="mblock">
+      <h2>By cut angle</h2>
+      <div class="byfrac" id="bin-ag"></div>
+    </div>
+    <div class="mblock">
+      <h2>By pocket</h2>
+      <div class="byfrac" id="bin-pt"></div>
+    </div>
+    <div class="mblock">
+      <h2>Walk-around</h2>
+      <div class="byfrac" id="bin-wk"></div>
+    </div>
+    <p class="cap" id="bincap"></p>
+    <div class="pgrid">
+      <div id="confbox">
+        <h2>Real fraction vs. your call</h2>
+        <div class="grid-wrap"><table class="conf" id="conf"></table></div>
+      </div>
+      <div>
+        <h2>Where you lean</h2>
+        <div class="legend"><span></span><div><span>← too full</span><span>too thin →</span></div><span></span></div>
+        <div class="leans" id="leans"></div>
+      </div>
+    </div>
+  </section>
+      </div>
+      <div class="tabpanel" role="tabpanel" id="tab-settings" hidden>
+  <section class="settings">
+    <div class="options">
+    
+    <div class="opt">View
+      <div class="seg" role="group" aria-label="View">
+        <button id="view-stand" data-set="view" data-val="stand">Standing</button>
+        <button id="view-down" data-set="view" data-val="down">Down on the ball</button>
+      </div>
+    </div>
+    <div class="opt">Table
+      <div class="seg" role="group" aria-label="Table size">
+        <button id="table-7" data-set="table" data-val="7">7 ft</button>
+        <button id="table-8" data-set="table" data-val="8">8 ft</button>
+        <button id="table-9" data-set="table" data-val="9">9 ft</button>
+      </div>
+    </div>
+    <div class="opt">Pockets
+      <div class="seg" role="group" aria-label="Pocket size">
+        <button id="pk-bar" data-set="pockets" data-val="bar">5&Prime;</button>
+        <button id="pk-std" data-set="pockets" data-val="std">4.5&Prime;</button>
+        <button id="pk-pro" data-set="pockets" data-val="pro">4&Prime;</button>
+      </div>
+    </div>
+    <div class="opt">Distance
+      <div class="seg" role="group" aria-label="Distance">
+        <button id="len-short" data-set="len" data-val="short">Short</button>
+        <button id="len-long" data-set="len" data-val="long">Long</button>
+        <button id="len-both" data-set="len" data-val="both">Both</button>
+      </div>
+    </div>
+    <div class="opt">Flash time
+      <div class="seg" role="group" aria-label="Flash time">
+        <button id="flash-1500" data-set="flash" data-val="1500">1.5 s</button>
+        <button id="flash-750" data-set="flash" data-val="750">0.75 s</button>
+      </div>
+    </div>
+    <div class="opt">Stance
+      <div class="seg" role="group" aria-label="Stance">
+        <button id="cam-line" data-set="cam" data-val="line">Ball line</button>
+        <button id="cam-aim" data-set="cam" data-val="aim">Aim line</button>
+      </div>
+    </div>
+    <div class="opt">Ghost ball
+      <div class="seg" role="group" aria-label="Show ghost ball">
+        <button id="ghost-0" data-set="ghost" data-val="0">Off</button>
+        <button id="ghost-1" data-set="ghost" data-val="1">On</button>
+      </div>
+    </div>
+    <div class="opt">Shot animation
+      <div class="seg" role="group" aria-label="Shot animation">
+        <button id="animate-0" data-set="animate" data-val="0">Off</button>
+        <button id="animate-1" data-set="animate" data-val="1">On</button>
+      </div>
+    </div>
+    <div class="opt">Sound
+      <div class="seg" role="group" aria-label="Sound">
+        <button id="sound-0" data-set="sound" data-val="0">Off</button>
+        <button id="sound-1" data-set="sound" data-val="1">On</button>
+      </div>
+    </div>
+    <div class="opt">Full-ball shots
+      <div class="seg" role="group" aria-label="Full-ball shots">
+        <button id="full-0" data-set="full" data-val="0">Off</button>
+        <button id="full-1" data-set="full" data-val="1">On</button>
+      </div>
+    </div>
+    <div class="opt">Deal my misses more
+      <div class="seg" role="group" aria-label="Deal my misses more">
+        <button id="focus-0" data-set="focus" data-val="0">Off</button>
+        <button id="focus-1" data-set="focus" data-val="1">On</button>
+      </div>
+    </div>
+    </div>
+  </section>
+      </div>
+    </div>
+  </div>
+
+
+
+</div>
+<script>
+(function(){
+const R = 1.125;               // ball radius, inches (2.25" ball)
+// Playing surfaces (inches), portrait. Pocket mouths: corner / side, jaw to jaw.
+const TABLES = {'7':[39,78], '8':[44,88], '9':[50,100]};
+const POCKET_SIZES = {bar:[5,5.5], std:[4.5,5], tight:[4.25,4.75], pro:[4,4.5]};
+let W = 50, H = 100, PK = POCKET_SIZES.std;
+const RAD = Math.PI/180;
+const REFS = [
+  {id:'full', label:'Full', f:1},
+  {id:'34', label:'¾', f:.75},
+  {id:'12', label:'½', f:.5},
+  {id:'14', label:'¼', f:.25},
+  {id:'18', label:'⅛', f:.125},
+].map(r => ({...r, deg: Math.asin(1-r.f)/RAD}));
+// cut-angle range in which each reference is the nearest fraction (Any angle mode tops out at 66°)
+const BOUNDS = (()=>{ const fs=[1,.875,.625,.375,.1875,1-Math.sin(66*RAD)]; return REFS.map((r,i)=>[Math.asin(1-fs[i])/RAD, Math.asin(1-fs[i+1])/RAD]); })();
+const VIEW_LABEL = {top:'Overhead', stand:'Standing', down:'Down on the ball'};
+const OB_COLORS = [['#f2b705','1'],['#1f4fbf','2'],['#d22b2b','3'],['#6b2fa0','4'],['#f07a12','5'],['#1d8a4a','6'],['#8a1f24','7']];
+let POCKETS = [];
+function setTable(size, pockets){
+  [W, H] = TABLES[size] || TABLES['9'];
+  PK = POCKET_SIZES[pockets] || POCKET_SIZES.std;
+  POCKETS = [
+    {c:[0,0], t:[0.9,0.9], side:false},{c:[W,0], t:[W-0.9,0.9], side:false},
+    {c:[0,H], t:[0.9,H-0.9], side:false},{c:[W,H], t:[W-0.9,H-0.9], side:false},
+    {c:[-0.6,H/2], t:[0.4,H/2], side:true, n:[1,0]},{c:[W+0.6,H/2], t:[W-0.4,H/2], side:true, n:[-1,0]},
+  ];
+}
+setTable('9','std');
+const pocketR = p => p.side ? PK[1]*0.48 : PK[0]*0.58;   // drawn hole radius
+const MISS = '#d9c2ff', NEAR_MISS_OK = '#d9c2ff';   // your call's path: informational, not a verdict
+
+const $ = id => document.getElementById(id);
+const rnd = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const sub = (a,b)=>[a[0]-b[0],a[1]-b[1]], add=(a,b)=>[a[0]+b[0],a[1]+b[1]], mul=(a,k)=>[a[0]*k,a[1]*k];
+const len = a=>Math.hypot(a[0],a[1]), norm=a=>mul(a,1/len(a)), dot=(a,b)=>a[0]*b[0]+a[1]*b[1];
+const rot = (v,t)=>[v[0]*Math.cos(t)-v[1]*Math.sin(t), v[0]*Math.sin(t)+v[1]*Math.cos(t)];
+const idx = id => REFS.findIndex(r=>r.id===id);
+function segDist(p,a,b){const ab=sub(b,a);const t=Math.max(0,Math.min(1,dot(sub(p,a),ab)/dot(ab,ab)));return len(sub(p,add(a,mul(ab,t))));}
+function f2(n){return n.toFixed(2);}
+
+// ---------- settings & stats ----------
+const settings = {view:'stand', mode:'ref', flash:'0', throw:'0', focus:'0', full:'1', cam:'line', task:'call', len:'both', table:'9', pockets:'std'};
+try{ Object.assign(settings, JSON.parse(localStorage.getItem('cutreader-settings')) || {}); }catch(e){}
+try{ const v = localStorage.getItem('cutreader-view'); if(v && !localStorage.getItem('cutreader-settings')) settings.view = v; }catch(e){}
+function saveSettings(){ try{ localStorage.setItem('cutreader-settings', JSON.stringify(settings)); }catch(e){} }
+
+const blankStats = () => ({n:0,c:0,made:0,streak:0,best:0,log:[]});
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem('cutreader-stats')); if(s && Array.isArray(s.log)) return s; }catch(e){}
+  return blankStats();
+}
+function save(){ try{ localStorage.setItem('cutreader-stats', JSON.stringify(stats)); }catch(e){} }
+let stats = load();
+let shot = null, answered = false;
+
+// ---------- physics ----------
+// Collision-induced throw, medium speed, no spin: peaks ~2.5° near a 45° cut.
+function throwFor(on, phi){ return on ? 2.5*Math.sin(2*phi*RAD) : 0; }
+
+function nearestRef(theta){
+  const f = 1 - Math.sin(theta*RAD);
+  let best = REFS[0];
+  for(const r of REFS) if(Math.abs(r.f-f) < Math.abs(best.f-f)) best = r;
+  return best;
+}
+
+function bucketWeights(){
+  const w = settings.focus!=='1' ? REFS.map(()=>1) : REFS.map(r=>{
+    const rec = stats.log.filter(e=>e.a===r.id && (e.t||'call')===settings.task).slice(-30);
+    const bad = rec.filter(e=>!success(e) || !e.m).length;
+    return 0.4 + 2.2*((bad+1)/(rec.length+2));
+  });
+  if(settings.full!=='1') w[0] = 0;
+  return w;
+}
+function weightedIndex(w){
+  let t = Math.random()*w.reduce((a,b)=>a+b,0);
+  for(let i=0;i<w.length;i++){ t-=w[i]; if(t<=0) return i; }
+  return w.length-1;
+}
+function chooseAim(i){
+  const r = REFS[i];
+  if(settings.mode==='any') return rnd(BOUNDS[i][0], BOUNDS[i][1]);
+  return r.id==='full' ? rnd(0,1) : r.deg + rnd(-1,1);
+}
+
+function pocketTol(P, u){
+  // margin scales with how much wider the mouth is than the ball (baseline: 4.5" corner, 5" side)
+  if(P.side){ const b = Math.acos(Math.min(1,dot(u, mul(P.n,-1))))/RAD; return 1.5*((PK[1]-2.25)/2.75)*(1-0.6*b/40); }
+  const bis = norm([Math.sign(P.c[0]-W/2), Math.sign(P.c[1]-H/2)]);
+  const a = Math.acos(Math.min(1,dot(u,bis)))/RAD;
+  return 1.3*((PK[0]-2.25)/2.25)*(1-0.35*a/45);
+}
+
+function generate(){
+  const w = bucketWeights();
+  const throwOn = settings.throw==='1';
+  const lenCls = settings.len==='both' ? (Math.random()<.5 ? 'short' : 'long') : settings.len;
+  const k = H/100;
+  const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
+  let fallback = null;
+  for(let i=0;i<6000;i++){
+    const phi = chooseAim(weightedIndex(w));
+    const P = pick(POCKETS);
+    const ob = [rnd(3,W-3), rnd(3,H-3)];
+    const toP = sub(P.t, ob), dist = len(toP);
+    if(dist < RANGE.p[0] || dist > RANGE.p[1]) continue;
+    const u = norm(toP);
+    if(P.side){ if(dot(u, mul(P.n,-1)) < Math.cos(38*RAD)) continue; }
+    else { const bis = norm([Math.sign(P.c[0]-W/2), Math.sign(P.c[1]-H/2)]); if(dot(u,bis) < Math.cos(44*RAD)) continue; }
+    const tp = phi - throwFor(throwOn, phi);           // angle between cue line and object-ball path
+    const sign = Math.random()<.5?-1:1;
+    const v = rot(u, sign*tp*RAD);                      // cue direction
+    const n = rot(v, -sign*phi*RAD);                    // line of centres at contact
+    const gb = sub(ob, mul(n, 2*R));
+    if(gb[0]<R||gb[0]>W-R||gb[1]<R||gb[1]>H-R) continue;
+    const d = rnd(RANGE.d[0], RANGE.d[1]);
+    const cb = sub(gb, mul(v, d));
+    if(cb[0]<2||cb[0]>W-2||cb[1]<2||cb[1]>H-2) continue;
+    if(segDist(cb, ob, P.t) < 2*R+0.4) continue;
+    if(len(sub(cb,ob)) < 4*R) continue;
+    const right = [-v[1], v[0]];
+    const cand = {len:lenCls, theta:phi, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
+      L: dist, tol: pocketTol(P,u), side: dot(u,right)>0?'R':'L',
+      color: pick(OB_COLORS), answer: nearestRef(phi), pick:null};
+    if(!fallback) fallback = cand;
+    if(pocketInView(cand)) return cand;
+  }
+  return fallback;
+}
+
+// Play a pure hit at cut angle phiC from the real cue-ball position.
+function outcome(s, phiC){
+  const D = len(sub(s.ob,s.cb)), w = norm(sub(s.ob,s.cb));
+  const al = Math.asin(Math.min(1, 2*R*Math.sin(phiC*RAD)/D));
+  const v2 = rot(w, s.sign*al);
+  const t = D*Math.cos(al) - 2*R*Math.cos(phiC*RAD);
+  const g2 = add(s.cb, mul(v2,t));
+  const u2 = rot(v2, -s.sign*(phiC - throwFor(s.throwOn, phiC))*RAD);
+  const err = Math.atan2(s.u[0]*u2[1]-s.u[1]*u2[0], dot(s.u,u2));
+  const lat = s.L*Math.sin(err);
+  return {v2, g2, u2, lat, made: Math.abs(lat) <= s.tol};
+}
+function makeWindow(s){
+  let lo = s.theta, hi = s.theta;
+  while(lo > 0 && outcome(s, lo-0.05).made) lo -= 0.05;
+  while(hi < 88 && outcome(s, hi+0.05).made) hi += 0.05;
+  lo = Math.max(0, lo);
+  return {lo, hi, fThick: 1-Math.sin(lo*RAD), fThin: 1-Math.sin(hi*RAD)};
+}
+
+function viewBoxFor(s){
+  const pts = [s.cb, s.ob, s.P.c];
+  const x0=Math.min(...pts.map(p=>p[0]))-7, x1=Math.max(...pts.map(p=>p[0]))+7;
+  const y0=Math.min(...pts.map(p=>p[1]))-7, y1=Math.max(...pts.map(p=>p[1]))+7;
+  let w=Math.max(x1-x0, 30), h=Math.max(y1-y0, 30/0.8);
+  if(w/h > 0.8) h = w/0.8; else w = h*0.8;
+  const minX=-6, maxX=W+6, minY=-6, maxY=H+6;
+  if(h >= 0.72*(maxY-minY)){ h = maxY-minY+2; w = h*0.8; return [(minX+maxX)/2-w/2, minY-1, w, h].map(n=>n.toFixed(2)).join(' '); }
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  let vx = cx-w/2, vy = cy-h/2;
+  vx = w <= maxX-minX ? Math.max(minX, Math.min(vx, maxX-w)) : (minX+maxX)/2 - w/2;
+  vy = h <= maxY-minY ? Math.max(minY, Math.min(vy, maxY-h)) : (minY+maxY)/2 - h/2;
+  return [vx,vy,w,h].map(n=>n.toFixed(2)).join(' ');
+}
+
+function tableSVG(s, reveal){
+  let o = `<defs>
+    <radialGradient id="feltg" cx="50%" cy="45%" r="75%"><stop offset="0" stop-color="#2a73b0"/><stop offset="1" stop-color="#1c5588"/></radialGradient>
+    <radialGradient id="cbg" cx="38%" cy="35%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#efe9d8"/><stop offset="1" stop-color="#cfc6ae"/></radialGradient>
+    <radialGradient id="shine" cx="35%" cy="32%" r="45%"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  </defs>`;
+  o += `<rect x="-6" y="-6" width="${W+12}" height="${H+12}" rx="2.5" fill="#3a2618"/>`;
+  o += `<rect x="-5.2" y="-5.2" width="${W+10.4}" height="${H+10.4}" rx="2" fill="none" stroke="#553a26" stroke-width=".35"/>`;
+  o += `<rect x="-1.6" y="-1.6" width="${W+3.2}" height="${H+3.2}" fill="#1a4f7e"/>`;
+  o += `<rect x="0" y="0" width="${W}" height="${H}" fill="url(#feltg)"/>`;
+  const dm = [];
+  for(const x of [1,2,3].map(i=>i*W/4)){ dm.push([x,-3.6],[x,H+3.6]); }
+  for(const y of [1,2,3,5,6,7].map(i=>i*H/8)){ dm.push([-3.6,y],[W+3.6,y]); }
+  for(const [x,y] of dm) o += `<path d="M${x} ${y-.55}L${x+.35} ${y}L${x} ${y+.55}L${x-.35} ${y}Z" fill="#eadcbf"/>`;
+  o += `<line x1="0" y1="${H*.75}" x2="${W}" y2="${H*.75}" stroke="#ffffff" stroke-opacity=".12" stroke-width=".18"/>`;
+  o += `<circle cx="${W/2}" cy="${H/4}" r=".35" fill="#ffffff" fill-opacity=".35"/>`;
+  for(const p of POCKETS){ o += `<circle cx="${p.c[0]}" cy="${p.c[1]}" r="${pocketR(p)}" fill="#080808"/>`; }
+  const P = s.P;
+  o += `<circle class="${reveal?'':'pulse'}" cx="${P.c[0]}" cy="${P.c[1]}" r="${pocketR(P)+1}" fill="none" stroke="#ffd34d" stroke-width=".45"/>`;
+
+  if(reveal){
+    const {cb,ob,gb,u,v,n,theta} = s;
+    const cueEnd = add(gb, mul(v, 7));
+    o += `<line x1="${f2(ob[0])}" y1="${f2(ob[1])}" x2="${f2(P.t[0])}" y2="${f2(P.t[1])}" stroke="#ffd34d" stroke-width=".3" stroke-dasharray="1 .7"/>`;
+    if(s.pick && s.pick.far){
+      const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, end = add(ob, mul(pk.u2, s.L+3));
+      o += `<line x1="${f2(ob[0])}" y1="${f2(ob[1])}" x2="${f2(end[0])}" y2="${f2(end[1])}" stroke="${col}" stroke-width=".3" stroke-dasharray="1 .7"/>`;
+      o += `<circle cx="${f2(pk.g2[0])}" cy="${f2(pk.g2[1])}" r="${R}" fill="none" stroke="${col}" stroke-width=".2" stroke-dasharray=".5 .35"/>`;
+    }
+    o += `<line x1="${f2(cb[0])}" y1="${f2(cb[1])}" x2="${f2(cueEnd[0])}" y2="${f2(cueEnd[1])}" stroke="#ffffff" stroke-opacity=".8" stroke-width=".25"/>`;
+    o += `<circle cx="${f2(gb[0])}" cy="${f2(gb[1])}" r="${R}" fill="#ffffff" fill-opacity=".12" stroke="#ffffff" stroke-width=".22" stroke-dasharray=".5 .35"/>`;
+    if(theta > 2){
+      const r = 5.2, a = add(gb, mul(v,r)), b = add(gb, mul(n,r));
+      const cross = v[0]*n[1]-v[1]*n[0];
+      o += `<path d="M${f2(a[0])} ${f2(a[1])}A${r} ${r} 0 0 ${cross>0?1:0} ${f2(b[0])} ${f2(b[1])}" fill="none" stroke="#ffd34d" stroke-width=".28"/>`;
+      const lp = add(gb, mul(norm(add(n,v)), r+3));
+      o += `<g font-family="IBM Plex Mono, monospace" font-size="2.1" font-weight="500" text-anchor="middle" dominant-baseline="middle"><rect x="${f2(lp[0]-3.6)}" y="${f2(lp[1]-1.6)}" width="7.2" height="3.2" rx=".8" fill="#0b1a26" fill-opacity=".85"/><text x="${f2(lp[0])}" y="${f2(lp[1]+.1)}" fill="#ffd34d">${theta.toFixed(1)}°</text></g>`;
+    }
+  }
+  if(!reveal && s.place){
+    const e2 = add(s.place, mul(norm(sub(s.place, s.cb)), 6));
+    o += `<line x1="${f2(s.cb[0])}" y1="${f2(s.cb[1])}" x2="${f2(e2[0])}" y2="${f2(e2[1])}" stroke="#fff" stroke-opacity=".55" stroke-width=".2"/>`;
+    o += `<circle cx="${f2(s.place[0])}" cy="${f2(s.place[1])}" r="${R}" fill="#fff" fill-opacity=".3" stroke="#fff" stroke-width=".22"/>`;
+  }
+  const ball = (p, fill, num) => {
+    let b = `<circle cx="${f2(p[0]+.25)}" cy="${f2(p[1]+.3)}" r="${R}" fill="#000" fill-opacity=".28"/>`;
+    b += `<circle cx="${f2(p[0])}" cy="${f2(p[1])}" r="${R}" fill="${fill}"/>`;
+    if(num){ b += `<circle cx="${f2(p[0])}" cy="${f2(p[1])}" r=".5" fill="#fff"/><text x="${f2(p[0])}" y="${f2(p[1]+.04)}" font-size=".65" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#111">${num}</text>`; }
+    b += `<circle cx="${f2(p[0])}" cy="${f2(p[1])}" r="${R}" fill="url(#shine)"/>`;
+    return b;
+  };
+  o += ball(s.ob, s.color[0], s.color[1]);
+  o += ball(s.cb, 'url(#cbg)');
+  return o;
+}
+
+const VIEWS = {
+  stand:{back:30, h:38, pitch:-42, hfov:72, yawMix:.45},
+  down: {back:14, h:7.5, pitch:-15, hfov:82, yawMix:.4},
+};
+const cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const norm3=a=>{const l=Math.hypot(a[0],a[1],a[2]);return [a[0]/l,a[1]/l,a[2]/l];};
+const VW=600, NEAR=0.6;
+let VH=400;   // grows with the table box on desktop
+
+// Build a camera from an eye position, a look direction and a horizontal field of view.
+function camFrom(E, f, hfov){
+  const right = norm3(cross3([0,0,1], f)), up = cross3(f, right);
+  const focal = (VW/2)/Math.tan(hfov/2*RAD);
+  const toCam = P=>{const q=[P[0]-E[0],P[1]-E[1],P[2]-E[2]];return [dot3(q,right),dot3(q,up),dot3(q,f)];};
+  const proj = c=>[VW/2 + focal*c[0]/c[2], VH/2 - focal*c[1]/c[2]];
+  return {E, f, hfov, toCam, proj, focal, unproject:()=>null};
+}
+// ---------- rotate around the object ball (Normal mode) ----------
+// Dragging swings the eye around a vertical axis through the object ball; the object ball stays put on screen.
+let walk = null;   // {ang (radians), blend 0..1 for the snap back}
+function walkCam(s, view){
+  const base = makeCam(s, view), a = walk.ang * walk.blend;
+  const rel = rot([base.E[0]-s.ob[0], base.E[1]-s.ob[1]], a);
+  const E = [s.ob[0] + rel[0], s.ob[1] + rel[1], base.E[2]];
+  const fh = rot([base.f[0], base.f[1]], a);
+  return camFrom(E, norm3([fh[0], fh[1], base.f[2]]), base.hfov);
+}
+function makeCam(s, view){
+  const c = VIEWS[view];
+  const d = norm(sub(s.ob, s.cb));
+  let eye, look;
+  if(settings.cam==='aim' && settings.task!=='place'){ eye = sub(s.cb, mul(s.v, c.back)); look = s.v; }      // on the correct shot line
+  else { eye = sub(s.cb, mul(d, c.back)); look = d; }
+  const E = [eye[0], eye[1], c.h];
+  // Tilt just enough to keep both the cue ball and the target pocket in frame (like lifting your eyes).
+  const hd = P=>Math.max(0.1, (P[0]-E[0])*look[0] + (P[1]-E[1])*look[1]);
+  const aCB = Math.atan2(R - c.h, hd(s.cb)), aP = Math.atan2(1.6 - c.h, hd(s.P.c));
+  const vHalf = Math.atan((VH/2)/((VW/2)/Math.tan(c.hfov/2*RAD))), mg = 5*RAD;
+  let pr = c.pitch*RAD;
+  if(aP > pr + vHalf - mg) pr = aP - vHalf + mg;
+  if(aCB < pr - vHalf + mg) pr = aCB + vHalf - mg;
+  const f = norm3([look[0]*Math.cos(pr), look[1]*Math.cos(pr), Math.sin(pr)]);
+  const right = norm3(cross3([0,0,1], f));
+  const up = cross3(f, right);
+  const focal = (VW/2)/Math.tan(c.hfov/2*RAD);
+  const toCam = P=>{const q=[P[0]-E[0],P[1]-E[1],P[2]-E[2]];return [dot3(q,right),dot3(q,up),dot3(q,f)];};
+  const proj = c=>[VW/2 + focal*c[0]/c[2], VH/2 - focal*c[1]/c[2]];
+  const unproject = (px, py, z)=>{
+    const x=(px-VW/2)/focal, y=-(py-VH/2)/focal;
+    const dir=[right[0]*x+up[0]*y+f[0], right[1]*x+up[1]*y+f[1], right[2]*x+up[2]*y+f[2]];
+    if(Math.abs(dir[2])<1e-6) return null;
+    const t=(z-E[2])/dir[2];
+    return t>0 ? [E[0]+dir[0]*t, E[1]+dir[1]*t] : null;
+  };
+  return {E, f, hfov:c.hfov, toCam, proj, focal, unproject};
+}
+function clipNear(pts){
+  const out=[];
+  for(let i=0;i<pts.length;i++){
+    const a=pts[i], b=pts[(i+1)%pts.length], ia=a[2]>=NEAR, ib=b[2]>=NEAR;
+    if(ia) out.push(a);
+    if(ia!==ib){const t=(NEAR-a[2])/(b[2]-a[2]); out.push([a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1]), NEAR]);}
+  }
+  return out;
+}
+function polyD(cam, pts3){
+  const c = clipNear(pts3.map(cam.toCam));
+  if(c.length<3) return '';
+  return 'M'+c.map(p=>cam.proj(p).map(n=>n.toFixed(1)).join(' ')).join('L')+'Z';
+}
+function segD(cam, A, B){
+  let a=cam.toCam(A), b=cam.toCam(B);
+  if(a[2]<NEAR && b[2]<NEAR) return '';
+  if(a[2]<NEAR){const t=(NEAR-a[2])/(b[2]-a[2]); a=[a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1]),NEAR];}
+  if(b[2]<NEAR){const t=(NEAR-b[2])/(a[2]-b[2]); b=[b[0]+t*(a[0]-b[0]),b[1]+t*(a[1]-b[1]),NEAR];}
+  const p=cam.proj(a), q=cam.proj(b);
+  return `M${p[0].toFixed(1)} ${p[1].toFixed(1)}L${q[0].toFixed(1)} ${q[1].toFixed(1)}`;
+}
+const rect3=(m,z)=>[[-m,-m,z],[W+m,-m,z],[W+m,H+m,z],[-m,H+m,z]];
+const circ3=(c,r,z,n=28)=>Array.from({length:n},(_,i)=>[c[0]+r*Math.cos(i/n*2*Math.PI), c[1]+r*Math.sin(i/n*2*Math.PI), z]);
+
+let lastCam = null;
+// The target pocket must be on screen, with a margin, from where you stand for this shot.
+function pocketInView(s){
+  const cam = makeCam(s, settings.view);
+  const m = 24;
+  return pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).every(pt=>{
+    const c = cam.toCam(pt); if(c[2] <= NEAR) return false;
+    const [x,y] = cam.proj(c); return x>=m && x<=VW-m && y>=m && y<=VH-m;
+  });
+}
+// The part of a pocket's circle that lies outside the playing surface (the cut in cushion and rail).
+// closed=true adds the corner point / chord so it can be filled.
+function pocketArc(p, r, z, closed){
+  const inward = p.side ? p.n : norm(sub([W/2,H/2], p.c));
+  const a0 = Math.atan2(inward[1], inward[0]);
+  const out = [];
+  for(let k=1;k<48;k++){
+    const a = a0 + k/48*2*Math.PI, x = p.c[0]+r*Math.cos(a), y = p.c[1]+r*Math.sin(a);
+    if(x<0 || x>W || y<0 || y>H) out.push([x,y,z]);
+  }
+  if(closed && !p.side) out.push([p.c[0], p.c[1], z]);
+  return out;
+}
+function convexHull(P){
+  const pts = P.slice().sort((a,b)=>a[0]-b[0] || a[1]-b[1]);
+  if(pts.length<3) return pts;
+  const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lo=[], up=[];
+  for(const q of pts){ while(lo.length>=2 && cr(lo[lo.length-2],lo[lo.length-1],q)<=0) lo.pop(); lo.push(q); }
+  for(const q of pts.slice().reverse()){ while(up.length>=2 && cr(up[up.length-2],up[up.length-1],q)<=0) up.pop(); up.push(q); }
+  return lo.slice(0,-1).concat(up.slice(0,-1));
+}
+function perspSVG(s, reveal, view){
+  const cam = (walk && walk.blend > 0) ? walkCam(s, view) : makeCam(s, view); lastCam = cam;
+  let o = `<defs>
+    <linearGradient id="pfelt" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stop-color="#1b5286"/><stop offset="1" stop-color="#2b76b4"/></linearGradient>
+    <radialGradient id="cbg" cx="38%" cy="35%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#efe9d8"/><stop offset="1" stop-color="#cfc6ae"/></radialGradient>
+    <radialGradient id="shine" cx="35%" cy="32%" r="45%"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="room" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0c0a09"/><stop offset="1" stop-color="#231a14"/></linearGradient>
+  </defs><rect width="${VW}" height="${VH}" fill="url(#room)"/>`;
+  o += `<path d="${polyD(cam, rect3(0,0))}" fill="url(#pfelt)"/>`;
+  // head string
+  o += `<path d="${segD(cam,[0,H*.75,0.01],[W,H*.75,0.01])}" stroke="#fff" stroke-opacity=".12" stroke-width="0.75"/>`;
+  // Pockets are holes cut through the cushion and rail: the dark walls go down to the slate,
+  // the cushions stop at the jaws, and the rail is cut away only outside the playing surface.
+  for(const p of POCKETS){
+    const pts = [...pocketArc(p, pocketR(p), 1.6, true), ...pocketArc(p, pocketR(p), -0.4, true)]
+      .map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+    const hull = convexHull(pts);
+    if(hull.length>2) o += `<path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z" fill="#050505"/>`;
+  }
+  const e = PK[0]/Math.SQRT2, sd = PK[1]/2;
+  const segs = [
+    [[e,0],[W-e,0],[0,1]], [[W-e,H],[e,H],[0,-1]],
+    [[0,H/2-sd],[0,e],[1,0]], [[0,H-e],[0,H/2+sd],[1,0]],
+    [[W,e],[W,H/2-sd],[-1,0]], [[W,H/2+sd],[W,H-e],[-1,0]],
+  ];
+  for(const [a,b,n] of segs){                       // cushion noses facing the eye
+    const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+    if(n[0]*(cam.E[0]-mid[0]) + n[1]*(cam.E[1]-mid[1]) <= 0) continue;
+    o += `<path d="${polyD(cam,[[a[0],a[1],0],[b[0],b[1],0],[b[0],b[1],1.5],[a[0],a[1],1.5]])}" fill="#16446d"/>`;
+  }
+  for(const [a,b,n] of segs){                       // cushion tops, nose to rail
+    o += `<path d="${polyD(cam,[[a[0],a[1],1.5],[b[0],b[1],1.5],[b[0]-n[0]*1.6,b[1]-n[1]*1.6,1.5],[a[0]-n[0]*1.6,a[1]-n[1]*1.6,1.5]])}" fill="#1d5a8f"/>`;
+  }
+  o += `<path d="${polyD(cam,rect3(6,1.6))}${polyD(cam,rect3(1.6,1.6))}" fill="#3a2618" fill-rule="evenodd"/>`;
+  o += `<path d="${polyD(cam,rect3(6,1.6))}" fill="none" stroke="#553a26" stroke-width="0.75"/>`;
+  for(const p of POCKETS) o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
+  for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
+  for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
+  const ringArc = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+  const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
+  o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
+
+  if(reveal){
+    o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[s.P.t[0],s.P.t[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
+    if(s.pick && s.pick.far){
+      const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, J = s.final && s.final.jaw;
+      const pts = J ? [s.ob, J, s.final.ob] : [s.ob, add(s.ob, mul(pk.u2, s.L+3))];
+      for(let k=0;k<pts.length-1;k++) o += `<path d="${segD(cam,[pts[k][0],pts[k][1],.03],[pts[k+1][0],pts[k+1][1],.03])}" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
+      const gc = cam.toCam([pk.g2[0],pk.g2[1],R]);
+      if(gc[2] > NEAR){ const [gx,gy] = cam.proj(gc); o += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="${(cam.focal*R/gc[2]).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.125" stroke-dasharray="4 3"/>`; }
+    }
+    const e = add(s.gb, mul(s.v, 7));
+    if(!s.final) o += `<path d="${segD(cam,[s.cb[0],s.cb[1],R],[e[0],e[1],R])}" stroke="#fff" stroke-opacity=".85" stroke-width="1.2"/>`;   // after an animation the dotted trail replaces it
+  }
+  if(!reveal && s.place){
+    const e2 = add(s.place, mul(norm(sub(s.place, s.cb)), 6));
+    o += `<path d="${segD(cam,[s.cb[0],s.cb[1],R],[e2[0],e2[1],R])}" stroke="#fff" stroke-opacity=".6" stroke-width="1.05"/>`;
+  }
+  // trails: where the balls have travelled (during the animation, and the cue ball's path afterwards)
+  const trail = s.anim ? s.anim.trail : (reveal && s.final ? s.final.trail : null);
+  if(trail){
+    for(let k=0;k<trail.cb.length-1;k++){
+      const a = trail.cb[k], b = trail.cb[k+1];
+      if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" stroke="#f4efe0" stroke-opacity=".6" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2 4"/>`;
+    }
+    if(trail.ob) for(let k=0;k<trail.ob.length-1;k++){
+      const a = trail.ob[k], b = trail.ob[k+1];
+      if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" stroke="${trail.obCol}" stroke-opacity=".9" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
+    }
+  }
+  // balls, far to near
+  const A = s.anim, F = reveal && !A ? s.final : null;
+  const items = [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];
+  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A ? A.obScale : 1});
+  // start-position references: each appears as soon as its ball leaves the spot
+  if(F || (A && len(sub(A.cb, s.cb)) > 0.2)) items.push({p:s.cb, kind:'refcb'});
+  if(F || (A && (!A.ob || len(sub(A.ob, s.ob)) > 0.2))) items.push({p:s.ob, kind:'refob'});
+  const contact = A && A.trail.ob;   // the balls have met and are diverging
+  if(A ? (contact || settings.ghost==='1') : (reveal || settings.ghost==='1')) items.push({p:s.gb, kind:'ghost'});   // ghost-ball aid shows it before you answer
+  if(contact && s.pick && s.pick.far) items.push({p:s.pick.g2, kind:'callghost'});   // where your call made contact; the reveal draws it once the balls stop
+  if(!reveal && s.place) items.push({p:s.place, kind:'user'});
+  items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],R]);});
+  items.sort((a,b)=>b.c[2]-a.c[2]);
+  for(const it of items){
+    if(it.c[2] < NEAR) continue;
+    const [x,y] = cam.proj(it.c), r = cam.focal*R/it.c[2]*(it.scale ?? 1);
+    if(r < 0.3) continue;
+    if(it.kind==='refcb'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#f4efe0" fill-opacity=".28" stroke="#f4efe0" stroke-opacity=".7" stroke-width="1"/>`; continue; }
+    if(it.kind==='refob'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${s.color[0]}" fill-opacity=".32" stroke="${s.color[0]}" stroke-opacity=".85" stroke-width="1"/>`; continue; }
+    if(it.kind==='user'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".3" stroke="#fff" stroke-width="1.2"/>`; continue; }
+    if(it.kind==='callghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="${s.pick.made ? NEAR_MISS_OK : MISS}" stroke-width="1.125" stroke-dasharray="4 3"/>`; continue; }
+    if(it.kind==='ghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".22" stroke="#fff" stroke-width="1.125" stroke-dasharray="4 3"/>`; continue; }
+    o += `<path d="${polyD(cam, circ3([it.p[0]+.2,it.p[1]+.2], R*.95*(it.scale ?? 1), .02, 20))}" fill="#000" fill-opacity=".35"/>`;
+    o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${it.kind==='cb'?'url(#cbg)':s.color[0]}"/>`;
+    if(it.kind==='ob') o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*.44).toFixed(1)}" fill="#fff"/><text x="${x.toFixed(1)}" y="${(y+r*.03).toFixed(1)}" font-size="${(r*.56).toFixed(1)}" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#111">${s.color[1]}</text>`;
+    o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#shine)"/>`;
+  }
+  // Rails between the eye and the balls hide the bottom of anything behind them: redraw the near side on top.
+  const sides = [
+    {n:[0,1],  mid:[W/2,0], rail:[[-6,-6],[W+6,-6],[W+6,-1.6],[-6,-1.6]]},
+    {n:[0,-1], mid:[W/2,H], rail:[[-6,H+1.6],[W+6,H+1.6],[W+6,H+6],[-6,H+6]]},
+    {n:[1,0],  mid:[0,H/2], rail:[[-6,-6],[-1.6,-6],[-1.6,H+6],[-6,H+6]]},
+    {n:[-1,0], mid:[W,H/2], rail:[[W+1.6,-6],[W+6,-6],[W+6,H+6],[W+1.6,H+6]]},
+  ];
+  const near = sides.filter(sd=>sd.n[0]*(cam.E[0]-sd.mid[0]) + sd.n[1]*(cam.E[1]-sd.mid[1]) <= 0);
+  if(near.length){
+    // the table's outer side (apron) below the rail, seen when the eye is beyond that rail
+    const aprons = [
+      {ok: cam.E[1] < -6,   q:[[-6,-6],[W+6,-6]]}, {ok: cam.E[1] > H+6, q:[[W+6,H+6],[-6,H+6]]},
+      {ok: cam.E[0] < -6,   q:[[-6,H+6],[-6,-6]]}, {ok: cam.E[0] > W+6, q:[[W+6,-6],[W+6,H+6]]},
+    ];
+    for(const ap of aprons) if(ap.ok){ const [a,b] = ap.q; o += `<path d="${polyD(cam,[[a[0],a[1],1.6],[b[0],b[1],1.6],[b[0],b[1],-14],[a[0],a[1],-14]])}" fill="#2a1b11"/>`; }
+    for(const sd of near){
+      for(const [a,b,n] of segs) if(n[0]===sd.n[0] && n[1]===sd.n[1])
+        o += `<path d="${polyD(cam,[[a[0],a[1],1.5],[b[0],b[1],1.5],[b[0]-n[0]*1.6,b[1]-n[1]*1.6,1.5],[a[0]-n[0]*1.6,a[1]-n[1]*1.6,1.5]])}" fill="#1d5a8f"/>`;
+      o += `<path d="${polyD(cam, sd.rail.map(q=>[q[0],q[1],1.6]))}" fill="#3a2618"/>`;
+    }
+    for(const p of POCKETS) o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
+    for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
+    for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
+    o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
+  }
+  // pocket pointer: only when no part of the pocket ring is on screen
+  const ringPts = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+  const ringVisible = ringPts.some(([x,y])=>x>=0 && x<=VW && y>=0 && y<=VH);
+  if(!ringVisible && !(walk && walk.blend > 0)){
+    const pc = cam.toCam([s.P.c[0], s.P.c[1], 1.6]);
+    let dx = pc[0], dy = -pc[1];
+    if(pc[2] <= NEAR){ dy = Math.abs(dy)+1; }
+    const k = Math.min((VW/2-30)/Math.abs(dx||1e-6), (VH/2-30)/Math.abs(dy||1e-6));
+    const ax = VW/2+dx*k, ay = VH/2+dy*k, ang = Math.atan2(dy,dx)/RAD;
+    o += `<g transform="translate(${ax.toFixed(1)} ${ay.toFixed(1)})"><g transform="rotate(${ang.toFixed(1)})"><path d="M10 0L-6 -8L-6 8Z" fill="#ffd34d"/></g>
+      <text y="${ay > VH/2 ? -14 : 22}" text-anchor="middle" font-size="13" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d">pocket</text></g>`;
+  }
+  return o;
+}
+
+function draw(reveal){
+  const box = document.querySelector('.table-box'), svg = $('table'), v = settings.view;
+  document.querySelector('.main').classList.toggle('persp', v!=='top');
+  box.classList.toggle('persp', v!=='top');
+  if(v==='top'){ svg.setAttribute('viewBox', viewBoxFor(shot)); svg.innerHTML = tableSVG(shot, reveal); }
+  else { fitViewBox(); svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`); svg.innerHTML = perspSVG(shot, reveal, v); }
+}
+
+function overlapSVG(s){
+  const right = [-s.v[1], s.v[0]];
+  const lat = 2*dot(s.n, right);      // OB centre offset from ghost-ball centre, in ball radii
+  const f = 1 - Math.sin(s.theta*RAD);
+  return `<svg viewBox="-3.3 -1.9 6.6 3.8" aria-label="Shooter's view of the overlap">
+    <rect x="-3.3" y="-1.9" width="6.6" height="3.8" rx=".4" fill="#1f5f96"/>
+    <circle cx="${f2(lat)}" cy="0" r="1" fill="${s.color[0]}"/>
+    <circle cx="0" cy="0" r="1" fill="#ffffff" fill-opacity=".35" stroke="#ffffff" stroke-width=".07" stroke-dasharray=".18 .12"/>
+    <line x1="0" y1="-1.55" x2="0" y2="1.55" stroke="#ffffff" stroke-opacity=".7" stroke-width=".05"/>
+    <text x="0" y="1.78" font-size=".34" text-anchor="middle" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Sans, sans-serif">aim line</text>
+    <text x="-3.1" y="-1.55" font-size=".34" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Mono, monospace">${f.toFixed(2)} ball</text>
+  </svg>`;
+}
+
+// ---------- modes ----------
+const MODE_LABEL = {call:'Freeplay', sess:'Sessions', flash:'Flash', place:'Ghost ball'};
+const taskOf = e => e.t || 'call';
+const isPlace = () => settings.task==='place';
+function success(e){ return taskOf(e)==='place' ? !!e.m : e.p===e.a; }
+function lean(e){          // +1 too thin (overcut), -1 too full (undercut), 0 right
+  if(taskOf(e)==='place') return e.m ? 0 : (e.e>0 ? 1 : -1);
+  const d = idx(e.p)-idx(e.a); return d>0 ? 1 : d<0 ? -1 : 0;
+}
+function modeLog(){ return stats.log.filter(e=>taskOf(e)===settings.task && !e.gh); }   // shots taken with the ghost-ball aid aren't scored
+
+// ---------- flash ----------
+let flashTimer = null;
+function startFlash(){
+  clearTimeout(flashTimer);
+  const cov = $('cover'), bar = $('flashbar');
+  cov.hidden = true; bar.hidden = true;
+  if(settings.task!=='flash') return;
+  const ms = +settings.flash || 1500;
+  bar.style.setProperty('--dur', ms+'ms');
+  bar.style.animation = 'none'; bar.hidden = false; void bar.offsetWidth; bar.style.animation = '';
+  flashTimer = setTimeout(()=>{ bar.hidden = true; if(!answered) cov.hidden = false; }, ms);
+}
+function endFlash(){ clearTimeout(flashTimer); $('cover').hidden = true; $('flashbar').hidden = true; }
+
+// ---------- round ----------
+const PLACEHOLDER = `Pick a fraction, or press 1–5. Then tap the table or press Enter for the next shot.`;
+const PLACE_HINT = `Tap or drag around the object ball to set the ghost ball. Fine-tune with the arrows, then Shoot. Keys <kbd>←</kbd> <kbd>→</kbd> nudge, <kbd>Enter</kbd> shoots.`;
+const QUESTION = {call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?'};
+const tableBox = document.querySelector('.table-box');
+
+function deal(){
+  if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
+  walk = null; walkDrag = null;
+  shot = generate();
+  answered = false;
+  draw(false);
+  document.querySelectorAll('#answers button').forEach(b=>{b.disabled=false;b.className='';});
+  $('result').innerHTML = `<p class="placeholder">The breakdown of each shot appears here after you answer.</p>`;
+  $('quick').innerHTML = `<div class="ql hint">${isPlace() ? PLACE_HINT : PLACEHOLDER}</div>`;
+  tableBox.classList.remove('tappable');
+  tableBox.classList.toggle('placing', isPlace());
+  updateControls();
+  if(settings.task==='flash' && !flashArmed) showStart(); else startFlash();
+  showSessIdle();
+}
+function showSessIdle(){
+  const idle = settings.task==='sess' && !(stats.active && stats.active.task==='sess');
+  $('sessidlecover').hidden = !idle;
+  document.querySelectorAll('#answers button').forEach(b=>b.disabled = idle || answered);
+  if(idle){
+    const last = (stats.sessions||[]).filter(x=>x.task==='sess').slice(-1)[0];
+    $('sessidlelast').textContent = last ? `Last session: ${pct(last.right,last.n)}% over ${last.size} shots.` : '';
+  }
+}
+let flashArmed = false;
+function showStart(){
+  endFlash();
+  $('starthint').textContent = `Each shot shows for ${(+settings.flash||1500)/1000} s, then it's covered.`;
+  $('startcover').hidden = false;
+  document.querySelectorAll('#answers button').forEach(b=>b.disabled=true);
+}
+function startFlashMode(){
+  flashArmed = true;
+  $('startcover').hidden = true;
+  document.querySelectorAll('#answers button').forEach(b=>b.disabled=false);
+  startFlash();
+}
+function updateControls(){
+  const place = isPlace(), nb = $('next');
+  $('answers').hidden = place;
+  $('nudge').hidden = !place || answered;
+  $('nudge').querySelectorAll('button').forEach(b=>b.disabled = !shot || !shot.place);
+  if(place && !answered){ nb.textContent = 'Shoot'; nb.disabled = !shot || !shot.place; }
+  else { nb.textContent = 'Next shot'; nb.disabled = !answered; }
+  $('question').firstChild.textContent = QUESTION[settings.task];
+}
+
+function logEntry(extra){
+  const act = stats.active && stats.active.task===settings.task ? stats.active.id : undefined;
+  stats.log.push({sid:act, t:settings.task, a:shot.answer.id, s:shot.side, v:settings.view,
+    c: settings.view==='top' ? '-' : (isPlace() ? 'line' : settings.cam),
+    md:settings.mode, th:settings.throw, ln:shot.len, rp:shot.replays||0, wk: shot.walked ? 1 : 0, dc:Math.round(len(sub(shot.ob,shot.cb))), dp:Math.round(shot.L), ag:+shot.theta.toFixed(1), pt:shot.P.side?'s':'c', gh: settings.ghost==='1' ? 1 : 0, tb:settings.table, pk:settings.pockets, ...extra});
+  if(stats.log.length > 3000) stats.log = stats.log.slice(-3000);
+  save(); renderStats();
+}
+function finishRound(){
+  tableBox.classList.add('tappable');
+  tableBox.classList.remove('placing');
+  updateControls();
+  $('next').focus({preventScroll:true});
+}
+const lbl = r => r.id==='full' ? 'full' : r.label;
+
+// ---------- sounds: soft, clean UI tones ----------
+let actx = null;
+function audioOut(level){
+  actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+  if(actx.state === 'suspended') actx.resume();
+  const out = actx.createGain(); out.gain.value = level;
+  const dly = actx.createDelay(); dly.delayTime.value = 0.09;          // a touch of short echo
+  const fb = actx.createGain(); fb.gain.value = 0.18;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5500;
+  out.connect(lp); lp.connect(actx.destination); lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(actx.destination);
+  return out;
+}
+function tone(out, freq, at, dur, gain, glideTo){
+  const t = actx.currentTime + at;
+  [[1, 1], [2, 0.12]].forEach(([mult, amp])=>{                         // tone plus a soft octave shimmer
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(freq*mult, t);
+    if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo*mult, t + dur*0.8);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain*amp, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.05);
+  });
+}
+const semis = (f, n)=>f*Math.pow(2, n/12);
+const STREAK_HOT = 6;   // "on a streak" means more than 5 right in a row
+let streakTimer = null;
+function showStreak(cur, endedAt){
+  const el = $('streakpill'); clearTimeout(streakTimer);
+  el.classList.remove('hot','over','pop');
+  if(cur >= STREAK_HOT){
+    el.innerHTML = `<span class="spark"></span>Streak <b>${cur}</b>`;
+    el.classList.add('hot'); el.hidden = false; void el.offsetWidth; el.classList.add('pop');
+  } else if(endedAt){
+    el.innerHTML = `Streak over at <b>${endedAt}</b>`;
+    el.classList.add('over'); el.hidden = false;
+    streakTimer = setTimeout(()=>{ el.hidden = true; }, 2600);
+  } else el.hidden = true;
+}
+function playSound(kind, streak){
+  if(settings.sound === '0') return;
+  try{
+    if(kind === 'made'){ const o = audioOut(0.22); tone(o, 880, 0, 0.22, 1); tone(o, 1318.5, 0.075, 0.32, 0.9); }
+    else if(kind === 'miss'){ const o = audioOut(0.22); tone(o, 392, 0, 0.30, 0.9, 330); }
+    else if(kind === 'streak'){
+      // a bright rising arpeggio that climbs a semitone with every shot of the streak (capped at an octave)
+      const o = audioOut(0.2), r = semis(659.25, Math.min(12, (streak||6) - 6));
+      [0, 4, 7, 12].forEach((n,i)=>tone(o, semis(r, n), i*0.055, i===3 ? 0.42 : 0.2, i===3 ? 1 : 0.85));
+    }
+    else if(kind === 'streakEnd'){
+      // a soft descending "power down"
+      const o = audioOut(0.22);
+      [12, 7, 3, 0].forEach((n,i)=>tone(o, semis(440, n), i*0.09, i===3 ? 0.55 : 0.22, 0.85, i===3 ? semis(440,-2) : 0));
+    }
+  }catch(e){}
+}
+function thock(good){ playSound(good ? 'made' : 'miss'); }
+
+// ---------- sessions ----------
+function startSession(size){
+  stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now()};
+  save(); $('sesscover').hidden = true; $('sessidlecover').hidden = true; renderSession(); deal();
+}
+function endSession(){ stats.active = null; save(); renderSession(); showSessIdle(); }
+function sessionTick(ok, made){
+  const a = stats.active; if(!a || a.task !== settings.task) return;
+  a.n++; if(ok) a.right++; if(made) a.made++;
+  if(a.n >= a.size) finishSession(); else { save(); renderSession(); }
+}
+function finishSession(){
+  const a = stats.active;
+  const rec = {id:a.id, task:a.task, size:a.size, n:a.n, right:a.right, made:a.made, start:a.start + (a.pause||0), end:Date.now(),
+    md:settings.mode, v:settings.view, ln:settings.len, tb:settings.table, pk:settings.pockets};
+  stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
+  stats.active = null; save(); renderSession(); renderStats(); showSummary(rec);
+}
+function syncStreakPill(){ if(!$('streakpill')) return; const c = runs(modeLog()).cur; showStreak(c >= STREAK_HOT ? c : 0, 0); }
+function renderSession(){
+  const a = stats.active && stats.active.task === settings.task ? stats.active : null;
+  $('sessidle').hidden = !!a; $('sesslive').hidden = !a;
+  if(a){ $('sesstext').textContent = `Session · ${a.n} / ${a.size}` + (a.n ? ` · ${pct(a.right, a.n)}%` : ''); $('sessfill').style.width = pct(a.n, a.size) + '%'; }
+}
+function showSummary(rec){
+  const L = stats.log.filter(e=>e.sid === rec.id);
+  const score = pct(rec.right, rec.n);
+  $('sumhead').textContent = `Session complete · ${rec.size} shots · ${MODE_LABEL[rec.task]}`;
+  $('sumbig').textContent = score + '%';
+  $('sumsub').textContent = 'called right';
+  const rows = [];   // [label, value, tone]
+  const prev = (stats.sessions || []).filter(x=>x.task===rec.task && x.size===rec.size && x.id!==rec.id).slice(-5);
+  if(prev.length){
+    const avg = Math.round(prev.reduce((t,x)=>t+pct(x.right,x.n),0)/prev.length), d = score - avg;
+    rows.push(['vs. your average', `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} pts <small>avg ${avg}%</small>`, d>=3?'up':d<=-3?'down':'']);
+  } else rows.push(['vs. your average', 'Baseline set', '']);
+  const secs = (rec.end - rec.start) / 1000 / Math.max(1, rec.n);
+  const prevPace = prev.filter(x=>x.end && x.start).map(x=>(x.end - x.start)/1000/Math.max(1,x.n));
+  const avgPace = prevPace.length ? prevPace.reduce((a,b)=>a+b,0)/prevPace.length : 0;
+  rows.push(['Pace', `${secs.toFixed(1)} s <small>per shot${avgPace ? ` · avg ${avgPace.toFixed(1)} s` : ''}</small>`, '']);
+  const byRef = REFS.map(r=>{ const x = L.filter(e=>e.a===r.id); return {r, n:x.length, p:pct(x.filter(success).length, x.length)}; }).filter(o=>o.n>=2);
+  if(byRef.length){
+    const best = byRef.reduce((a,b)=>b.p>a.p?b:a), worst = byRef.reduce((a,b)=>b.p<a.p?b:a);
+    rows.push(['Best cut', `${best.r.label} <small>${best.p}%</small>`, 'up']);
+    rows.push(['Toughest cut', worst !== best ? `${worst.r.label} <small>${worst.p}%</small>` : '—', worst !== best ? 'down' : '']);
+  }
+  const thin = L.filter(e=>lean(e)>0).length, full = L.filter(e=>lean(e)<0).length, wrong = thin + full;
+  rows.push(['Misses lean', !wrong ? 'No misses' : thin/wrong >= .65 ? `Too thin <small>${thin} of ${wrong}</small>` : full/wrong >= .65 ? `Too full <small>${full} of ${wrong}</small>` : `Even <small>${thin} thin · ${full} full</small>`, '']);
+  const rs = runs(L.filter(e=>!e.gh));
+  rows.push(['Longest streak', rs.best ? `${rs.best}${rs.cur >= STREAK_HOT && rs.cur === rs.best ? ' <small>still going</small>' : ''}` : '—', rs.best >= STREAK_HOT ? 'up' : '']);
+  const mins = Math.max(0, Math.round((rec.end - rec.start)/1000)), mm = Math.floor(mins/60), ss = String(mins%60).padStart(2,'0');
+  rows.push(['Time', `${mm}:${ss}`, '']);
+  $('sumnotes').innerHTML = rows.map(([k,v,t])=>`<dt>${k}</dt><dd class="${t}">${v}</dd>`).join('');
+
+  $('sessagain').textContent = `Another ${rec.size}`;
+  $('sessagain').dataset.size = rec.size;
+  $('sesscover').hidden = false;
+}
+function renderSessionHistory(){
+  const S = (stats.sessions || []).filter(x=>x.task===settings.task);
+  const last = S.slice(-12);
+  $('sessform').innerHTML = last.length
+    ? last.map(x=>`<i style="height:${Math.max(3,pct(x.right,x.n))}%" title="${new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'})} · ${x.size} shots · ${pct(x.right,x.n)}%"></i>`).join('')
+    : `<span class="empty">No finished sessions yet. Start one above the answer buttons.</span>`;
+  const best = {};
+  S.forEach(x=>{ const p = pct(x.right,x.n); if(!best[x.size] || p > best[x.size]) best[x.size] = p; });
+  $('sesscap').textContent = last.length ? 'Each bar is one finished session, newest on the right. The line marks 50%.' + (Object.keys(best).length ? ' Best: ' + Object.entries(best).map(([k,v])=>`${v}% (${k})`).join(', ') + '.' : '') : '';
+  $('sesslist').innerHTML = S.slice(-8).reverse().map(x=>`<div class="srow"><span>${new Date(x.end).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${x.size} shots</span><b>${pct(x.right,x.n)}%</b><span>${pct(x.made,x.n)}% pocketed</span></div>`).join('');
+}
+
+function answer(id){
+  if(answered || !shot || isPlace() || !$('sessidlecover').hidden) return;
+  answered = true;
+  endFlash();
+  const picked = REFS.find(r=>r.id===id);
+  const oc = outcome(shot, picked.deg);
+  const ok = id === shot.answer.id;
+  const tip = ok && !oc.made && settings.mode==='any';       // right bucket, but the pure reference needs adjusting
+  const counted = oc.made || ok;                             // a right call never counts against your pocket rate
+  shot.pick = {...oc, id, far: Math.abs(picked.deg - shot.theta) > 0.3 && (!ok || tip)};
+  const aided = settings.ghost === '1';
+  const prevStreak = aided ? 0 : runs(modeLog()).cur;
+  logEntry({p:id, m:counted?1:0});
+  const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
+  document.querySelectorAll('#answers button').forEach(b=>{ b.disabled = true; });
+  const reveal = (animMs)=>{
+    if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
+    draw(true);
+    $('quick').innerHTML = quickHTML + `<div class="ql tap">${settings.ghost==='1' ? 'Ghost ball on: practice shot, not scored. ' : ''}Tap the table for the next shot</div>`;
+    finishRound();
+    sessionTick(ok, counted);
+  };
+
+  const f = 1 - Math.sin(shot.theta*RAD);
+  const over = picked.deg > shot.theta;
+  let msg, cls;
+  if(ok){ msg = tip ? 'Right call.' : pick(['Good read.','On the money.','That’s it.','Clean.']); cls='ok'; }
+  else if(oc.made){ msg = `Wrong fraction, but it still drops.`; cls='ok'; }
+  else { msg = over ? 'Too thin.' : 'Too full.'; cls='no'; }
+  const exactLine = Math.abs(f - shot.answer.f) > .02
+    ? `Cut angle <b>${shot.theta.toFixed(1)}°</b>, a <b>${f.toFixed(2)}</b>-ball hit. Nearest reference: ${lbl(shot.answer)}.`
+    : `Cut angle <b>${shot.theta.toFixed(1)}°</b>, a ${lbl(shot.answer)}-ball hit.`;
+  const adjust = over ? 'fuller' : 'thinner';
+  const tipText = tip ? `Tip: a pure ${lbl(picked)} misses by ${Math.abs(oc.lat).toFixed(1)}″. Hit it a touch ${adjust}.` : '';
+  showResult(msg, cls, counted, oc.lat, over, exactLine, tipText);
+  const quickHTML = `<div class="ql"><b class="${counted?'ok':'no'}">${counted ? 'Pocketed' : 'Missed'}</b>`
+    + (!ok ? `<span class="out">${over?'Too thin':'Too full'}${counted ? '' : ', by '+Math.abs(oc.lat).toFixed(1)+'″'}</span>` : '')
+    + `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`
+    + (tip ? `<div class="ql"><span class="tipq">Hit it a touch ${adjust}</span><span>A pure ${lbl(picked)} misses ${Math.abs(oc.lat).toFixed(1)}″</span></div>` : '');
+  // the verdict lands on the call, not after the animation: sound, result, button colours, streak
+  $('quick').innerHTML = quickHTML + `<div class="ql tap">Tap the table to skip</div>`;
+  document.querySelectorAll('#answers button').forEach(b=>{
+    if(b.dataset.id===shot.answer.id) b.className='right';
+    else if(b.dataset.id===id) b.className='wrong';
+  });
+  if(!aided) showStreak(newStreak, !ok && prevStreak >= STREAK_HOT ? prevStreak : 0);
+  if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);
+  else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
+  else thock(counted);
+  if(settings.animate !== '0') animateShot(ok ? outcome(shot, shot.theta) : oc, reveal, ok ? '#ffd34d' : MISS); else reveal(0);
+}
+
+// ---------- shot animation: your call, played out. No spin or physics, just clean motion. ----------
+let anim = null;
+function rayToCushion(p, dir, maxLen){
+  let t = Infinity;
+  const lo = [R, R], hi = [W-R, H-R];
+  for(const k of [0,1]){
+    if(dir[k] > 1e-9) t = Math.min(t, (hi[k]-p[k])/dir[k]);
+    else if(dir[k] < -1e-9) t = Math.min(t, (lo[k]-p[k])/dir[k]);
+  }
+  t = Math.max(0, Math.min(t, maxLen ?? Infinity));
+  return add(p, mul(dir, t));
+}
+function animateShot(oc, done, obCol){
+  const s = shot, cb0 = s.cb, ob0 = s.ob, g2 = oc.g2;
+  const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
+  const toPocket = dot(sub(s.P.t, ob0), oc.u2);
+  const sink = oc.made;
+  // a near miss catches the jaw and kicks back out, so it never looks like it dropped
+  const lat = Math.abs(oc.lat ?? 0);
+  const rattle = !sink && toPocket > 4 && lat < s.tol + 2.4;
+  let jaw = null, obEnd;
+  if(sink) obEnd = add(ob0, mul(oc.u2, toPocket + 2.6));
+  else if(rattle){
+    jaw = rayToCushion(ob0, oc.u2, toPocket - (s.P.side ? 1.6 : 2.8));
+    const d = sub(jaw, s.P.t), latDir = sub(d, mul(oc.u2, dot(d, oc.u2)));
+    const out = len(latDir) > 1e-6 ? norm(latDir) : [-oc.u2[1], oc.u2[0]];
+    obEnd = rayToCushion(jaw, norm(add(mul(oc.u2, -1), mul(out, -0.6))), 6);   // off the jaw and back into the table
+  }
+  else obEnd = rayToCushion(ob0, oc.u2);
+  const dJ = jaw ? len(sub(jaw, ob0)) : 0;
+  const obAt = dist => !jaw || dist <= dJ ? add(ob0, mul(oc.u2, dist)) : add(jaw, mul(norm(sub(obEnd, jaw)), dist - dJ));
+  // stop shot: after contact the cue ball leaves along the tangent line, farther on thinner hits
+  let tan = sub(v2, mul(n2, dot(v2, n2))); const tl = len(tan);
+  const cbEnd = tl > 0.05 ? rayToCushion(g2, mul(tan, 1/tl), 26*tl) : g2;
+  const cl = (x,a,b)=>Math.max(a, Math.min(b, x));
+  const d1 = len(sub(g2, cb0)), d2 = jaw ? dJ + len(sub(obEnd, jaw)) : len(sub(obEnd, ob0)), d3 = len(sub(cbEnd, g2));
+  const V = 75;                                   // one constant speed (inches per second) for every ball, start to finish
+  const T1 = d1/V, T2 = d2/V, T3 = d3/V;
+  const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
+  const easeOut = u => u;   // linear: no speeding up or slowing down
+  const t0 = performance.now();
+  const frame = now => {
+    if(!anim) return;
+    const t = (now - t0) / 1000;
+    let cb, ob = ob0, obScale = 1;
+    if(t < T1){ cb = add(cb0, mul(sub(g2, cb0), t/T1)); }
+    else {
+      const u2 = Math.min(1, (t-T1)/T2), u3 = Math.min(1, (t-T1)/T3);
+      ob = jaw ? obAt(d2*u2) : add(ob0, mul(sub(obEnd, ob0), easeOut(u2)));
+      cb = add(g2, mul(sub(cbEnd, g2), easeOut(u3)));
+      if(sink){ const past = len(sub(ob, ob0)) - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
+    }
+    s.anim = {cb, ob: obScale > 0.02 ? ob : null, obScale,
+      trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : (jaw && len(sub(ob, ob0)) > dJ ? [ob0, jaw, ob] : [ob0, ob]), obCol}};
+    draw(false);
+    if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
+  };
+  s.final = {cb: cbEnd, ob: sink ? null : obEnd, jaw, trail: {cb: [cb0, g2, cbEnd]}};
+  anim = {done, t0, raf: requestAnimationFrame(frame)};
+}
+function finishAnim(){
+  if(!anim) return;
+  const a = anim; anim = null;
+  cancelAnimationFrame(a.raf);
+  if(shot) shot.anim = null;
+  a.done(performance.now() - a.t0);
+}
+
+function showResult(msg, cls, made, lat, over, firstLine, tipText){
+  const badge = tipText ? `<span class="badge tip">${tipText}</span>` : made
+    ? `<span class="badge in">● Pocketed</span>`
+    : `<span class="badge out">Misses by ${Math.abs(lat).toFixed(1)}″, ${over?'overcut':'undercut'}</span>`;
+  const win = makeWindow(shot);
+  const winLine = `It drops from <b>${win.fThin.toFixed(2)}</b> to <b>${win.fThick.toFixed(2)}</b> ball, a <b>${(win.hi-win.lo).toFixed(1)}°</b> window.`;
+  const throwLine = shot.throwOn && shot.theta > 1
+    ? `<p class="detail">Throw carries the object ball <b>${(shot.theta-shot.pathDeg).toFixed(1)}°</b> toward the cue line, so the path to the pocket is ${shot.pathDeg.toFixed(1)}° but you aim ${shot.theta.toFixed(1)}°.</p>` : '';
+  const key = shot.pick.far
+    ? `<p class="detail">White dashed is the right ghost ball. Purple is where ${isPlace()?'your ghost ball':'your call'} sends it.</p>`
+    : `<p class="detail">The dashed ball is the ghost ball. The panel shows the overlap from behind the cue ball.</p>`;
+  $('result').innerHTML = `${overlapSVG(shot)}<div>
+    <p class="detail">${firstLine} ${winLine}</p>${throwLine}${key}</div>`;
+}
+
+// ---------- ghost-ball placement ----------
+const svgEl = $('table');
+function worldFromEvent(ev){
+  const pt = svgEl.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const q = pt.matrixTransform(svgEl.getScreenCTM().inverse());
+  if(settings.view==='top') return [q.x, q.y];
+  return lastCam ? lastCam.unproject(q.x, q.y, R) : null;
+}
+function placeAt(p){
+  if(!p) return;
+  const d = sub(p, shot.ob);
+  if(len(d) < 1e-6) return;
+  shot.place = clampGhost(norm(d));
+  draw(false); updateControls();
+}
+// Keep the ghost ball on the cue-ball side of the object ball (at most 80° around from the cue ball).
+function clampGhost(dir){
+  const toCB = norm(sub(shot.cb, shot.ob));
+  let ang = Math.atan2(toCB[0]*dir[1]-toCB[1]*dir[0], dot(toCB,dir));
+  const lim = 80*RAD;
+  if(Math.abs(ang) > lim) ang = Math.sign(ang)*lim;
+  return add(shot.ob, mul(rot(toCB, ang), 2*R));
+}
+function nudge(dir){             // dir +1 = right, -1 = left, as seen from behind the cue ball
+  if(!shot || !shot.place || answered) return;
+  const w = norm(sub(shot.ob, shot.cb)), right = [-w[1], w[0]];
+  const a = sub(shot.place, shot.ob);
+  for(const sg of [1,-1]){
+    const cand = clampGhost(norm(rot(a, sg*0.008)));
+    if(Math.sign(dot(sub(cand, shot.place), right)) === dir){ shot.place = cand; break; }
+  }
+  draw(false);
+}
+let dragging = false;
+svgEl.addEventListener('pointerdown', ev=>{
+  if(!isPlace() || answered || !shot) return;
+  dragging = true;
+  try{ svgEl.setPointerCapture(ev.pointerId); }catch(e){}
+  placeAt(worldFromEvent(ev));
+  ev.preventDefault();
+});
+svgEl.addEventListener('pointermove', ev=>{ if(dragging) placeAt(worldFromEvent(ev)); });
+['pointerup','pointercancel'].forEach(t=>svgEl.addEventListener(t, ()=>{ dragging = false; }));
+
+function outcomeFromGhost(s, g){
+  const v2 = norm(sub(g, s.cb)), n2 = norm(sub(s.ob, g));
+  const cr = v2[0]*n2[1]-v2[1]*n2[0];
+  const phi = Math.atan2(Math.abs(cr), dot(v2,n2))/RAD;
+  const u2 = rot(n2, -Math.sign(cr)*throwFor(s.throwOn, phi)*RAD);
+  const err = Math.atan2(s.u[0]*u2[1]-s.u[1]*u2[0], dot(s.u,u2));
+  const lat = s.L*Math.sin(err);
+  const trueSide = Math.sign(s.v[0]*s.n[1]-s.v[1]*s.n[0]);
+  const signed = (Math.sign(cr)===trueSide || phi < 0.01) ? phi : -phi;   // negative = past full, on the wrong side
+  const reachable = phi < 88;
+  return {u2, lat, phi, e: signed - s.theta, made: reachable && Math.abs(lat) <= s.tol, reachable};
+}
+function shoot(){
+  if(answered || !shot || !shot.place) return;
+  answered = true;
+  const oc = outcomeFromGhost(shot, shot.place);
+  shot.pick = {g2: shot.place, u2: oc.u2, made: oc.made, far: Math.abs(oc.e) > 0.3};
+  logEntry({e: +oc.e.toFixed(2), m: oc.made?1:0});
+  draw(true);
+  const over = oc.e > 0;
+  const wrongSide = oc.e < -shot.theta - 1 && oc.phi > 2;
+  const msg = !oc.reachable ? 'The cue ball can’t reach that spot.'
+    : wrongSide ? 'Wrong side of the ball. That cuts it the other way.'
+    : oc.made ? (Math.abs(oc.e) < 0.6 ? 'Dead center.' : 'In.') : (over ? 'Too thin.' : 'Too full.');
+  const cls = oc.made ? 'ok' : 'no';
+  const fu = 1 - Math.sin(Math.min(90,Math.abs(oc.phi))*RAD), f = 1 - Math.sin(shot.theta*RAD);
+  const first = `Your ghost ball: <b>${oc.phi.toFixed(1)}°</b> (${fu.toFixed(2)} ball). Needed: <b>${shot.theta.toFixed(1)}°</b> (${f.toFixed(2)} ball, nearest ${lbl(shot.answer)}). You were <b>${Math.abs(oc.e).toFixed(1)}°</b> ${over?'thin':'full'}.`;
+  showResult(msg, cls, oc.made, oc.lat, over, first);
+  $('quick').innerHTML = `<div class="ql"><b class="${cls}">${oc.made ? 'Pocketed' : 'Missed'}</b>`
+    + (oc.made ? '' : `<span class="out">${over?'Too thin':'Too full'}, by ${Math.abs(oc.lat).toFixed(1)}″</span>`)
+    + `<span>off by ${Math.abs(oc.e).toFixed(1)}°</span></div><div class="ql tap">Tap the table for the next shot</div>`;
+  finishRound();
+}
+
+// ---------- stats & patterns ----------
+function pct(a,b){ return b ? Math.round(100*a/b) : 0; }
+function median(xs){ if(!xs.length) return 0; const a=[...xs].sort((x,y)=>x-y), m=a.length>>1; return a.length%2 ? a[m] : (a[m-1]+a[m])/2; }
+function runs(L){
+  let cur = 0, best = 0;
+  for(const e of L){ if(success(e)){ cur++; best = Math.max(best,cur); } else cur = 0; }
+  return {cur, best};
+}
+function renderStats(){
+  const L = modeLog(), n = L.length, place = isPlace();
+  const r = runs(L);
+  $('s-l1').textContent = place ? 'Typical miss' : 'Called right';
+  $('s-acc').textContent = !n ? '–' : place
+    ? median(L.map(e=>Math.abs(e.e||0))).toFixed(1)+'°'
+    : pct(L.filter(success).length, n)+'%';
+  const recent = L.slice(-20);
+  $('s-made').textContent = recent.length ? pct(recent.filter(place ? e=>e.m : success).length, recent.length)+'%' : '–';
+  $('s-streak').textContent = r.cur;
+  $('s-best').textContent = r.best;
+  $('s-n').textContent = n;
+  $('scoremode').textContent = `${MODE_LABEL[settings.task]} mode`;
+  $('byfrac-h').textContent = place ? 'Pocketed, by real fraction' : 'Called right, by real fraction';
+  $('byfrac').innerHTML = REFS.map(ref=>{
+    const rec = L.filter(e=>e.a===ref.id), c = rec.filter(place ? e=>e.m : success).length, p = pct(c, rec.length);
+    return `<div class="row"><span class="lab">${ref.label}</span><div class="bar"><i style="width:${p}%"></i></div><span class="n">${rec.length? p+'% · '+rec.length : '—'}</span></div>`;
+  }).join('');
+  renderPatterns();
+  renderSessionHistory();
+  renderSession();
+}
+
+
+function groupStats(rec){
+  const n = rec.length, right = rec.filter(success).length;
+  const thin = rec.filter(e=>lean(e)>0).length, full = rec.filter(e=>lean(e)<0).length;
+  return {n, right, thin, full, acc: pct(right,n)};
+}
+
+function renderPatterns(){
+  const log = modeLog(), place = isPlace();
+  $('patterns-h').textContent = `Your misses · ${MODE_LABEL[settings.task]}`;
+  $('confbox').hidden = place;
+  const M = REFS.map(()=>REFS.map(()=>0));
+  if(!place){
+    log.forEach(e=>{ const i=idx(e.a), j=idx(e.p); if(i>=0&&j>=0) M[i][j]++; });
+    let t = `<tr><th></th><th class="axis" colspan="5">You called</th></tr><tr><th class="axis rowh">Real</th>${REFS.map(r=>`<th>${r.label}</th>`).join('')}</tr>`;
+    REFS.forEach((r,i)=>{
+      const tot = M[i].reduce((a,b)=>a+b,0);
+      t += `<tr><th class="rowh">${r.label}</th>` + M[i].map((c,j)=>{
+        const share = tot ? c/tot : 0;
+        const bg = c===0 ? 'var(--chip)' : `color-mix(in srgb, ${i===j?'var(--good)':'var(--bad)'} ${Math.round(18+share*62)}%, var(--chip))`;
+        return `<td style="background:${bg}">${c||'·'}</td>`;
+      }).join('') + `</tr>`;
+    });
+    $('conf').innerHTML = t;
+  }
+
+  const groups = [
+    ['All shots', ()=>true],
+    ['Left cuts', e=>e.s==='L'], ['Right cuts', e=>e.s==='R'],
+    ['Overhead', e=>e.v==='top'], ['Standing', e=>e.v==='stand'], ['Down on the ball', e=>e.v==='down'],
+    ['Ball line', e=>e.v!=='top' && e.c==='line'], ['Aim line', e=>e.v!=='top' && e.c==='aim'],
+    ['Short shots', e=>e.ln==='short'], ['Long shots', e=>e.ln==='long'],
+    ['Reference cuts', e=>e.md==='ref'], ['Any angle', e=>e.md==='any'],
+  ];
+  $('leans').innerHTML = groups.map(([name,fn],gi)=>{
+    const g = groupStats(log.filter(fn));
+    if(!g.n && gi>0) return '';
+    if(!g.n) return `<div class="lean"><span>${name}</span><div class="dbar"></div><span class="n">—</span></div>`;
+    const val = (g.thin - g.full)/g.n, w = Math.min(Math.abs(val),.5)/.5*50;
+    const bar = val===0 ? '' : `<i class="${val>0?'thin':'full'}" style="width:${w.toFixed(1)}%"></i>`;
+    return `<div class="lean"><span>${name}</span><div class="dbar" title="${g.thin} too thin, ${g.full} too full">${bar}</div><span class="n">${g.acc}% · ${g.n}</span></div>`;
+  }).join('');
+
+  const notes = renderBreakdowns(log);
+  const all = groupStats(log);
+  if(all.n < 10){ $('insight').textContent = all.n ? `${10-all.n} more shots in this mode before patterns mean much.` : 'Play a few shots in this mode and your patterns show up here.'; return; }
+  const noun = place ? 'misses' : 'wrong calls';
+  const parts = [];
+  const wrong = all.thin + all.full;
+  if(wrong === 0) parts.push(place ? 'No misses yet. Try Any angle or a lower view.' : 'No wrong calls yet. Try long shots, Down on the ball, or Flash mode.');
+  else if(wrong >= 4 && all.thin/wrong >= .65) parts.push(`Most of your ${noun} are too thin, so you’d overcut (${all.thin} of ${wrong}).`);
+  else if(wrong >= 4 && all.full/wrong >= .65) parts.push(`Most of your ${noun} are too full, so you’d undercut (${all.full} of ${wrong}).`);
+  else if(wrong >= 4) parts.push(`Your ${noun} split fairly evenly: ${all.thin} too thin, ${all.full} too full.`);
+  if(place){
+    parts.push(`Your typical (median) ghost-ball error is ${median(log.map(e=>Math.abs(e.e||0))).toFixed(1)}°.`);
+  }
+  const L = groupStats(log.filter(e=>e.s==='L')), Rr = groupStats(log.filter(e=>e.s==='R'));
+  if(L.n>=6 && Rr.n>=6 && Math.abs(L.acc-Rr.acc)>=12){
+    const worse = L.acc<Rr.acc ? ['left',L.acc,Rr.acc] : ['right',Rr.acc,L.acc];
+    parts.push(`You do worse on ${worse[0]} cuts (${worse[1]}% vs ${worse[2]}%).`);
+  }
+  const vs = ['top','stand','down'].map(v=>({v, g:groupStats(log.filter(e=>e.v===v))})).filter(x=>x.g.n>=6);
+  if(vs.length>=2){
+    vs.sort((a,b)=>a.g.acc-b.g.acc);
+    if(vs[vs.length-1].g.acc - vs[0].g.acc >= 12) parts.push(`Your weakest view is ${VIEW_LABEL[vs[0].v]} (${vs[0].g.acc}%).`);
+  }
+  if(!place){
+    let top = null;
+    M.forEach((row,i)=>row.forEach((c,j)=>{ if(i!==j && c>=3 && (!top || c>top.c)) top={i,j,c}; }));
+    if(top) parts.push(`Most common mix-up: calling ${REFS[top.j].label} when it’s ${REFS[top.i].label} (${top.c}×).`);
+  }
+  parts.push(...notes);
+  $('insight').innerHTML = parts.map(p=>`<span>${p}</span>`).join('');
+}
+
+// ---------- breakdowns: distance, angle, pocket, recent form ----------
+const BINS = {
+  dc: [[0,24,'Short','under 2 ft'],[24,42,'Medium','2 to 3½ ft'],[42,1e9,'Long','3½ ft or more']],
+  dp: [[0,24,'Short','under 2 ft'],[24,48,'Medium','2 to 4 ft'],[48,1e9,'Long','4 ft or more']],
+  ag: [[0,7.5,'0–7°'],[7.5,20,'8–20°'],[20,35,'20–35°'],[35,50,'35–50°'],[50,90,'50° +']],
+};
+function binRows(id, rows){
+  const el = $(id); el.classList.add('bins');
+  el.innerHTML = rows.map(r=>{
+    const p = pct(r.ok, r.n), few = r.n > 0 && r.n < 5;
+    const name = r.range ? `${r.label} (${r.range})` : r.label;
+    const tip = r.n ? `${name}: ${r.ok} of ${r.n} right (${p}%)` : `${name}: no shots yet`;
+    return `<div class="row${few?' thin':''}" title="${tip}"><span class="lab wide">${r.label}</span><div class="bar"><i style="width:${r.n?p:0}%"></i></div><span class="n">${r.n ? p+'% · '+r.n : '—'}</span></div>`;
+  }).join('');
+}
+function renderBreakdowns(log){
+  const place = isPlace(), notes = [];
+  const withDist = log.filter(e=>typeof e.dc === 'number');
+  const stat = rec => ({n: rec.length, ok: rec.filter(place ? e=>e.m : success).length});
+  const binned = key => BINS[key].map(([lo,hi,label,range])=>({label, range, ...stat(withDist.filter(e=>e[key]>=lo && e[key]<hi))}));
+  const dc = binned('dc'), dp = binned('dp'), ag = binned('ag');
+  binRows('bin-dc', dc); binRows('bin-dp', dp); binRows('bin-ag', ag);
+  binRows('bin-wk', [{label:'Walked', ...stat(log.filter(e=>e.wk===1))}, {label:'Didn’t', ...stat(log.filter(e=>e.wk===0))}]);
+  binRows('bin-pt', [{label:'Corner', ...stat(withDist.filter(e=>e.pt==='c'))}, {label:'Side', ...stat(withDist.filter(e=>e.pt==='s'))}]);
+  $('bincap').textContent = withDist.length < log.length
+    ? `Distance, angle and pocket breakdowns count ${withDist.length} of your ${log.length} shots; older shots didn’t record them. Faded rows have fewer than 5 shots.`
+    : 'Faded rows have fewer than 5 shots.';
+  // recent form: blocks of 10, up to the last 12 blocks
+  const blocks = [];
+  for(let i = Math.max(0, log.length - 120); i < log.length; i += 10){ const b = log.slice(i, i+10); blocks.push({from:i+1, to:i+b.length, ...stat(b)}); }
+  $('form').innerHTML = blocks.length
+    ? blocks.map(b=>`<i class="${b.n<10?'thin':''}" style="height:${Math.max(3,pct(b.ok,b.n))}%" title="Shots ${b.from}–${b.to}: ${pct(b.ok,b.n)}%${b.n<10?' (block in progress)':''}"></i>`).join('')
+    : `<span class="empty">No shots yet</span>`;
+  // plain-language findings
+  const acc = rows => { const n = rows.reduce((a,r)=>a+r.n,0), ok = rows.reduce((a,r)=>a+r.ok,0); return {n, p: pct(ok,n)}; };
+  const nearD = acc(dc.slice(0,1)), farD = acc(dc.slice(2));
+  if(nearD.n>=6 && farD.n>=6 && nearD.p - farD.p >= 12) notes.push(`Accuracy drops with distance: ${nearD.p}% on short shots, ${farD.p}% on long ones.`);
+  else if(nearD.n>=6 && farD.n>=6 && Math.abs(nearD.p - farD.p) < 8) notes.push(`Distance isn’t hurting you: ${nearD.p}% on short shots, ${farD.p}% on long ones.`);
+  const angs = ag.filter(r=>r.n>=5);
+  if(angs.length>=2){
+    const worst = angs.reduce((a,b)=>pct(b.ok,b.n)<pct(a.ok,a.n)?b:a), best = angs.reduce((a,b)=>pct(b.ok,b.n)>pct(a.ok,a.n)?b:a);
+    if(pct(best.ok,best.n) - pct(worst.ok,worst.n) >= 15) notes.push(`Weakest cuts: ${worst.label} (${pct(worst.ok,worst.n)}%). Strongest: ${best.label} (${pct(best.ok,best.n)}%).`);
+  }
+  if(blocks.length>=4){
+    const full = blocks.filter(b=>b.n===10), first = full.slice(0,2), last = full.slice(-2);
+    if(full.length>=4){ const a = acc(first), z = acc(last); if(z.p - a.p >= 15) notes.push(`You’re improving: ${a.p}% → ${z.p}% across your recent blocks.`); else if(a.p - z.p >= 15) notes.push(`Your last 20 shots (${z.p}%) are below your earlier ones (${a.p}%). Fatigue, or harder settings?`); }
+  }
+  return notes;
+}
+
+// ---------- controls ----------
+const HINTS = {
+  ref: 'Every shot sits within about a degree of one reference fraction.',
+  any: 'Any cut up to 66°. Call the nearest reference, then check whether it drops.',
+};
+function syncPressed(){
+  tableBox.classList.toggle('walkable', settings.task==='call' || settings.task==='sess');
+  $('sessrow').hidden = settings.task!=='sess';
+  $('sesshist').hidden = settings.task!=='sess';
+  document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
+  $('modehint').textContent = isPlace()
+    ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
+    : HINTS[settings.mode];
+}
+function applySetting(key, val){
+  if(settings[key]===val) return;
+  settings[key] = val; saveSettings(); syncPressed();
+  if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
+  if(key==='ghost'){ if(shot) draw(answered); }
+  else if(key==='view' || key==='cam'){ if(shot && !answered) deal(); else if(shot) draw(answered); }
+  else if(key==='table' || key==='pockets'){ setTable(settings.table, settings.pockets); deal(); }
+  else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();
+  renderStats();
+}
+document.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click', ()=>applySetting(b.dataset.set, b.dataset.val)));
+
+$('answers').innerHTML = REFS.map((r,i)=>`<button data-id="${r.id}" id="ans-${r.id}" aria-label="${r.label} ball, key ${i+1}">${r.label}<span>${r.deg.toFixed(r.deg%1?1:0)}°</span></button>`).join('');
+$('answers').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) answer(b.dataset.id); });
+$('nudge-l').addEventListener('click', ()=>nudge(-1));
+$('nudge-r').addEventListener('click', ()=>nudge(1));
+$('next').addEventListener('click', ()=>{ if(anim){ finishAnim(); return; } if(isPlace() && !answered) shoot(); else deal(); });
+let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
+const walkOn = () => settings.task==='call' || settings.task==='sess';
+function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
+svgEl.addEventListener('pointerdown', ev=>{
+  if(anim || !walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
+  // a drag across the full width of the table swings you half way round the object ball
+  walkDrag = {x: ev.clientX, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth)};
+});
+svgEl.addEventListener('pointermove', ev=>{
+  if(!walkDrag || ev.pointerId !== walkDrag.id) return;
+  const dx = ev.clientX - walkDrag.x;
+  if(!walkDrag.moved && Math.abs(dx) < 6) return;
+  if(!walkDrag.moved){ walkDrag.moved = true; try{ svgEl.setPointerCapture(ev.pointerId); }catch(e){} if(!answered) shot.walked = true; }
+  walk = {ang: dx*walkDrag.k, blend: 1};
+  walkRedraw();
+});
+function walkRelease(){
+  if(!walkDrag) return;
+  const moved = walkDrag.moved; walkDrag = null;
+  if(!moved || !walk) return;
+  walkEndedAt = performance.now();
+  const from = walk.blend, start = performance.now(), dur = 320;
+  const step = now=>{
+    if(!walk) return;
+    const u = Math.min(1, (now-start)/dur), ease = 1-Math.pow(1-u,3);
+    walk.blend = from*(1-ease);
+    if(shot) draw(answered);
+    if(u < 1) requestAnimationFrame(step); else { walk = null; if(shot) draw(answered); }
+  };
+  requestAnimationFrame(step);
+}
+svgEl.addEventListener('pointerup', walkRelease);
+svgEl.addEventListener('pointercancel', walkRelease);
+tableBox.addEventListener('click', ()=>{ if(anim){ finishAnim(); return; } if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) deal(); });
+$('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
+function replay(){ if(!shot || answered || settings.task!=='flash') return; shot.replays = (shot.replays||0)+1; startFlash(); }
+$('replay').addEventListener('click', e=>{ e.stopPropagation(); replay(); });
+// Desktop: the table fills the column down to the bottom of the window; the drawing matches the box shape.
+const mqDesk = matchMedia('(min-width: 900px)');
+function sizeTable(){ if(shot) draw(answered); }
+function fitViewBox(){
+  const box = document.querySelector('.table-box');
+  const w = box.clientWidth, h = box.clientHeight;
+  VH = (w && h) ? Math.round(VW*h/w) : 400;
+}
+let rsz = null;
+window.addEventListener('resize', ()=>{ clearTimeout(rsz); rsz = setTimeout(sizeTable, 60); });
+if(mqDesk.addEventListener) mqDesk.addEventListener('change', sizeTable);
+function showTab(t){
+  document.querySelectorAll('.tab').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===t));
+  document.querySelectorAll('.tabpanel').forEach(p=>p.hidden = p.id!=='tab-'+t);
+  settings.tab = t; saveSettings();
+}
+document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click', ()=>showTab(b.dataset.tab)));
+showTab(['shot','stats','misses','settings'].includes(settings.tab) ? settings.tab : 'shot');
+$('reset').addEventListener('click', ()=>{ stats.log = stats.log.filter(e=>taskOf(e)!==settings.task); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==settings.task); if(stats.active && stats.active.task===settings.task) stats.active = null; save(); renderStats(); });
+document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
+$('sessend').addEventListener('click', endSession);
+$('sessagain').addEventListener('click', e=>{ e.stopPropagation(); startSession(+e.currentTarget.dataset.size); });
+$('sessdone').addEventListener('click', e=>{ e.stopPropagation(); $('sesscover').hidden = true; deal(); });
+document.querySelectorAll('#sessidlecover [data-sess]').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); startSession(+b.dataset.sess); }));
+$('sessidlecover').addEventListener('click', e=>e.stopPropagation());
+$('sesscover').addEventListener('click', e=>e.stopPropagation());
+document.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(anim){ if(e.key==='Enter' || e.key===' '){ finishAnim(); e.preventDefault(); } return; }
+  if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ startSession(50); e.preventDefault(); } return; }
+  if(!$('sesscover').hidden){ if(e.key==='Enter'){ startSession(+$('sessagain').dataset.size); e.preventDefault(); } else if(e.key==='Escape'){ $('sesscover').hidden = true; deal(); } return; }
+  if(!$('startcover').hidden){ if(e.key==='Enter' || e.key===' '){ startFlashMode(); e.preventDefault(); } return; }
+  if((e.key==='r' || e.key==='R') && !$('cover').hidden){ replay(); e.preventDefault(); return; }
+  const k = parseInt(e.key,10);
+  if(!isPlace() && k>=1 && k<=5 && !answered){ answer(REFS[k-1].id); e.preventDefault(); }
+  else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1); e.preventDefault(); }
+  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(isPlace() && shot && shot.place){ shoot(); e.preventDefault(); } }
+});
+
+if(!['stand','down'].includes(settings.view)) settings.view='stand';
+settings.mode = 'ref';   // reference cuts only for now
+if(!['line','aim'].includes(settings.cam)) settings.cam='line';
+if(!['short','long','both'].includes(settings.len)) settings.len='both';
+if(!['0','1'].includes(settings.ghost)) settings.ghost='0';
+if(!['0','1'].includes(settings.sound)) settings.sound='1';
+if(!['0','1'].includes(settings.animate)) settings.animate='1';
+settings.throw='0';   // throw option removed
+if(!TABLES[settings.table]) settings.table='9';
+if(!['bar','std','pro'].includes(settings.pockets)) settings.pockets='std';
+setTable(settings.table, settings.pockets);
+if(!settings.sv){ settings.full='1'; settings.sv=2; }   // full-ball shots are now on by default
+if(!['call','sess','flash'].includes(settings.task)) settings.task = 'call';
+if(stats.log.some(e=>e.t==='aim' || e.t==='tt')){ stats.log = stats.log.filter(e=>e.t!=='aim' && e.t!=='tt'); save(); }   // Aim and Thick/Thin were tried and dropped
+// one-time move: sessions played before Sessions became its own mode now belong to it
+if(!settings.sv3){
+  stats.log.forEach(e=>{ if(e.sid && (e.t||'call')==='call') e.t = 'sess'; });
+  (stats.sessions||[]).forEach(x=>{ if(x.task==='call') x.task = 'sess'; });
+  if(stats.active && stats.active.task==='call') stats.active.task = 'sess';
+  settings.sv3 = 1; save();
+}
+if(!['1500','750'].includes(settings.flash)) settings.flash='1500';
+saveSettings();
+syncPressed();
+renderStats();
+sizeTable();
+deal();
+syncStreakPill();
+// Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
+})();
+</script>
+
