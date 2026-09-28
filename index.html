@@ -54,7 +54,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .quick b.ok{color:var(--good)} .quick b.no{color:var(--bad)}
 .quick .in{color:var(--good);font-weight:600} .quick .out{color:var(--ink);font-weight:600}
 .table-box.tappable{cursor:pointer}
-.table-box.walkable svg{touch-action:pan-y;cursor:grab}
+.table-box.walkable svg{touch-action:none;cursor:grab}
 .table-box.walkable svg:active{cursor:grabbing}
 .table-box.placing svg{touch-action:none;cursor:crosshair}
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
@@ -713,10 +713,14 @@ function camFrom(E, f, hfov){
 let walk = null;   // {ang (radians), blend 0..1 for the snap back}
 function walkCam(s, view){
   const base = makeCam(s, view), a = walk.ang * walk.blend;
-  const rel = rot([base.E[0]-s.ob[0], base.E[1]-s.ob[1]], a);
-  const E = [s.ob[0] + rel[0], s.ob[1] + rel[1], base.E[2]];
-  const fh = rot([base.f[0], base.f[1]], a);
-  return camFrom(E, norm3([fh[0], fh[1], base.f[2]]), base.hfov);
+  // up/down: swing the eye over the object ball in the vertical plane, tilting the view to match
+  const r0 = [base.E[0]-s.ob[0], base.E[1]-s.ob[1]], hd = len(r0), dz = base.E[2] - R;
+  const el0 = Math.atan2(dz, hd), dist = Math.hypot(hd, dz);
+  const el = Math.max(3*RAD, Math.min(80*RAD, el0 + (walk.el||0) * walk.blend));
+  const rel = rot(mul(r0, dist*Math.cos(el)/hd), a);
+  const E = [s.ob[0] + rel[0], s.ob[1] + rel[1], R + dist*Math.sin(el)];
+  const fh = rot([base.f[0], base.f[1]], a), p0 = Math.asin(base.f[2]), p1 = p0 - (el - el0), c1 = Math.cos(p1)/Math.hypot(fh[0], fh[1]);
+  return camFrom(E, norm3([fh[0]*c1, fh[1]*c1, Math.sin(p1)]), base.hfov);
 }
 function makeCam(s, view){
   const c = VIEWS[view];
@@ -1580,14 +1584,15 @@ function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{
 svgEl.addEventListener('pointerdown', ev=>{
   if(anim || !walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
   // a drag across the full width of the table swings you half way round the object ball
-  walkDrag = {x: ev.clientX, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth)};
+  walkDrag = {x: ev.clientX, y: ev.clientY, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth), kv: (12*RAD) / Math.max(150, svgEl.clientHeight*0.45)};
 });
 svgEl.addEventListener('pointermove', ev=>{
   if(!walkDrag || ev.pointerId !== walkDrag.id) return;
-  const dx = ev.clientX - walkDrag.x;
-  if(!walkDrag.moved && Math.abs(dx) < 6) return;
+  const dx = ev.clientX - walkDrag.x, dy = ev.clientY - walkDrag.y;
+  if(!walkDrag.moved && Math.hypot(dx, dy) < 6) return;
   if(!walkDrag.moved){ walkDrag.moved = true; try{ svgEl.setPointerCapture(ev.pointerId); }catch(e){} if(!answered) shot.walked = true; }
-  walk = {ang: dx*walkDrag.k, blend: 1};
+  const EL = 12*RAD;   // up/down is kept slight: at most 12° higher or lower
+  walk = {ang: dx*walkDrag.k, el: Math.max(-EL, Math.min(EL, dy*walkDrag.kv)), blend: 1};
   walkRedraw();
 });
 function walkRelease(){
