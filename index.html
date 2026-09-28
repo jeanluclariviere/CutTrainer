@@ -1273,6 +1273,7 @@ function answer(id){
   document.querySelectorAll('#answers button').forEach(b=>{ b.disabled = true; });
   const reveal = (animMs)=>{
     if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
+    if(jumpingAhead){ sessionTick(ok, counted); return; }   // going straight to the next shot: just count it, draw nothing
     draw(true);
     $('quick').innerHTML = quickHTML + `<div class="ql tap">${settings.ghost==='1' ? 'Ghost ball on: practice shot, not scored. ' : ''}Tap the table for the next shot</div>`;
     finishRound();
@@ -1630,11 +1631,14 @@ $('answers').addEventListener('pointerdown', e=>{ if(e.button !== 0) return; con
 $('answers').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b && e.detail === 0) answer(b.dataset.id); });   // keyboard activation (Enter/Space on a focused button)
 $('nudge-l').addEventListener('click', ()=>nudge(-1));
 $('nudge-r').addEventListener('click', ()=>nudge(1));
-$('next').addEventListener('click', ()=>{
-  // mid-animation: wrap up the shot (scores, session count), then go straight to the next one
-  if(anim){ finishAnim(); if($('sesscover').hidden) deal(); return; }
-  if(isPlace() && !answered) shoot(); else deal();
-});
+// Next shot: always straight to a new shot. A running animation is simply dropped (the shot still counts).
+let jumpingAhead = false;
+function nextShot(){
+  if(!answered) return;
+  if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
+  if($('sesscover').hidden) deal();
+}
+$('next').addEventListener('click', ()=>{ if(isPlace() && !answered) shoot(); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
 const walkOn = () => settings.task==='call' || settings.task==='sess';
 function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
@@ -1709,11 +1713,7 @@ $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
-  if(anim){
-    if(e.key==='Enter'){ finishAnim(); if($('sesscover').hidden) deal(); e.preventDefault(); }   // Enter = next shot, skipping the animation (the shot still counts)
-    else if(e.key===' '){ finishAnim(); e.preventDefault(); }                                  // Space just skips to the end
-    return;
-  }
+  if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
   if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ startSession(50); e.preventDefault(); } return; }
   if(!$('sesscover').hidden){ if(e.key==='Enter'){ startSession(+$('sessagain').dataset.size); e.preventDefault(); } else if(e.key==='Escape'){ $('sesscover').hidden = true; deal(); } return; }
   if(!$('startcover').hidden){ if(e.key==='Enter' || e.key===' '){ startFlashMode(); e.preventDefault(); } return; }
