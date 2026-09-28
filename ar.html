@@ -83,7 +83,7 @@ a{color:var(--accent)}
 </div>
 
 <script type="module">
-import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, rigidFit, R, REFS} from './ar-core.js';
+import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, rigidFit, findBalls, clothColour, R, REFS} from './ar-core.js';
 
 const $ = id => document.getElementById(id);
 const DEBUG = new URLSearchParams(location.search).has('debug');
@@ -113,6 +113,10 @@ let table = null;
 let balls = {cue: null, obj: null};   // pinned centres
 let target = null;            // target pocket index
 let shot = null, picked = null;
+let seen = [];                // balls found in the camera picture: {p (pinned), label, cue, t}
+let objLabel = '';
+let camRowsDown = null;       // do the camera picture's rows run top-down? (worked out from the table itself)
+let lastScan = 0;
 let lastView = null;          // {proj, view}
 const taps = [];              // screen taps waiting for the next frame (they need its camera image)
 const history = [];           // for Undo
@@ -184,6 +188,10 @@ function onFrame(t, frame){
     }
   }
   if(view.camera && binding) cameraAccess = true;
+  if(table && cameraAccess && t - lastScan > 450 && ['balls','pocket','call','reveal'].includes(step)){
+    lastScan = t;
+    try{ scanBalls(view); }catch(e){ if(DEBUG) console.warn(e); }
+  }
   while(taps.length) handleTap(taps.shift(), frame, view);
   draw();
 }
@@ -219,6 +227,24 @@ function handleTap(tap, frame, view){
     return;
   }
   if(step === 'balls' || step === 'call' || step === 'reveal'){
+    // a ball the scanner has already found: tap near it to choose it
+    // nearest found ball on screen, within a fingertip
+    const tx = (tap.x + 1) / 2 * innerWidth, ty = (1 - tap.y) / 2 * innerHeight;
+    const near = seen.map(b => { const q = proj(b.p); return q ? {b, d: Math.hypot((q.x+1)/2*innerWidth - tx, (1-q.y)/2*innerHeight - ty)} : null; })
+      .filter(o => o && o.d < 44).sort((a,b)=>a.d-b.d)[0];
+    if(near){
+      const prev = {...balls}, prevLabel = objLabel, prevTarget = target;
+      history.push(()=>{ balls = prev; objLabel = prevLabel; target = prevTarget; picked = null; setStep(balls.cue && balls.obj ? 'pocket' : 'balls'); });
+      if(near.b.cue) balls.cue = near.b.p;
+      else {
+        balls.obj = near.b.p; objLabel = near.b.label;
+        const cue = seen.find(b => b.cue);
+        if(cue) balls.cue = cue.p;                      // the cue ball is picked for you
+      }
+      picked = null; target = null;
+      setStep(balls.cue && balls.obj ? 'pocket' : 'balls');
+      return;
+    }
     const c = findBall(tap, frame, view);
     if(!c) return;
     // the cue ball is the white one; otherwise the first ball you tap
@@ -257,6 +283,82 @@ function pinCorners(frame){
     .then(list => { anchors = list; anchorAt = corners.map(c=>c.slice()); })     // their positions in pinned coordinates
     .catch(()=>{ anchors = []; });
 }
+// ---------- the camera picture ----------
+// Read the camera image, shrunk to at most maxW pixels wide (a small shader draws it into our own framebuffer).
+let shrink = null;
+function grabCamera(view, maxW){
+  const tex = binding.getCameraImage(view.camera);
+  const W0 = view.camera.width, H0 = view.camera.height, k = Math.min(1, maxW / Math.min(W0, H0));   // maxW: the short side
+  const w = Math.max(8, Math.round(W0*k)), h = Math.max(8, Math.round(H0*k));
+  if(!shrink){
+    const vs = 'attribute vec2 p; varying vec2 uv; void main(){ uv = p*0.5+0.5; gl_Position = vec4(p,0.,1.); }';
+    const fs = 'precision mediump float; varying vec2 uv; uniform sampler2D t; void main(){ gl_FragColor = texture2D(t, uv); }';
+    const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return o; };
+    const prog = gl.createProgram(); gl.attachShader(prog, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    shrink = {prog, buf, loc: gl.getAttribLocation(prog, 'p'), fb: gl.createFramebuffer(), tex: gl.createTexture(), w: 0, h: 0};
+  }
+  if(shrink.w !== w || shrink.h !== h){
+    gl.bindTexture(gl.TEXTURE_2D, shrink.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    shrink.w = w; shrink.h = h;
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, shrink.fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, shrink.tex, 0);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(shrink.prog);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(gl.getUniformLocation(shrink.prog, 't'), 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, shrink.buf); gl.enableVertexAttribArray(shrink.loc); gl.vertexAttribPointer(shrink.loc, 2, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  const img = new Uint8Array(w*h*4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, img);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, xrLayer.framebuffer);
+  let any = 0; for(let i=0;i<img.length;i+=4093) any |= img[i] | img[i+1] | img[i+2];
+  if(!any) throw new Error('blank camera image');
+  return {img, w, h};
+}
+// NDC ↔ picture pixels, for either row order
+const ndcToImg = (x, y, w, h, down) => [(x + 1) / 2 * w, down ? (1 - y) / 2 * h : (y + 1) / 2 * h];
+const imgToNdc = (px, py, w, h, down) => [px / w * 2 - 1, down ? 1 - py / h * 2 : py / h * 2 - 1];
+
+// ---------- finding the balls on the table, a few times a second ----------
+function scanBalls(view){
+  const {img, w, h} = grabCamera(view, 720);
+  // the playing surface, pulled in a little so the cushions and rails stay out
+  const inset = 0.045, T = table;
+  const inner = [[inset, inset], [T.L1 - inset, inset], [T.L1 - inset, T.L2 - inset], [inset, T.L2 - inset]]
+    .map(([a, b]) => v3.add(T.origin, v3.add(v3.mul(T.ex, a), v3.mul(T.ey, b))));
+  const ndc = inner.map(p => proj(p));
+  if(ndc.some(q => !q)) return;
+  if(camRowsDown === null){
+    const devs = [true, false].map(down => { const c = clothColour(img, w, h, ndc.map(q => ndcToImg(q.x, q.y, w, h, down)), 8); return c ? c.dev : Infinity; });
+    if(Math.min(...devs) < Infinity) camRowsDown = devs[0] <= devs[1];
+    else return;
+  }
+  const poly = ndc.map(q => ndcToImg(q.x, q.y, w, h, camRowsDown));
+  const focal = lastView.proj[5] * h / 2;
+  const onCloth = (px, py) => { const [x, y] = imgToNdc(px, py, w, h, camRowsDown); return rayPlane(pinnedRay(x, y), plane, R); };
+  const rAt = (px, py) => { const p = onCloth(px, py); if(!p) return 0; const e = m4point(lastView.view, toWorld(p)); return -e[2] > 0 ? focal * R / -e[2] : 0; };
+  if(DEBUG) window.__lastScan = {img: Array.from(img), w, h, poly, r0: rAt(poly[0][0], poly[0][1])};
+  const raw = findBalls(img, w, h, poly, rAt);
+  // no clear cue ball? the whitest one is it, if it's white enough
+  if(!raw.some(b => b.cue)){ const wb = raw.reduce((a, b) => (!a || b.wf > a.wf) ? b : a, null); if(wb && wb.wf > 0.35){ wb.cue = true; wb.label = 'Cue'; } }
+  const found = raw.map(b => ({p: onCloth(b.x, b.y), label: b.label, cue: !!b.cue})).filter(b => b.p);
+  // match with what we saw before, so a ball hidden for a moment (a hand, the cue) doesn't vanish
+  const now = performance.now(), next = [];
+  for(const b of found){
+    const old = seen.find(o => v3.len(v3.sub(o.p, b.p)) < 0.05);
+    next.push({...b, label: b.label === '?' && old ? old.label : b.label, cue: b.cue || (old && old.cue && b.label === '?'), t: now});
+  }
+  for(const o of seen) if(now - o.t < 1500 && !next.some(n => v3.len(v3.sub(n.p, o.p)) < 0.05)) next.push(o);
+  seen = next;
+  if(step === 'balls') setStep('balls');   // refresh the prompt (cue ball found or not)
+}
+
 // Find the ball under a tap: read the camera picture, look for a ball-sized blob that isn't cloth, and use its centre.
 function findBall(tap, frame, view){
   const ray = pinnedRay(tap.x, tap.y);
@@ -318,7 +420,7 @@ function showDebug(img, w, h, best, rExp){
 const STEP_TEXT = {
   scan: 'Move the phone slowly over the table. When the ring sits flat on the cloth, <b>tap</b>.',
   table: () => `Tap the <b>${['first','next','across'][corners.length]}</b> corner pocket` + (corners.length===0 ? ' (any one).' : corners.length===1 ? ', along the same rail.' : ', on the other side from that one.'),
-  balls: () => (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
+  balls: () => (seen.some(b=>b.cue) && !balls.obj) ? 'Tap the <b>object ball</b>.' : (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
   pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
   call: 'How full do you hit it?',
   reveal: 'Move the balls and tap them again, or tap New shot.',
@@ -356,11 +458,11 @@ function call(id){
 }
 $('realign').addEventListener('click', ()=>{ if(!table) return; if(step !== 'realign') resumeStep = step; setStep('realign'); });
 $('undo').addEventListener('click', ()=>{ const f = history.pop(); if(f) f(); });
-$('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
+$('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; objLabel = ''; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
 $('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchors.forEach(a=>{ try{ a.delete(); }catch(e){} }); anchors = []; anchorAt = []; pin = m4identity(); unpin = m4identity(); nudge = [0,0,0];
-  balls = {cue:null, obj:null}; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
+  balls = {cue:null, obj:null}; seen = []; camRowsDown = null; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
 
-if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; } };
+if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; }, get seen(){ return seen; }, get rows(){ return camRowsDown; } };
 let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
 
@@ -401,6 +503,19 @@ function draw(){
     const cs = table.corners.map(c => v3.add(c, v3.mul(plane.n, 0.002)));
     path3([...segment(cs[0],cs[1]), ...segment(cs[1],cs[2]), ...segment(cs[2],cs[3]), ...segment(cs[3],cs[0])], 'rgba(255,255,255,.55)', 1.5);
     table.pockets.forEach((pk,i) => path3(ringOnCloth(pk.p, 0.06), i === target ? '#ffd34d' : 'rgba(255,255,255,.7)', i === target ? 4 : 2));
+  }
+  if(table && step !== 'scan' && step !== 'table'){
+    const d = devicePixelRatio || 1;
+    ctx.font = `600 ${13*d}px system-ui, sans-serif`; ctx.textAlign = 'center';
+    for(const b of seen){
+      const chosen = balls.obj && v3.len(v3.sub(b.p, balls.obj)) < 0.03;
+      const onCloth = v3.sub(b.p, v3.mul(plane.n, R));
+      path3(ringOnCloth(onCloth, R*1.45), b.cue ? '#ffffff' : chosen ? '#ffd34d' : 'rgba(255,255,255,.75)', chosen || b.cue ? 3 : 2);
+      const q = proj(v3.add(b.p, v3.mul(plane.n, R*2.2))); if(!q) continue;
+      const [x, y] = S(q), txt = b.cue ? 'Cue' : b.label;
+      ctx.lineWidth = 3*d; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.setLineDash([]); ctx.strokeText(txt, x, y);
+      ctx.fillStyle = b.cue ? '#ffffff' : chosen ? '#ffd34d' : '#ffffff'; ctx.fillText(txt, x, y);
+    }
   }
   if(balls.cue) sphere(balls.cue, null, '#ffffff');
   if(balls.obj) sphere(balls.obj, null, '#ffd34d');

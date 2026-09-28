@@ -205,3 +205,118 @@ export function rigidFit(a, b, n){
   for(let i=0;i<k;i++) residual = Math.max(residual, v3.len(v3.sub(v3.add(rot(a[i]), t), b[i])));
   return {m, residual, angle: ang, shift: v3.len(t)};
 }
+
+// ---------- finding every ball on the table ----------
+export function pointInPoly(x, y, poly){
+  let inside = false;
+  for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if(((yi > y) !== (yj > y)) && (x < (xj-xi)*(y-yi)/(yj-yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function toHsv(r, g, b){
+  r/=255; g/=255; b/=255; const mx = Math.max(r,g,b), mn = Math.min(r,g,b), d = mx - mn;
+  let h = 0;
+  if(d > 1e-6){ h = mx===r ? ((g-b)/d)%6 : mx===g ? (b-r)/d+2 : (r-g)/d+4; h *= 60; if(h < 0) h += 360; }
+  return {h, s: mx ? d/mx : 0, v: mx};
+}
+// What the cloth looks like: median colour of sample points inside the table outline.
+export function clothColour(img, w, h, poly, step = 6){
+  const cs=[[],[],[]], ls=[];
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const [x,y] of poly){ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); }
+  for(let y=Math.max(0,Math.floor(minY)); y<=Math.min(h-1,maxY); y+=step)
+    for(let x=Math.max(0,Math.floor(minX)); x<=Math.min(w-1,maxX); x+=step){
+      if(!pointInPoly(x, y, poly)) continue;
+      const i=(y*w+x)*4, s=img[i]+img[i+1]+img[i+2]+1e-3;
+      cs[0].push(img[i]/s); cs[1].push(img[i+1]/s); cs[2].push(img[i+2]/s); ls.push(s/765);
+    }
+  if(ls.length < 20) return null;
+  const med = a => { const b=[...a].sort((p,q)=>p-q); return b[b.length>>1]; };
+  const c = cs.map(med), l = med(ls);
+  // how uniform it is (lower = more like one cloth), used to check the picture's orientation
+  let dev = 0; for(let k=0;k<ls.length;k++) dev += Math.abs(cs[0][k]-c[0]) + Math.abs(cs[1][k]-c[1]) + Math.abs(cs[2][k]-c[2]);
+  return {c, l, dev: dev/ls.length, n: ls.length};
+}
+// Name a ball from the colours inside it. Solids 1–7 by colour, the 8 black, stripes 9–15 = colour with lots of white.
+const HUES = [{n:1,name:'yellow',h:52},{n:5,name:'orange',h:28},{n:3,name:'red',h:4},{n:4,name:'purple',h:285},{n:2,name:'blue',h:222},{n:6,name:'green',h:140}];
+export function classifyBall(img, w, h, cx, cy, r){
+  let white=0, black=0, n=0; const hues=[];
+  const rr = r*0.8;
+  for(let y=Math.max(0,Math.floor(cy-rr)); y<=Math.min(h-1,Math.ceil(cy+rr)); y++)
+    for(let x=Math.max(0,Math.floor(cx-rr)); x<=Math.min(w-1,Math.ceil(cx+rr)); x++){
+      if((x-cx)**2 + (y-cy)**2 > rr*rr) continue;
+      const i=(y*w+x)*4, q = toHsv(img[i], img[i+1], img[i+2]); n++;
+      if(q.s < 0.3 && q.v > 0.42) white++;             // white, including its shaded side
+      else if(q.v < 0.22) black++;
+      else if(q.s > 0.3) hues.push(q);
+    }
+  if(!n) return {id:'?', label:'?', wf:0};
+  const wf = white/n, bf = black/n;
+  if(wf > 0.62) return {id:'cue', label:'Cue', cue:true, wf};
+  if(bf > 0.45 && hues.length < n*0.3) return {id:'8', label:'8', wf};
+  if(hues.length < n*0.12) return {id:'?', label:'?', wf};
+  // circular mean of the hue
+  let sx=0, sy=0, sv=0; for(const q of hues){ sx += Math.cos(q.h*Math.PI/180); sy += Math.sin(q.h*Math.PI/180); sv += q.v; }
+  let hue = Math.atan2(sy, sx)*180/Math.PI; if(hue < 0) hue += 360;
+  const dist = (a,b) => { const d = Math.abs(a-b)%360; return Math.min(d, 360-d); };
+  let best = HUES[0]; for(const c of HUES) if(dist(hue, c.h) < dist(hue, best.h)) best = c;
+  let num = best.n;
+  if(best.n === 3 && sv/hues.length < 0.5) num = 7;          // dark red: maroon 7
+  const stripe = wf > 0.22;
+  if(stripe) num += 8;
+  return {id: String(num), label: String(num), stripe, wf};
+}
+// All balls in the picture, inside the table outline (image coordinates). rAt(x,y) gives the expected radius there.
+export function findBalls(img, w, h, poly, rAt){
+  const cloth = clothColour(img, w, h, poly, 5); if(!cloth) return [];
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for(const [x,y] of poly){ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); }
+  minX=Math.max(0,Math.floor(minX)); minY=Math.max(0,Math.floor(minY)); maxX=Math.min(w-1,Math.ceil(maxX)); maxY=Math.min(h-1,Math.ceil(maxY));
+  const bw = maxX-minX+1, bh = maxY-minY+1; if(bw < 4 || bh < 4) return [];
+  const mask = new Uint8Array(bw*bh);
+  for(let y=minY; y<=maxY; y++) for(let x=minX; x<=maxX; x++){
+    if(!pointInPoly(x, y, poly)) continue;
+    const i=(y*w+x)*4, s=img[i]+img[i+1]+img[i+2]+1e-3, l=s/765;
+    const d = Math.abs(img[i]/s-cloth.c[0]) + Math.abs(img[i+1]/s-cloth.c[1]) + Math.abs(img[i+2]/s-cloth.c[2]);
+    if(l > cloth.l*1.7+0.05 || l < cloth.l*0.22 || d > 0.09) mask[(y-minY)*bw + (x-minX)] = 1;
+  }
+  const seen = new Uint8Array(bw*bh), out = [], stack = [];
+  for(let k=0; k<bw*bh; k++){
+    if(!mask[k] || seen[k]) continue;
+    const pts = []; stack.push(k); seen[k] = 1;
+    while(stack.length){
+      const q = stack.pop(), qx = q % bw, qy = (q / bw) | 0; pts.push(qx, qy);
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx = qx+dx, ny = qy+dy; if(nx<0||ny<0||nx>=bw||ny>=bh) continue;
+        const nk = ny*bw+nx; if(mask[nk] && !seen[nk]){ seen[nk] = 1; stack.push(nk); }
+      }
+    }
+    const area = pts.length/2; let sx=0, sy=0;
+    for(let i=0;i<pts.length;i+=2){ sx+=pts[i]; sy+=pts[i+1]; }
+    const cx = sx/area + minX, cy = sy/area + minY, r = rAt(cx, cy);
+    if(!r) continue;
+    const one = Math.PI*r*r;
+    if(area < one*0.3) continue;                        // specks, chalk, reflections
+    let k2 = Math.max(1, Math.round(area/(one*0.85)));
+    if(k2 > 6) continue;                                // too big: a hand, the cue, a rail
+    // touching balls come out as one blob: split it into k2 by k-means on the pixel positions
+    let cents = [];
+    for(let c=0;c<k2;c++){ const j = Math.floor((c+0.5)/k2*area)*2; cents.push([pts[j]+minX, pts[j+1]+minY]); }
+    for(let it=0; it<8 && k2>1; it++){
+      const acc = cents.map(()=>[0,0,0]);
+      for(let i=0;i<pts.length;i+=2){ const x=pts[i]+minX, y=pts[i+1]+minY; let b=0, bd=Infinity; cents.forEach((c,ci)=>{ const d=(c[0]-x)**2+(c[1]-y)**2; if(d<bd){bd=d;b=ci;} }); acc[b][0]+=x; acc[b][1]+=y; acc[b][2]++; }
+      cents = acc.map((a,ci)=> a[2] ? [a[0]/a[2], a[1]/a[2]] : cents[ci]);
+    }
+    for(const [ux,uy] of cents){
+      const ru = rAt(ux, uy) || r;
+      const d = detectBall(img, w, h, ux, uy, ru);
+      const x = d ? d.x : ux, y = d ? d.y : uy;
+      if(d && d.fill < 0.35) continue;
+      out.push({x, y, r: ru, ...classifyBall(img, w, h, x, y, ru)});
+    }
+  }
+  // two detections of the same ball: keep one
+  return out.filter((b,i)=>!out.some((o,j)=> j<i && Math.hypot(o.x-b.x, o.y-b.y) < b.r*1.2));
+}
