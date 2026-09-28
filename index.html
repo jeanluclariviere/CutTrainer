@@ -130,8 +130,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 @media (prefers-reduced-motion:reduce){.streakpill.pop,.streakpill .spark{animation:none!important}}
 /* shot breakdown: one fixed-size box, scrolls inside if a long explanation ever overflows */
 .result{height:236px;overflow:auto;align-content:start}
-.result svg{width:120px;height:72px}
-@media (max-width:420px){.result{height:268px}}
+.result svg{width:100%;max-width:440px;height:auto;margin:0 auto;display:block}
+@media (max-width:420px){.result{height:auto}}
 .replay{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font:600 14px var(--body);letter-spacing:0;background:transparent;color:#ffd34d;border:1.5px solid #ffd34d;border-radius:999px;padding:7px 16px;cursor:pointer}
 .startbtn{font:700 24px var(--display);letter-spacing:.04em;background:#ffd34d;color:#10283d;border:0;border-radius:10px;padding:10px 34px;cursor:pointer}
 .flashtrack{height:4px;margin-top:6px;border-radius:2px;overflow:hidden}
@@ -148,8 +148,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .answers button.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
 .answers button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.result{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
-.result svg{width:132px;height:80px;display:block}
+.result{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:1fr;gap:14px;align-items:start}
 .verdict{font-family:var(--display);font-weight:700;font-size:22px;margin:0;line-height:1.1}
 .verdict.ok{color:var(--good)} .verdict.no{color:var(--bad)}
 .badge{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--body);padding:3px 10px;border-radius:999px;margin-top:6px}
@@ -213,7 +212,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   .next{padding:11px 16px}
   .opt{flex-wrap:wrap}
 }
-@media (max-width:420px){.answers button{font-size:24px}.result{grid-template-columns:1fr}.result svg{margin:0 auto}.lean,.legend{grid-template-columns:96px 1fr 64px}}
+@media (max-width:420px){.answers button{font-size:24px}.lean,.legend{grid-template-columns:96px 1fr 64px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.pulse{animation:none!important}}
 .pulse{animation:pulse 1.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.95}50%{opacity:.35}}
@@ -990,7 +989,7 @@ function deal(){
   answered = false;
   draw(false);
   document.querySelectorAll('#answers button').forEach(b=>{b.disabled=false;b.className='';});
-  $('result').innerHTML = `<p class="placeholder">The breakdown of each shot appears here after you answer.</p>`;
+  $('result').innerHTML = `<p class="placeholder">The overlap from behind the cue ball appears here after you answer.</p>`;
   $('quick').innerHTML = `<div class="ql hint">${isPlace() ? PLACE_HINT : PLACEHOLDER}</div>`;
   tableBox.classList.remove('tappable');
   tableBox.classList.toggle('placing', isPlace());
@@ -1291,19 +1290,8 @@ function finishAnim(){
   a.done(performance.now() - a.t0);
 }
 
-function showResult(msg, cls, made, lat, over, firstLine, tipText){
-  const badge = tipText ? `<span class="badge tip">${tipText}</span>` : made
-    ? `<span class="badge in">● Pocketed</span>`
-    : `<span class="badge out">Misses by ${Math.abs(lat).toFixed(1)}″, ${over?'overcut':'undercut'}</span>`;
-  const win = makeWindow(shot);
-  const winLine = `It drops from <b>${win.fThin.toFixed(2)}</b> to <b>${win.fThick.toFixed(2)}</b> ball, a <b>${(win.hi-win.lo).toFixed(1)}°</b> window.`;
-  const throwLine = shot.throwOn && shot.theta > 1
-    ? `<p class="detail">Throw carries the object ball <b>${(shot.theta-shot.pathDeg).toFixed(1)}°</b> toward the cue line, so the path to the pocket is ${shot.pathDeg.toFixed(1)}° but you aim ${shot.theta.toFixed(1)}°.</p>` : '';
-  const key = shot.pick.far
-    ? `<p class="detail">White dashed is the right ghost ball. Purple is where ${isPlace()?'your ghost ball':'your call'} sends it.</p>`
-    : `<p class="detail">The dashed ball is the ghost ball. The panel shows the overlap from behind the cue ball.</p>`;
-  $('result').innerHTML = `${overlapSVG(shot)}<div>
-    <p class="detail">${firstLine} ${winLine}</p>${throwLine}${key}</div>`;
+function showResult(){
+  $('result').innerHTML = overlapSVG(shot);   // the diagram speaks for itself
 }
 
 // ---------- ghost-ball placement ----------
