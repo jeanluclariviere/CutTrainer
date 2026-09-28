@@ -939,13 +939,14 @@ function draw(reveal){
 function overlapSVG(s){
   const right = [-s.v[1], s.v[0]];
   const lat = 2*dot(s.n, right);      // OB centre offset from ghost-ball centre, in ball radii
-  return `<svg viewBox="-3.3 -1.9 6.6 3.8" aria-label="Shooter's view of the overlap">
-    <rect x="-3.3" y="-1.9" width="6.6" height="3.8" rx=".4" fill="#1f5f96"/>
-    <circle cx="${f2(lat)}" cy="0" r="1" fill="${s.color[0]}"/>
-    <circle cx="0" cy="0" r="1" fill="#ffffff" fill-opacity=".35" stroke="#ffffff" stroke-width=".07" stroke-dasharray=".18 .12"/>
-    <line x1="0" y1="-1.55" x2="0" y2="1.55" stroke="#ffffff" stroke-opacity=".7" stroke-width=".05"/>
-    <text x="0" y="1.78" font-size=".34" text-anchor="middle" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Sans, sans-serif">aim line</text>
-    <text x="-3.1" y="-1.55" font-size=".34" fill="#ffffff" fill-opacity=".85" font-family="IBM Plex Sans, sans-serif" font-weight="600">${s.answer.id==='full' ? 'Full ball' : s.answer.label+' ball'}</text>
+  const name = s.answer.id==='full' ? 'Full ball' : s.answer.label+' ball';
+  return `<svg viewBox="-3.3 -2.45 6.6 4.9" aria-label="Shooter's view of the overlap: ${name}">
+    <rect x="-3.3" y="-2.45" width="6.6" height="4.9" rx=".35" fill="#1f5f96"/>
+    <text x="0" y="-1.72" font-size=".56" text-anchor="middle" fill="#ffffff" font-family="Barlow Condensed, sans-serif" font-weight="700" letter-spacing=".01">${name}</text>
+    <circle cx="${f2(lat)}" cy=".15" r="1" fill="${s.color[0]}"/>
+    <circle cx="0" cy=".15" r="1" fill="#ffffff" fill-opacity=".35" stroke="#ffffff" stroke-width=".06" stroke-dasharray=".18 .12"/>
+    <line x1="0" y1="-1.3" x2="0" y2="1.6" stroke="#ffffff" stroke-opacity=".7" stroke-width=".04"/>
+    <text x="0" y="2.1" font-size=".26" text-anchor="middle" fill="#ffffff" fill-opacity=".7" font-family="IBM Plex Sans, sans-serif" letter-spacing=".04">AIM LINE</text>
   </svg>`;
 }
 
