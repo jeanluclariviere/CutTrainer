@@ -337,7 +337,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="tabpanel" role="tabpanel" id="tab-shot"><div class="result" id="result"></div></div>
       <div class="tabpanel" role="tabpanel" id="tab-stats" hidden>
       <div class="stathead">
-        <h2 id="scoremode">Normal mode</h2>
+        <div class="seg statmode" role="group" aria-label="Which mode's stats">
+          <button data-stat="sess">Freeplay</button>
+          <button data-stat="flash">Flash ⚡️</button>
+        </div>
         <div class="seg subtabs" role="tablist" aria-label="Stats sections">
           <button data-sub="overview" role="tab">Overview</button>
           <button data-sub="fractions" role="tab">Fractions</button>
@@ -381,11 +384,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="subpanel" data-sub="details">
         <div class="mblock">
-          <h2>Recent form</h2>
-          <div class="form" id="form"></div>
-          <p class="cap" id="formcap">Each bar is 10 shots, newest on the right. The line marks 50%.</p>
-        </div>
-        <div class="mblock">
           <h2>By distance, cue ball to object ball</h2>
           <p class="cap" style="margin:0">Short under 2 ft · Medium 2–3½ ft · Long 3½ ft +</p>
           <div class="byfrac" id="bin-dc"></div>
@@ -404,7 +402,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <div class="sesslist" id="sesslist"></div>
         </div>
       </div>
-      <div class="foot"><span>Each mode keeps its own score. Best streak: <b id="s-best">0</b></span><button class="link" id="reset">Reset this mode</button></div>
+      <div class="foot"><span>Best streak: <b id="s-best">0</b></span><button class="link" id="reset">Reset this mode</button></div>
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-settings" hidden>
   <section class="settings">
@@ -1005,6 +1003,8 @@ function lean(e){          // +1 too thin (overcut), -1 too full (undercut), 0 r
   const d = idx(e.p)-idx(e.a); return d>0 ? 1 : d<0 ? -1 : 0;
 }
 function modeLog(){ return stats.log.filter(e=>taskOf(e)===settings.task && !e.gh); }   // shots taken with the ghost-ball aid aren't scored
+const statTask = () => settings.statTask==='flash' ? 'flash' : 'sess';   // which mode the Stats tab shows (its own toggle)
+function statLog(){ return stats.log.filter(e=>taskOf(e)===statTask() && !e.gh); }
 
 // ---------- flash ----------
 let flashTimer = null;
@@ -1206,7 +1206,7 @@ function showSummary(rec){
   $('sesscover').hidden = false;
 }
 function renderSessionHistory(){
-  const S = (stats.sessions || []).filter(x=>x.task===settings.task);
+  const S = (stats.sessions || []).filter(x=>x.task===statTask());
   const el = $('trend');
   const fmt = x => new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   let h = [0,50,100].map(v=>`<div class="grid${v===0?' base':''}" style="top:${100-v}%"></div><span class="ylab" style="top:${100-v}%">${v}%</span>`).join('');
@@ -1449,7 +1449,7 @@ function runs(L){
   return {cur, best};
 }
 function renderStats(){
-  const L = modeLog(), n = L.length, place = isPlace();
+  const L = statLog(), n = L.length, place = isPlace();
   const r = runs(L);
   $('s-l1').textContent = place ? 'Typical miss' : 'Called right';
   $('s-acc').textContent = !n ? '–' : place
@@ -1460,7 +1460,8 @@ function renderStats(){
   $('s-streak').textContent = r.cur;
   $('s-best').textContent = r.best;
   $('s-n').textContent = n;
-  $('scoremode').textContent = `${MODE_LABEL[settings.task]} mode`;
+  document.querySelectorAll('.statmode button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.stat===statTask()));
+  $('reset').textContent = `Reset ${MODE_LABEL[statTask()]} stats`;
   $('byfrac-h').textContent = place ? 'Pocketed, by real fraction' : 'Called right, by real fraction';
   $('byfrac').innerHTML = REFS.map(ref=>{
     const rec = L.filter(e=>e.a===ref.id), c = rec.filter(place ? e=>e.m : success).length, p = pct(c, rec.length);
@@ -1479,7 +1480,7 @@ function groupStats(rec){
 }
 
 function renderPatterns(){
-  const log = modeLog(), place = isPlace();
+  const log = statLog(), place = isPlace();
   $('confbox').hidden = place;
   const M = REFS.map(()=>REFS.map(()=>0));
   if(!place){
@@ -1562,12 +1563,9 @@ function renderBreakdowns(log){
   $('bincap').textContent = withDist.length < log.length
     ? `Distance and pocket breakdowns count ${withDist.length} of your ${log.length} shots; older shots didn’t record them. Faded rows have fewer than 5 shots.`
     : 'Faded rows have fewer than 5 shots.';
-  // recent form: blocks of 10, up to the last 12 blocks
+  // blocks of 10 shots (last 120), used for the Trend line in Patterns
   const blocks = [];
   for(let i = Math.max(0, log.length - 120); i < log.length; i += 10){ const b = log.slice(i, i+10); blocks.push({from:i+1, to:i+b.length, ...stat(b)}); }
-  $('form').innerHTML = blocks.length
-    ? blocks.map(b=>`<i class="${b.n<10?'thin':''}" style="height:${Math.max(3,pct(b.ok,b.n))}%" title="Shots ${b.from}–${b.to}: ${pct(b.ok,b.n)}%${b.n<10?' (block in progress)':''}"></i>`).join('')
-    : `<span class="empty">No shots yet</span>`;
   // findings for the Patterns list
   const acc = rows => { const n = rows.reduce((a,r)=>a+r.n,0), ok = rows.reduce((a,r)=>a+r.ok,0); return {n, p: pct(ok,n)}; };
   const nearD = acc(dc.slice(0,1)), farD = acc(dc.slice(2));
@@ -1597,7 +1595,6 @@ const HINTS = {
 };
 function syncPressed(){
   tableBox.classList.toggle('walkable', settings.task==='call' || settings.task==='sess');
-  $('sesshist').hidden = !sessTask(settings.task);
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
   $('modehint').textContent = isPlace()
     ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
@@ -1687,7 +1684,8 @@ function showSub(t){
 document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('click', ()=>showSub(b.dataset.sub)));
 showSub(['overview','fractions','details'].includes(settings.sub) ? settings.sub : 'overview');
 showTab(settings.tab==='misses' ? 'stats' : ['shot','stats','settings'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
-$('reset').addEventListener('click', ()=>{ stats.log = stats.log.filter(e=>taskOf(e)!==settings.task); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==settings.task); if(stats.active && stats.active.task===settings.task) stats.active = null; save(); renderStats(); });
+$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(stats.active && stats.active.task===t){ stats.active = null; showSessIdle(); } save(); renderStats(); syncStreakPill(); });
+document.querySelectorAll('.statmode button').forEach(b=>b.addEventListener('click', ()=>{ settings.statTask = b.dataset.stat; saveSettings(); renderStats(); }));
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
 $('sessagain').addEventListener('click', e=>{ e.stopPropagation(); startSession(+e.currentTarget.dataset.size); });
