@@ -350,10 +350,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="byfrac" id="bin-dc"></div>
     </div>
     <div class="mblock">
-      <h2>By cut angle</h2>
-      <div class="byfrac" id="bin-ag"></div>
-    </div>
-    <div class="mblock">
       <h2>By pocket</h2>
       <div class="byfrac" id="bin-pt"></div>
     </div>
@@ -1494,7 +1490,6 @@ function renderPatterns(){
 // ---------- breakdowns: distance, angle, pocket, recent form ----------
 const BINS = {
   dc: [[0,24,'Short','under 2 ft'],[24,42,'Medium','2 to 3½ ft'],[42,1e9,'Long','3½ ft or more']],
-  ag: [[0,7.5,'0–7°'],[7.5,20,'8–20°'],[20,35,'20–35°'],[35,50,'35–50°'],[50,90,'50° +']],
 };
 function binRows(id, rows){
   const el = $(id); el.classList.add('bins');
@@ -1510,12 +1505,12 @@ function renderBreakdowns(log){
   const withDist = log.filter(e=>typeof e.dc === 'number');
   const stat = rec => ({n: rec.length, ok: rec.filter(place ? e=>e.m : success).length});
   const binned = key => BINS[key].map(([lo,hi,label,range])=>({label, range, ...stat(withDist.filter(e=>e[key]>=lo && e[key]<hi))}));
-  const dc = binned('dc'), ag = binned('ag');
-  binRows('bin-dc', dc); binRows('bin-ag', ag);
+  const dc = binned('dc');
+  binRows('bin-dc', dc);
   binRows('bin-wk', [{label:'Walked', ...stat(log.filter(e=>e.wk===1))}, {label:'Didn’t', ...stat(log.filter(e=>e.wk===0))}]);
   binRows('bin-pt', [{label:'Corner', ...stat(withDist.filter(e=>e.pt==='c'))}, {label:'Side', ...stat(withDist.filter(e=>e.pt==='s'))}]);
   $('bincap').textContent = withDist.length < log.length
-    ? `Distance, angle and pocket breakdowns count ${withDist.length} of your ${log.length} shots; older shots didn’t record them. Faded rows have fewer than 5 shots.`
+    ? `Distance and pocket breakdowns count ${withDist.length} of your ${log.length} shots; older shots didn’t record them. Faded rows have fewer than 5 shots.`
     : 'Faded rows have fewer than 5 shots.';
   // recent form: blocks of 10, up to the last 12 blocks
   const blocks = [];
@@ -1528,7 +1523,7 @@ function renderBreakdowns(log){
   const nearD = acc(dc.slice(0,1)), farD = acc(dc.slice(2));
   if(nearD.n>=6 && farD.n>=6 && nearD.p - farD.p >= 12) notes.push(`Accuracy drops with distance: ${nearD.p}% on short shots, ${farD.p}% on long ones.`);
   else if(nearD.n>=6 && farD.n>=6 && Math.abs(nearD.p - farD.p) < 8) notes.push(`Distance isn’t hurting you: ${nearD.p}% on short shots, ${farD.p}% on long ones.`);
-  const angs = ag.filter(r=>r.n>=5);
+  const angs = REFS.map(r=>({label: r.label, ...stat(log.filter(e=>e.a===r.id))})).filter(r=>r.n>=5);   // by fraction
   if(angs.length>=2){
     const worst = angs.reduce((a,b)=>pct(b.ok,b.n)<pct(a.ok,a.n)?b:a), best = angs.reduce((a,b)=>pct(b.ok,b.n)>pct(a.ok,a.n)?b:a);
     if(pct(best.ok,best.n) - pct(worst.ok,worst.n) >= 15) notes.push(`Weakest cuts: ${worst.label} (${pct(worst.ok,worst.n)}%). Strongest: ${best.label} (${pct(best.ok,best.n)}%).`);
