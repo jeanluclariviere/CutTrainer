@@ -188,7 +188,7 @@ function onFrame(t, frame){
     }
   }
   if(view.camera && binding) cameraAccess = true;
-  if(table && cameraAccess && t - lastScan > 450 && ['balls','pocket','call','reveal'].includes(step)){
+  if(table && cameraAccess && !scanBusy && t - lastScan > 400 && ['balls','pocket','call','reveal'].includes(step)){
     lastScan = t;
     try{ scanBalls(view); }catch(e){ if(DEBUG) console.warn(e); }
   }
@@ -230,7 +230,7 @@ function handleTap(tap, frame, view){
     // a ball the scanner has already found: tap near it to choose it
     // nearest found ball on screen, within a fingertip
     const tx = (tap.x + 1) / 2 * innerWidth, ty = (1 - tap.y) / 2 * innerHeight;
-    const near = seen.map(b => { const q = proj(b.p); return q ? {b, d: Math.hypot((q.x+1)/2*innerWidth - tx, (1-q.y)/2*innerHeight - ty)} : null; })
+    const near = shown().map(b => { const q = proj(b.p); return q ? {b, d: Math.hypot((q.x+1)/2*innerWidth - tx, (1-q.y)/2*innerHeight - ty)} : null; })
       .filter(o => o && o.d < 44).sort((a,b)=>a.d-b.d)[0];
     if(near){
       const prev = {...balls}, prevLabel = objLabel, prevTarget = target;
@@ -238,7 +238,7 @@ function handleTap(tap, frame, view){
       if(near.b.cue) balls.cue = near.b.p;
       else {
         balls.obj = near.b.p; objLabel = near.b.label;
-        const cue = seen.find(b => b.cue);
+        const cue = shown().find(b => b.cue);
         if(cue) balls.cue = cue.p;                      // the cue ball is picked for you
       }
       picked = null; target = null;
@@ -325,8 +325,20 @@ function grabCamera(view, maxW){
 const ndcToImg = (x, y, w, h, down) => [(x + 1) / 2 * w, down ? (1 - y) / 2 * h : (y + 1) / 2 * h];
 const imgToNdc = (px, py, w, h, down) => [px / w * 2 - 1, down ? 1 - py / h * 2 : py / h * 2 - 1];
 
-// ---------- finding the balls on the table, a few times a second ----------
+// ---------- finding the balls on the table, a couple of times a second ----------
+// The camera picture is read here, the searching happens in a worker so the camera view stays smooth,
+// and results are placed using the camera position from the moment the picture was taken.
+const worker = (()=>{ try{ return new Worker('ar-worker.js', {type: 'module'}); }catch(e){ return null; } })();
+let scanBusy = false, scanId = 0;
+const scanCtx = {};
+function rayWith(ctx, ndcX, ndcY){
+  const r = rayFromNDC(ctx.proj, ctx.view, ndcX, ndcY); if(!r) return null;
+  const tp = p => v3.sub(m4point(ctx.unpin, p).slice(0,3), ctx.nudge);
+  const o = tp(r.o), e = tp(v3.add(r.o, r.d));
+  return {o, d: v3.norm(v3.sub(e, o))};
+}
 function scanBalls(view){
+  if(!worker || scanBusy) return;
   const {img, w, h} = grabCamera(view, 720);
   // the playing surface, pulled in a little so the cushions and rails stay out
   const inset = 0.045, T = table;
@@ -340,24 +352,60 @@ function scanBalls(view){
     else return;
   }
   const poly = ndc.map(q => ndcToImg(q.x, q.y, w, h, camRowsDown));
-  const focal = lastView.proj[5] * h / 2;
-  const onCloth = (px, py) => { const [x, y] = imgToNdc(px, py, w, h, camRowsDown); return rayPlane(pinnedRay(x, y), plane, R); };
-  const rAt = (px, py) => { const p = onCloth(px, py); if(!p) return 0; const e = m4point(lastView.view, toWorld(p)); return -e[2] > 0 ? focal * R / -e[2] : 0; };
-  if(DEBUG) window.__lastScan = {img: Array.from(img), w, h, poly, r0: rAt(poly[0][0], poly[0][1])};
-  const raw = findBalls(img, w, h, poly, rAt);
-  // no clear cue ball? the whitest one is it, if it's white enough
-  if(!raw.some(b => b.cue)){ const wb = raw.reduce((a, b) => (!a || b.wf > a.wf) ? b : a, null); if(wb && wb.wf > 0.35){ wb.cue = true; wb.label = 'Cue'; } }
-  const found = raw.map(b => ({p: onCloth(b.x, b.y), label: b.label, cue: !!b.cue})).filter(b => b.p);
-  // match with what we saw before, so a ball hidden for a moment (a hand, the cue) doesn't vanish
+  const ctx = {proj: Float32Array.from(lastView.proj), view: Float32Array.from(lastView.view), unpin: Float32Array.from(unpin), pin: Float32Array.from(pin), nudge: nudge.slice(), w, h, down: camRowsDown};
+  const onCloth = (px, py) => { const [x, y] = imgToNdc(px, py, w, h, ctx.down); return rayPlane(rayWith(ctx, x, y), plane, R); };
+  // expected ball radius, on a coarse grid over the table's part of the picture
+  const focal = ctx.proj[5] * h / 2;
+  const xs = poly.map(p=>p[0]), ys = poly.map(p=>p[1]);
+  const x0 = Math.max(0, Math.min(...xs)), x1 = Math.min(w-1, Math.max(...xs)), y0 = Math.max(0, Math.min(...ys)), y1 = Math.min(h-1, Math.max(...ys));
+  const nx = 9, ny = 9, v = new Float32Array(nx*ny);
+  for(let j=0;j<ny;j++) for(let i=0;i<nx;i++){
+    const p = onCloth(x0 + (x1-x0)*i/(nx-1), y0 + (y1-y0)*j/(ny-1));
+    if(!p){ v[j*nx+i] = 0; continue; }
+    const e = m4point(ctx.view, m4point(ctx.pin, v3.add(p, ctx.nudge)).slice(0,3));
+    v[j*nx+i] = -e[2] > 0 ? focal * R / -e[2] : 0;
+  }
+  const id = ++scanId; scanCtx[id] = {ctx, onCloth};
+  scanBusy = true;
+  worker.postMessage({id, buf: img.buffer, w, h, poly, grid: {x0, y0, dx: (x1-x0)/(nx-1) || 1, dy: (y1-y0)/(ny-1) || 1, nx, ny, v}}, [img.buffer]);
+  if(DEBUG) window.__lastScan = {w, h, poly};
+}
+if(worker) worker.onmessage = e => {
+  scanBusy = false;
+  const {id, balls: raw} = e.data, sc = scanCtx[id]; delete scanCtx[id];
+  if(!sc || !table) return;
+  mergeSeen(raw.map(b => ({p: sc.onCloth(b.x, b.y), label: b.label, cue: b.cue, wf: b.wf})).filter(b => b.p));
+};
+// Keep a steady picture of the table: a ball has to be seen twice before it's shown, its position is smoothed,
+// its name is the one it's been given most often, and a ball out of sight for a moment (hand, cue) stays for 1.5 s.
+// There's only one of each ball, and two balls can't be closer than a ball's width.
+function mergeSeen(found){
   const now = performance.now(), next = [];
   for(const b of found){
-    const old = seen.find(o => v3.len(v3.sub(o.p, b.p)) < 0.05);
-    next.push({...b, label: b.label === '?' && old ? old.label : b.label, cue: b.cue || (old && old.cue && b.label === '?'), t: now});
+    const old = seen.filter(o => !next.includes(o)).map(o => ({o, d: v3.len(v3.sub(o.p, b.p))})).filter(x => x.d < 0.045).sort((a,c)=>a.d-c.d)[0];
+    if(old){
+      const o = old.o;
+      o.p = v3.add(v3.mul(o.p, 0.5), v3.mul(b.p, 0.5)); o.t = now; o.hits++;
+      o.votes[b.cue ? 'Cue' : b.label] = (o.votes[b.cue ? 'Cue' : b.label] || 0) + 1;
+      next.push(o);
+    } else next.push({p: b.p, t: now, hits: 1, votes: {[b.cue ? 'Cue' : b.label]: 1}});
   }
-  for(const o of seen) if(now - o.t < 1500 && !next.some(n => v3.len(v3.sub(n.p, o.p)) < 0.05)) next.push(o);
-  seen = next;
+  for(const o of seen) if(!next.includes(o) && now - o.t < 1500) next.push(o);
+  // names by vote, one of each
+  for(const o of next){
+    const best = Object.entries(o.votes).filter(([k]) => k !== '?').sort((a,c)=>c[1]-a[1])[0];
+    o.label = best ? best[0] : '?'; o.score = best ? best[1] : 0; o.cue = o.label === 'Cue';
+  }
+  const owner = {};
+  for(const o of next) if(o.label !== '?' && (!owner[o.label] || o.score > owner[o.label].score)) owner[o.label] = o;
+  for(const o of next) if(o.label !== '?' && owner[o.label] !== o){ o.label = '?'; o.cue = false; }
+  // no two balls on top of each other
+  const kept = [];
+  for(const o of next.sort((a,c)=>c.hits-a.hits)) if(!kept.some(k => v3.len(v3.sub(k.p, o.p)) < 2*R*0.9)) kept.push(o);
+  seen = kept;
   if(step === 'balls') setStep('balls');   // refresh the prompt (cue ball found or not)
 }
+const shown = () => seen.filter(b => b.hits >= 2);
 
 // Find the ball under a tap: read the camera picture, look for a ball-sized blob that isn't cloth, and use its centre.
 function findBall(tap, frame, view){
@@ -420,7 +468,7 @@ function showDebug(img, w, h, best, rExp){
 const STEP_TEXT = {
   scan: 'Move the phone slowly over the table. When the ring sits flat on the cloth, <b>tap</b>.',
   table: () => `Tap the <b>${['first','next','across'][corners.length]}</b> corner pocket` + (corners.length===0 ? ' (any one).' : corners.length===1 ? ', along the same rail.' : ', on the other side from that one.'),
-  balls: () => (seen.some(b=>b.cue) && !balls.obj) ? 'Tap the <b>object ball</b>.' : (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
+  balls: () => (shown().some(b=>b.cue) && !balls.obj) ? 'Tap the <b>object ball</b>.' : (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
   pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
   call: 'How full do you hit it?',
   reveal: 'Move the balls and tap them again, or tap New shot.',
@@ -460,7 +508,7 @@ $('realign').addEventListener('click', ()=>{ if(!table) return; if(step !== 'rea
 $('undo').addEventListener('click', ()=>{ const f = history.pop(); if(f) f(); });
 $('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; objLabel = ''; target = null; picked = null; shot = null; history.length = 0; if(table) setStep('balls'); });
 $('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchors.forEach(a=>{ try{ a.delete(); }catch(e){} }); anchors = []; anchorAt = []; pin = m4identity(); unpin = m4identity(); nudge = [0,0,0];
-  balls = {cue:null, obj:null}; seen = []; camRowsDown = null; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
+  balls = {cue:null, obj:null}; seen = []; camRowsDown = null; scanBusy = false; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
 
 if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; }, get seen(){ return seen; }, get rows(){ return camRowsDown; } };
 let toastT = 0;
@@ -507,7 +555,7 @@ function draw(){
   if(table && step !== 'scan' && step !== 'table'){
     const d = devicePixelRatio || 1;
     ctx.font = `600 ${13*d}px system-ui, sans-serif`; ctx.textAlign = 'center';
-    for(const b of seen){
+    for(const b of shown()){
       const chosen = balls.obj && v3.len(v3.sub(b.p, balls.obj)) < 0.03;
       const onCloth = v3.sub(b.p, v3.mul(plane.n, R));
       path3(ringOnCloth(onCloth, R*1.45), b.cue ? '#ffffff' : chosen ? '#ffd34d' : 'rgba(255,255,255,.75)', chosen || b.cue ? 3 : 2);

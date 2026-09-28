@@ -253,9 +253,9 @@ export function classifyBall(img, w, h, cx, cy, r){
       else if(q.s > 0.3) hues.push(q);
     }
   if(!n) return {id:'?', label:'?', wf:0};
-  const wf = white/n, bf = black/n;
-  if(wf > 0.62) return {id:'cue', label:'Cue', cue:true, wf};
-  if(bf > 0.45 && hues.length < n*0.3) return {id:'8', label:'8', wf};
+  const wf = white/n, bf = black/n, cf = hues.length/n;
+  if(wf > 0.55 && cf < 0.1) return {id:'cue', label:'Cue', cue:true, wf, conf: wf};   // white with no coloured band: not a stripe
+  if(bf > 0.45 && hues.length < n*0.3) return {id:'8', label:'8', wf, conf: bf};
   if(hues.length < n*0.12) return {id:'?', label:'?', wf};
   // circular mean of the hue
   let sx=0, sy=0, sv=0; for(const q of hues){ sx += Math.cos(q.h*Math.PI/180); sy += Math.sin(q.h*Math.PI/180); sv += q.v; }
@@ -266,57 +266,100 @@ export function classifyBall(img, w, h, cx, cy, r){
   if(best.n === 3 && sv/hues.length < 0.5) num = 7;          // dark red: maroon 7
   const stripe = wf > 0.22;
   if(stripe) num += 8;
-  return {id: String(num), label: String(num), stripe, wf};
+  return {id: String(num), label: String(num), stripe, wf, conf: cf};
+}
+// Which pixels of each row are inside the (convex) table outline: [x0, x1] per row, or null.
+function polyRows(poly, w, h){
+  const rows = new Array(h).fill(null);
+  for(let y=0; y<h; y++){
+    let lo = Infinity, hi = -Infinity;
+    for(let i=0, j=poly.length-1; i<poly.length; j=i++){
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if((yi > y) !== (yj > y)){ const x = (xj-xi)*(y-yi)/(yj-yi) + xi; lo = Math.min(lo, x); hi = Math.max(hi, x); }
+    }
+    if(lo <= hi){ const a = Math.max(0, Math.ceil(lo)), b = Math.min(w-1, Math.floor(hi)); if(a <= b) rows[y] = [a, b]; }
+  }
+  return rows;
 }
 // All balls in the picture, inside the table outline (image coordinates). rAt(x,y) gives the expected radius there.
+// A blob only counts as balls if it's shaped like them: round for one ball, or a chain of round parts for touching balls.
+// Long thin blobs (a cushion edge, a shadow along the rail, the cue) are thrown out rather than chopped into "balls".
 export function findBalls(img, w, h, poly, rAt){
   const cloth = clothColour(img, w, h, poly, 5); if(!cloth) return [];
-  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-  for(const [x,y] of poly){ minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); }
-  minX=Math.max(0,Math.floor(minX)); minY=Math.max(0,Math.floor(minY)); maxX=Math.min(w-1,Math.ceil(maxX)); maxY=Math.min(h-1,Math.ceil(maxY));
-  const bw = maxX-minX+1, bh = maxY-minY+1; if(bw < 4 || bh < 4) return [];
-  const mask = new Uint8Array(bw*bh);
-  for(let y=minY; y<=maxY; y++) for(let x=minX; x<=maxX; x++){
-    if(!pointInPoly(x, y, poly)) continue;
-    const i=(y*w+x)*4, s=img[i]+img[i+1]+img[i+2]+1e-3, l=s/765;
-    const d = Math.abs(img[i]/s-cloth.c[0]) + Math.abs(img[i+1]/s-cloth.c[1]) + Math.abs(img[i+2]/s-cloth.c[2]);
-    if(l > cloth.l*1.7+0.05 || l < cloth.l*0.22 || d > 0.09) mask[(y-minY)*bw + (x-minX)] = 1;
+  const rows = polyRows(poly, w, h);
+  const mask = new Uint8Array(w*h);
+  for(let y=0; y<h; y++){
+    const rr = rows[y]; if(!rr) continue;
+    for(let x=rr[0]; x<=rr[1]; x++){
+      const i=(y*w+x)*4, s=img[i]+img[i+1]+img[i+2]+1e-3, l=s/765;
+      const d = Math.abs(img[i]/s-cloth.c[0]) + Math.abs(img[i+1]/s-cloth.c[1]) + Math.abs(img[i+2]/s-cloth.c[2]);
+      if(l > cloth.l*1.7+0.05 || l < cloth.l*0.22 || d > 0.09) mask[y*w+x] = 1;
+    }
   }
-  const seen = new Uint8Array(bw*bh), out = [], stack = [];
-  for(let k=0; k<bw*bh; k++){
+  const seen = new Uint8Array(w*h), out = [], stack = [];
+  const pts = [];
+  for(let k=0; k<w*h; k++){
     if(!mask[k] || seen[k]) continue;
-    const pts = []; stack.push(k); seen[k] = 1;
+    pts.length = 0; stack.push(k); seen[k] = 1;
     while(stack.length){
-      const q = stack.pop(), qx = q % bw, qy = (q / bw) | 0; pts.push(qx, qy);
-      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
-        const nx = qx+dx, ny = qy+dy; if(nx<0||ny<0||nx>=bw||ny>=bh) continue;
-        const nk = ny*bw+nx; if(mask[nk] && !seen[nk]){ seen[nk] = 1; stack.push(nk); }
-      }
+      const q = stack.pop(), qx = q % w, qy = (q / w) | 0; pts.push(qx, qy);
+      if(qx+1 < w && mask[q+1] && !seen[q+1]){ seen[q+1]=1; stack.push(q+1); }
+      if(qx > 0 && mask[q-1] && !seen[q-1]){ seen[q-1]=1; stack.push(q-1); }
+      if(qy+1 < h && mask[q+w] && !seen[q+w]){ seen[q+w]=1; stack.push(q+w); }
+      if(qy > 0 && mask[q-w] && !seen[q-w]){ seen[q-w]=1; stack.push(q-w); }
     }
     const area = pts.length/2; let sx=0, sy=0;
     for(let i=0;i<pts.length;i+=2){ sx+=pts[i]; sy+=pts[i+1]; }
-    const cx = sx/area + minX, cy = sy/area + minY, r = rAt(cx, cy);
+    const cx = sx/area, cy = sy/area, r = rAt(cx, cy);
     if(!r) continue;
     const one = Math.PI*r*r;
-    if(area < one*0.3) continue;                        // specks, chalk, reflections
-    let k2 = Math.max(1, Math.round(area/(one*0.85)));
-    if(k2 > 6) continue;                                // too big: a hand, the cue, a rail
-    // touching balls come out as one blob: split it into k2 by k-means on the pixel positions
+    if(area < one*0.35) continue;                       // specks, chalk, reflections
+    const k2 = Math.max(1, Math.round(area/(one*0.9)));
+    if(k2 > 4) continue;                                // too big: a hand, the cue, a rail
+    // shape: how stretched the blob is (1 = round; two touching balls ≈ 2.2)
+    let sxx=0, syy=0, sxy=0;
+    for(let i=0;i<pts.length;i+=2){ const dx=pts[i]-cx, dy=pts[i+1]-cy; sxx+=dx*dx; syy+=dy*dy; sxy+=dx*dy; }
+    sxx/=area; syy/=area; sxy/=area;
+    const tr = sxx+syy, det = sxx*syy-sxy*sxy, disc = Math.sqrt(Math.max(0, tr*tr/4-det));
+    const stretch = Math.sqrt((tr/2+disc) / Math.max(1e-6, tr/2-disc));
+    if(k2 === 1 && stretch > 1.6) continue;
+    if(k2 > 1 && stretch > 1.15*k2 + 0.6) continue;    // longer and thinner than a row of touching balls
     let cents = [];
-    for(let c=0;c<k2;c++){ const j = Math.floor((c+0.5)/k2*area)*2; cents.push([pts[j]+minX, pts[j+1]+minY]); }
-    for(let it=0; it<8 && k2>1; it++){
-      const acc = cents.map(()=>[0,0,0]);
-      for(let i=0;i<pts.length;i+=2){ const x=pts[i]+minX, y=pts[i+1]+minY; let b=0, bd=Infinity; cents.forEach((c,ci)=>{ const d=(c[0]-x)**2+(c[1]-y)**2; if(d<bd){bd=d;b=ci;} }); acc[b][0]+=x; acc[b][1]+=y; acc[b][2]++; }
-      cents = acc.map((a,ci)=> a[2] ? [a[0]/a[2], a[1]/a[2]] : cents[ci]);
+    if(k2 === 1) cents = [[cx, cy]];
+    else {
+      for(let c=0;c<k2;c++){ const j = Math.floor((c+0.5)/k2*area)*2; cents.push([pts[j], pts[j+1]]); }
+      const lab = new Int8Array(area);
+      for(let it=0; it<8; it++){
+        const acc = cents.map(()=>[0,0,0]);
+        for(let i=0,n=0;i<pts.length;i+=2,n++){ let b=0, bd=Infinity; for(let ci=0;ci<k2;ci++){ const d=(cents[ci][0]-pts[i])**2+(cents[ci][1]-pts[i+1])**2; if(d<bd){bd=d;b=ci;} } lab[n]=b; acc[b][0]+=pts[i]; acc[b][1]+=pts[i+1]; acc[b][2]++; }
+        cents = acc.map((a,ci)=> a[2] ? [a[0]/a[2], a[1]/a[2]] : cents[ci]);
+      }
+      // each part must itself look like a ball: compact, and about a ball's size
+      let okParts = true;
+      const cnt = new Array(k2).fill(0), inside = new Array(k2).fill(0);
+      for(let i=0,n=0;i<pts.length;i+=2,n++){ const c = cents[lab[n]]; cnt[lab[n]]++; if((pts[i]-c[0])**2 + (pts[i+1]-c[1])**2 <= (r*1.15)**2) inside[lab[n]]++; }
+      for(let c=0;c<k2;c++) if(cnt[c] < one*0.45 || inside[c] < cnt[c]*0.85) okParts = false;
+      if(!okParts) continue;
     }
     for(const [ux,uy] of cents){
       const ru = rAt(ux, uy) || r;
       const d = detectBall(img, w, h, ux, uy, ru);
-      const x = d ? d.x : ux, y = d ? d.y : uy;
-      if(d && d.fill < 0.35) continue;
-      out.push({x, y, r: ru, ...classifyBall(img, w, h, x, y, ru)});
+      if(!d || d.fill < 0.45) continue;
+      out.push({x: d.x, y: d.y, r: ru, fill: d.fill, ...classifyBall(img, w, h, d.x, d.y, ru)});
     }
   }
-  // two detections of the same ball: keep one
-  return out.filter((b,i)=>!out.some((o,j)=> j<i && Math.hypot(o.x-b.x, o.y-b.y) < b.r*1.2));
+  // two detections closer than a ball's width are the same ball
+  const kept = [];
+  for(const b of out.sort((a,b)=>b.fill-a.fill)) if(!kept.some(o => Math.hypot(o.x-b.x, o.y-b.y) < b.r*1.8)) kept.push(b);
+  return uniqueLabels(kept);
+}
+// There is one of each ball: one cue ball (the whitest), one of each number (the most convincing); the rest become '?'.
+export function uniqueLabels(balls){
+  const cueScore = b => b.cue ? b.wf : -1;
+  const cue = balls.reduce((a,b)=> cueScore(b) > cueScore(a || {cue:false}) ? b : a, null);
+  for(const b of balls){ if(b.cue && b !== cue){ b.cue = false; b.label = '?'; b.id = '?'; } }
+  const byLabel = {};
+  for(const b of balls){ if(b.cue || b.label === '?') continue; const o = byLabel[b.label]; if(!o || (b.conf||0) > (o.conf||0)) byLabel[b.label] = b; }
+  for(const b of balls){ if(!b.cue && b.label !== '?' && byLabel[b.label] !== b){ b.label = '?'; b.id = '?'; } }
+  return balls;
 }
