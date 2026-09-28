@@ -1709,7 +1709,11 @@ $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
-  if(anim){ if(e.key==='Enter' || e.key===' '){ finishAnim(); e.preventDefault(); } return; }
+  if(anim){
+    if(e.key==='Enter'){ finishAnim(); if($('sesscover').hidden) deal(); e.preventDefault(); }   // Enter = next shot, skipping the animation (the shot still counts)
+    else if(e.key===' '){ finishAnim(); e.preventDefault(); }                                  // Space just skips to the end
+    return;
+  }
   if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ startSession(50); e.preventDefault(); } return; }
   if(!$('sesscover').hidden){ if(e.key==='Enter'){ startSession(+$('sessagain').dataset.size); e.preventDefault(); } else if(e.key==='Escape'){ $('sesscover').hidden = true; deal(); } return; }
   if(!$('startcover').hidden){ if(e.key==='Enter' || e.key===' '){ startFlashMode(); e.preventDefault(); } return; }
