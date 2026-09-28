@@ -622,6 +622,7 @@ function generate(){
       color: pick(OB_COLORS), answer: nearestRef(phi), pick:null};
     if(!fallback) fallback = cand;
     if(cueScratches(cand)) continue;                   // don't deal shots where the cue ball rolls into a pocket
+    if(Math.abs(u[0]) > 0.85 && dist > W*0.55) continue;   // no long runs across the table along an end rail: that layout only ever came up as a thin cut, so it gave the answer away
     if(pocketInView(cand)) return cand;
   }
   return fallback;
@@ -1747,7 +1748,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test') window.__ct = {generate, cueScratches, cuePathEnd, setTable};   // hooks for automated checks only
+if(location.hash === '#test') window.__ct = {generate, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
