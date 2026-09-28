@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d151b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Cut Trainer Live</title>
+<style>
+:root{--bg:#0d151b;--surface:#15212a;--ink:#e2eaef;--muted:#8fa1ad;--line:#26343e;--accent:#5aaee6;--good:#5cc27c;--bad:#ef7a63;--gold:#ffd34d}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.intro{max-width:560px;margin:0 auto;padding:28px 16px 40px}
+h1{font-size:28px;margin:0 0 6px}
+.intro p{color:var(--muted);margin:8px 0}
+.intro ol{color:var(--muted);padding-left:20px}
+.intro li{margin:6px 0}
+.intro b{color:var(--ink)}
+.btn{font:600 16px system-ui,sans-serif;border:0;border-radius:12px;padding:14px 18px;background:var(--accent);color:#08131b;cursor:pointer}
+.btn:disabled{opacity:.45}
+.btn.ghost{background:rgba(21,33,42,.85);color:var(--ink);border:1px solid var(--line)}
+#support{margin-top:14px;font-size:14px}
+#support.bad{color:var(--bad)}
+a{color:var(--accent)}
+
+/* AR overlay (shown over the camera view) */
+#overlay{position:fixed;inset:0;display:none;pointer-events:none}
+#overlay.on{display:block}
+#overlay .top,#overlay .bottom{position:absolute;left:0;right:0;padding:12px 12px calc(12px + env(safe-area-inset-bottom));pointer-events:auto}
+#overlay .top{top:0;padding-top:calc(10px + env(safe-area-inset-top));display:flex;gap:8px;align-items:flex-start}
+#overlay .bottom{bottom:0;display:flex;flex-direction:column;gap:8px}
+.status{flex:1;background:rgba(13,21,27,.78);border-radius:12px;padding:10px 12px;font-size:14px}
+.status b{color:var(--gold)}
+.readout{background:rgba(13,21,27,.82);border-radius:12px;padding:10px 12px;font:500 14px ui-monospace,Menlo,monospace;display:none}
+.readout.on{display:block}
+.readout .big{font:700 20px system-ui,sans-serif}
+.readout .ok{color:var(--good)} .readout .no{color:var(--bad)}
+.row{display:flex;gap:8px}
+.row .btn{flex:1}
+.answers{display:none;grid-template-columns:repeat(5,1fr);gap:6px}
+.answers.on{display:grid}
+.answers button{font:700 22px system-ui,sans-serif;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:rgba(21,33,42,.9);color:var(--ink)}
+.answers button.right{border-color:var(--good);background:rgba(92,194,124,.25)}
+.answers button.wrong{border-color:var(--bad);background:rgba(239,122,99,.25)}
+#cross{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;pointer-events:none}
+#cross:before,#cross:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}
+#cross:before{left:16px;top:0;width:2px;height:34px}
+#cross:after{top:16px;left:0;height:2px;width:34px}
+#cross.nohit{opacity:.35}
+</style>
+</head>
+<body>
+<div class="intro" id="intro">
+  <h1>Cut Trainer Live</h1>
+  <p>A first test of live AR at a real table: can your phone find the table and keep marks pinned to the balls while you move?</p>
+  <ol>
+    <li>Set up a cue ball and an object ball on the table.</li>
+    <li>Press <b>Start AR</b>, then slowly sweep the phone over the table until the crosshair turns solid.</li>
+    <li>Aim the crosshair at the <b>centre of the cue ball</b> and press <b>Mark</b>. Then the <b>object ball</b>, then the <b>middle of the pocket</b>.</li>
+    <li>Call the fraction. The ghost ball, aim line and path appear on the table.</li>
+    <li>Walk around the shot: the marks should stay on the balls. If they slide, note where and how much.</li>
+  </ol>
+  <button class="btn" id="start" disabled>Start AR</button>
+  <div id="support">Checking whether this device supports AR…</div>
+  <p style="margin-top:22px"><a href="./">← Back to the trainer</a></p>
+</div>
+
+<div id="overlay">
+  <div class="top">
+    <div class="status" id="status">Starting…</div>
+    <button class="btn ghost" id="exit">Exit</button>
+  </div>
+  <div id="cross" class="nohit"></div>
+  <div class="bottom">
+    <div class="readout" id="readout"></div>
+    <div class="answers" id="answers"></div>
+    <div class="row">
+      <button class="btn ghost" id="undo">Undo</button>
+      <button class="btn" id="mark" disabled>Mark</button>
+      <button class="btn ghost" id="reset">Reset</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from './vendor/three.module.min.js';
+
+const $ = id => document.getElementById(id);
+const R = 0.028575;                       // ball radius in metres (2¼" ball)
+const RAD = Math.PI/180;
+const REFS = [{id:'full',label:'Full',f:1},{id:'34',label:'¾',f:.75},{id:'12',label:'½',f:.5},{id:'14',label:'¼',f:.25},{id:'18',label:'⅛',f:.125}]
+  .map(r => ({...r, deg: Math.asin(1-r.f)/RAD}));
+const STEPS = ['cue ball', 'object ball', 'pocket'];
+
+// ---------- support check ----------
+async function checkSupport(){
+  const el = $('support');
+  if(!window.isSecureContext){ el.textContent = 'AR needs the page opened over HTTPS.'; el.className='bad'; return; }
+  if(!navigator.xr){ el.innerHTML = 'This browser has no WebXR. Use <b>Chrome on an Android phone</b> with Google Play Services for AR installed.'; el.className='bad'; return; }
+  let ok = false;
+  try{ ok = await navigator.xr.isSessionSupported('immersive-ar'); }catch(e){}
+  if(!ok){ el.innerHTML = 'AR isn\'t available here. Use <b>Chrome on an Android phone</b> with Google Play Services for AR installed.'; el.className='bad'; return; }
+  el.textContent = 'AR is supported on this device.';
+  $('start').disabled = false;
+}
+checkSupport();
+
+// ---------- three.js scene ----------
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.xr.enabled = true;
+renderer.domElement.style.display = 'none';
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 30);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.2));
+
+// reticle: a flat ring on the surface under the crosshair
+const reticle = new THREE.Mesh(new THREE.RingGeometry(R*0.9, R*1.15, 40).rotateX(-Math.PI/2),
+  new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.8}));
+reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
+
+const marks = [];                         // {kind, anchor?, pos: Vector3, obj}
+let plane = null;                         // {point, normal} of the cloth, from the first mark
+const ballMat = c => new THREE.MeshStandardMaterial({color:c, transparent:true, opacity:.55, roughness:.4});
+function markObject(kind){
+  if(kind === 2){   // pocket: a gold ring on the cloth
+    return new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.004, 8, 48).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color:0xffd34d}));
+  }
+  return new THREE.Mesh(new THREE.SphereGeometry(R*1.02, 32, 16), ballMat(kind === 0 ? 0xffffff : 0xf2b705));
+}
+const overlayGroup = new THREE.Group(); scene.add(overlayGroup);
+
+// ---------- session ----------
+let session = null, hitSource = null, refSpace = null, viewerSpace = null;
+let lastHit = null;                       // {matrix, point, normal, result}
+let lastViewer = null;                    // viewer pose transform
+let picked = null;
+
+$('start').addEventListener('click', start);
+async function start(){
+  try{
+    session = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay', 'anchors', 'local-floor'],
+      domOverlay: {root: $('overlay')}
+    });
+  }catch(e){ $('support').textContent = 'Couldn\'t start AR: ' + e.message; $('support').className='bad'; return; }
+  $('overlay').classList.add('on'); $('intro').style.display = 'none';
+  renderer.domElement.style.display = 'block';
+  renderer.xr.setReferenceSpaceType('local');
+  await renderer.xr.setSession(session);
+  refSpace = renderer.xr.getReferenceSpace();
+  viewerSpace = await session.requestReferenceSpace('viewer');
+  hitSource = await session.requestHitTestSource({space: viewerSpace});
+  // taps on our buttons shouldn't also count as AR "select" taps
+  $('overlay').addEventListener('beforexrselect', e => e.preventDefault());
+  session.addEventListener('end', ()=>{
+    hitSource = null; session = null;
+    $('overlay').classList.remove('on'); $('intro').style.display = ''; renderer.domElement.style.display = 'none';
+  });
+  resetAll();
+  renderer.setAnimationLoop(onFrame);
+}
+$('exit').addEventListener('click', ()=>{ if(session) session.end(); });
+
+function onFrame(t, frame){
+  if(!frame) return;
+  const pose = frame.getViewerPose(refSpace);
+  lastViewer = pose ? pose.transform : null;
+  lastHit = null;
+  if(hitSource){
+    const hits = frame.getHitTestResults(hitSource);
+    if(hits.length){
+      const hp = hits[0].getPose(refSpace);
+      if(hp){
+        const m = new THREE.Matrix4().fromArray(hp.transform.matrix);
+        const p = new THREE.Vector3().setFromMatrixPosition(m);
+        const n = new THREE.Vector3(0,1,0).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(m)).normalize();
+        lastHit = {matrix:m, point:p, normal:n, result:hits[0]};
+      }
+    }
+  }
+  // anchored marks follow the tracking system's corrections
+  for(const mk of marks){
+    if(mk.anchor && frame.trackedAnchors && frame.trackedAnchors.has(mk.anchor)){
+      const ap = frame.getPose(mk.anchor.anchorSpace, refSpace);
+      if(ap){ mk.pos.set(ap.transform.position.x, ap.transform.position.y, ap.transform.position.z).add(mk.offset); }
+    }
+    mk.obj.position.copy(mk.pos);
+  }
+  if(marks.length === 3 && picked){ const key = marks.map(m => m.pos.toArray().map(x => Math.round(x*2000)).join(',')).join(';'); if(key !== overlayKey){ overlayKey = key; drawOverlay(); } }
+
+  const want = marks.length < 3;
+  reticle.visible = !!lastHit && want;
+  if(lastHit){ reticle.matrix.copy(lastHit.matrix); }
+  $('cross').className = lastHit ? '' : 'nohit';
+  $('mark').disabled = !lastHit || !want;
+  updateStatus();
+  renderer.render(scene, camera);
+}
+
+function updateStatus(){
+  const s = $('status');
+  if(marks.length < 3){
+    s.innerHTML = !lastHit ? 'Looking for the table… sweep the phone slowly over the cloth.'
+      : `Aim at the ${marks.length===2 ? '<b>middle of the pocket</b>' : `<b>centre of the ${STEPS[marks.length]}</b>`} and press Mark.`;
+  } else if(!picked){
+    s.innerHTML = 'Call it: how full do you hit the object ball?';
+  } else {
+    s.innerHTML = 'Walk around the shot. The marks should stay on the balls.';
+  }
+}
+
+// Where the crosshair ray meets the cloth, raised by h (a ball's centre sits one radius above the cloth).
+function aimPoint(h){
+  if(!lastHit) return null;
+  const pl = plane || {point: lastHit.point, normal: lastHit.normal};
+  if(!lastViewer || h === 0){
+    // pocket: the crosshair's own hit is right
+    return lastHit.point.clone();
+  }
+  const o = new THREE.Vector3(lastViewer.position.x, lastViewer.position.y, lastViewer.position.z);
+  const q = new THREE.Quaternion(lastViewer.orientation.x, lastViewer.orientation.y, lastViewer.orientation.z, lastViewer.orientation.w);
+  const d = new THREE.Vector3(0,0,-1).applyQuaternion(q).normalize();
+  const p0 = pl.point.clone().addScaledVector(pl.normal, h);
+  const den = d.dot(pl.normal);
+  if(Math.abs(den) < 1e-4) return null;
+  const t = p0.clone().sub(o).dot(pl.normal) / den;
+  if(t <= 0) return null;
+  return o.clone().addScaledVector(d, t);
+}
+
+$('mark').addEventListener('click', async ()=>{
+  if(!lastHit || marks.length >= 3) return;
+  const kind = marks.length;
+  if(!plane) plane = {point: lastHit.point.clone(), normal: lastHit.normal.clone()};
+  const pos = aimPoint(kind === 2 ? 0 : R);
+  if(!pos) return;
+  const obj = markObject(kind); obj.position.copy(pos); scene.add(obj);
+  const mk = {kind, pos, obj, anchor:null, offset:new THREE.Vector3()};
+  marks.push(mk);
+  // pin it to the real world, so tracking corrections move it with the table
+  if(lastHit.result && lastHit.result.createAnchor){
+    try{
+      const a = await lastHit.result.createAnchor();
+      if(a){ mk.anchor = a; mk.offset = pos.clone().sub(lastHit.point); }
+    }catch(e){}
+  }
+  if(marks.length === 3) showAnswers();
+  navigator.vibrate && navigator.vibrate(15);
+});
+$('undo').addEventListener('click', ()=>{
+  if(picked){ picked = null; clearOverlay(); showAnswers(); return; }
+  const mk = marks.pop(); if(!mk) return;
+  scene.remove(mk.obj); if(mk.anchor && mk.anchor.delete) mk.anchor.delete();
+  if(!marks.length) plane = null;
+  $('answers').classList.remove('on'); $('readout').classList.remove('on');
+});
+$('reset').addEventListener('click', resetAll);
+function resetAll(){
+  for(const mk of marks){ scene.remove(mk.obj); if(mk.anchor && mk.anchor.delete) mk.anchor.delete(); }
+  marks.length = 0; plane = null; picked = null; clearOverlay();
+  $('answers').classList.remove('on'); $('readout').classList.remove('on');
+}
+
+// ---------- the shot ----------
+function flat(v){ const n = plane.normal; return v.clone().sub(n.clone().multiplyScalar(v.dot(n))); }
+function shotGeometry(){
+  const [cb, ob, pk] = marks.map(m => m.pos);
+  const u = flat(pk.clone().sub(ob)).normalize();                // object ball to pocket
+  const gb = ob.clone().addScaledVector(u, -2*R);                  // ghost ball: touching the object ball, opposite the pocket
+  const v = flat(gb.clone().sub(cb)).normalize();                  // cue ball to ghost ball
+  const theta = Math.acos(Math.max(-1, Math.min(1, v.dot(u)))) / RAD;
+  const f = 1 - Math.sin(Math.min(90, theta)*RAD);
+  const nearest = REFS.reduce((a,b)=> Math.abs(b.f-f) < Math.abs(a.f-f) ? b : a);
+  return {cb, ob, pk, gb, u, v, theta, f, nearest,
+    dCO: flat(ob.clone().sub(cb)).length(), dOP: flat(pk.clone().sub(ob)).length()};
+}
+function showAnswers(){
+  const el = $('answers');
+  el.innerHTML = REFS.map(r => `<button data-id="${r.id}">${r.label}</button>`).join('');
+  el.classList.add('on');
+  el.querySelectorAll('button').forEach(b => b.addEventListener('click', ()=> call(b.dataset.id)));
+}
+function call(id){
+  if(picked || marks.length < 3) return;
+  const g = shotGeometry();
+  picked = id;
+  const ok = id === g.nearest.id;
+  $('answers').querySelectorAll('button').forEach(b => { b.className = b.dataset.id===g.nearest.id ? 'right' : b.dataset.id===id ? 'wrong' : ''; });
+  const cm = x => (x*100).toFixed(0)+' cm';
+  $('readout').innerHTML = g.theta >= 89
+    ? `<span class="big no">Can't be cut to that pocket</span><br>The cut is past 90°.`
+    : `<span class="big ${ok?'ok':'no'}">${ok ? 'Right' : 'Wrong'}</span> · ${g.nearest.label} ball<br>`
+    + `Cut ${g.theta.toFixed(1)}° · ${g.f.toFixed(2)} ball<br>`
+    + `Cue→object ${cm(g.dCO)} · object→pocket ${cm(g.dOP)}`;
+  $('readout').classList.add('on');
+  drawOverlay();
+}
+
+// ghost ball, aim line and object-ball path, drawn on the cloth
+let overlayMeshes = [], overlayKey = '';
+function clearOverlay(){ overlayMeshes.forEach(m => { overlayGroup.remove(m); m.geometry && m.geometry.dispose(); m.material && m.material.dispose(); }); overlayMeshes = []; overlayKey = ''; }
+function line(a, b, color, dashed){
+  const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
+  const mat = dashed ? new THREE.LineDashedMaterial({color, dashSize:0.02, gapSize:0.015}) : new THREE.LineBasicMaterial({color});
+  const l = new THREE.Line(geo, mat); if(dashed) l.computeLineDistances(); return l;
+}
+function drawOverlay(){
+  clearOverlay();
+  const g = shotGeometry();
+  const ghost = new THREE.Mesh(new THREE.SphereGeometry(R, 32, 16), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:.3}));
+  ghost.position.copy(g.gb);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(R, 0.0015, 6, 48).rotateX(Math.PI/2), new THREE.MeshBasicMaterial({color:0xffffff}));
+  ring.position.copy(g.gb);
+  const aimEnd = g.gb.clone().addScaledVector(g.v, 0.25);
+  overlayMeshes = [ghost, ring, line(g.cb, aimEnd, 0xffffff, false), line(g.ob, g.pk, 0xffd34d, true)];
+  overlayMeshes.forEach(m => overlayGroup.add(m));
+}
+
+window.addEventListener('resize', ()=>{ if(!session){ renderer.setSize(window.innerWidth, window.innerHeight); } });
+</script>
+</body>
+</html>
