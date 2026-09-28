@@ -83,11 +83,11 @@ a{color:var(--accent)}
 </div>
 
 <script type="module">
-import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, rigidFit, findBalls, clothColour, R, REFS} from './ar-core.js';
+import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlane, tableFrom3, guessTable, shotGeometry, detectBall, rigidFit, findBalls, clothColour, signatureDistance, R, REFS} from './ar-core.js';
 
 const $ = id => document.getElementById(id);
 // Stay current: if the server has a newer version of this page than the one running, load it.
-const BUILD = '20260928221208';
+const BUILD = '20260928221841';
 if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 fetch(location.pathname, {cache: 'no-store'}).then(r => r.text()).then(t => {
   const m = t.match(/^const BUILD\s*=\s*'([^']+)'/m);
@@ -267,6 +267,7 @@ function handleTap(tap, frame, view){
       }
       if(track.obj === track.cue) track.obj = null;
       track.cueAt = track.cue.p; track.objAt = track.obj ? track.obj.p : null;
+      track.cueSig = track.cue.sig; track.objSig = track.obj ? track.obj.sig : null;   // what each one looks like, to tell them apart later
       balls = {cue: track.cue.p, obj: track.obj ? track.obj.p : null};
       picked = null; manualPocket = false; settle = null;
       if(balls.obj) newShot(); else setStep('balls');
@@ -409,7 +410,7 @@ if(worker) worker.onmessage = e => {
   scanBusy = false;
   const {id, balls: raw} = e.data, sc = scanCtx[id]; delete scanCtx[id];
   if(!sc || !table) return;
-  mergeSeen(raw.map(b => ({p: sc.onCloth(b.x, b.y)})).filter(b => b.p));
+  mergeSeen(raw.map(b => ({p: sc.onCloth(b.x, b.y), sig: b.sig})).filter(b => b.p));
 };
 // Keep a steady picture of the table: a ball has to be seen twice before it's shown, its position is smoothed,
 // a ball out of sight for a moment (hand, cue) stays for 1.5 s, and two balls can't be closer than a ball's width.
@@ -417,8 +418,8 @@ function mergeSeen(found){
   const now = performance.now(), next = [];
   for(const b of found){
     const old = seen.filter(o => !next.includes(o)).map(o => ({o, d: v3.len(v3.sub(o.p, b.p))})).filter(x => x.d < 0.045).sort((a,c)=>a.d-c.d)[0];
-    if(old){ const o = old.o; o.p = v3.add(v3.mul(o.p, 0.5), v3.mul(b.p, 0.5)); o.t = now; o.hits++; next.push(o); }
-    else next.push({p: b.p, t: now, hits: 1});
+    if(old){ const o = old.o; o.p = v3.add(v3.mul(o.p, 0.5), v3.mul(b.p, 0.5)); o.t = now; o.hits++; if(b.sig) o.sig = o.sig ? o.sig.map((v,k)=>v*0.6 + b.sig[k]*0.4) : b.sig; o.fresh = b.sig; next.push(o); }
+    else next.push({p: b.p, t: now, hits: 1, sig: b.sig, fresh: b.sig});
   }
   for(const o of seen) if(!next.includes(o) && now - o.t < 1500) next.push(o);
   const kept = [];
@@ -536,7 +537,28 @@ function followBalls(){
   const vis = shown();
   // Keep each ball as long as the scanner does. If one is lost (picked up, pocketed) and a ball turns up
   // somewhere new, it's that one; if both are lost, match them to where each was last.
-  let cue = vis.includes(track.cue) ? track.cue : null, obj = track.obj && vis.includes(track.obj) ? track.obj : null;
+  let cue = null, obj = null;
+  const sd = signatureDistance;
+  if(track.cueSig && track.objSig && vis.length >= 2){
+    // Which is which, by how they look: the pairing that best matches both balls as you tapped them.
+    let best = null;
+    for(const a of vis) for(const b of vis){
+      if(a === b) continue;
+      const cost = sd(a.sig, track.cueSig) + sd(b.sig, track.objSig);
+      if(!best || cost < best.cost) best = {a, b, cost};
+    }
+    // only trust it if swapping them would clearly look worse
+    const swapped = best && sd(best.b.sig, track.cueSig) + sd(best.a.sig, track.objSig);
+    if(best && swapped - best.cost > 0.08){ cue = best.a; obj = best.b; }
+  } else if(track.cueSig && track.objSig && vis.length === 1){
+    const b = vis[0];
+    if(sd(b.sig, track.objSig) - sd(b.sig, track.cueSig) > 0.08) cue = b;
+    else if(sd(b.sig, track.cueSig) - sd(b.sig, track.objSig) > 0.08) obj = b;
+  }
+  if(!cue && !obj){
+    // looks don't settle it: fall back to keeping each ball where it was being followed
+    cue = vis.includes(track.cue) ? track.cue : null; obj = track.obj && vis.includes(track.obj) ? track.obj : null;
+  }
   const free = vis.filter(b => b !== cue && b !== obj);
   if(!cue && obj && free.length === 1) cue = free[0];
   else if(cue && !obj && free.length === 1) obj = free[0];
@@ -547,6 +569,8 @@ function followBalls(){
   }
   if(cue){ track.cue = cue; track.cueAt = cue.p; }
   if(obj){ track.obj = obj; track.objAt = obj.p; }
+  if(!track.objSig && obj && obj.sig) track.objSig = obj.sig;
+  if(!track.cueSig && cue && cue.sig) track.cueSig = cue.sig;
   if(!cue || !obj) return;                              // a ball is off the table (pocketed, in your hand): wait
   const obP = obj.p, cueP = cue.p;
   const moved = (a, b) => !a || !b || v3.len(v3.sub(a, b)) > 0.04;

@@ -14,5 +14,5 @@ self.onmessage = e => {
   const {id, buf, w, h, poly, grid} = e.data;
   let balls = [];
   try{ balls = findBalls(new Uint8Array(buf), w, h, poly, radiusFrom(grid)); }catch(err){ balls = []; }
-  self.postMessage({id, balls: balls.map(b => ({x: b.x, y: b.y, label: b.label, cue: !!b.cue, wf: b.wf || 0, conf: b.conf || 0}))});
+  self.postMessage({id, balls: balls.map(b => ({x: b.x, y: b.y, sig: b.sig}))});
 };

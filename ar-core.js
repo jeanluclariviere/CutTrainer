@@ -239,6 +239,24 @@ export function clothColour(img, w, h, poly, step = 6){
   let dev = 0; for(let k=0;k<ls.length;k++) dev += Math.abs(cs[0][k]-c[0]) + Math.abs(cs[1][k]-c[1]) + Math.abs(cs[2][k]-c[2]);
   return {c, l, dev: dev/ls.length, n: ls.length};
 }
+// What a ball looks like, as numbers to compare two balls with: average colour mix, brightness,
+// and how much of it is strongly coloured (a cue ball: almost none; a stripe: some; a solid: most).
+export function ballSignature(img, w, h, cx, cy, r){
+  let n=0, cr=0, cg=0, cb=0, v=0, sat=0;
+  const rr = r*0.75;
+  for(let y=Math.max(0,Math.floor(cy-rr)); y<=Math.min(h-1,Math.ceil(cy+rr)); y++)
+    for(let x=Math.max(0,Math.floor(cx-rr)); x<=Math.min(w-1,Math.ceil(cx+rr)); x++){
+      if((x-cx)**2 + (y-cy)**2 > rr*rr) continue;
+      const i=(y*w+x)*4, R=img[i], G=img[i+1], B=img[i+2], s=R+G+B+1e-3, mx=Math.max(R,G,B), mn=Math.min(R,G,B);
+      cr+=R/s; cg+=G/s; cb+=B/s; v+=mx/255; if(mx > 20 && (mx-mn)/mx > 0.35) sat++; n++;
+    }
+  if(!n) return null;
+  return [cr/n, cg/n, cb/n, v/n, sat/n];
+}
+export function signatureDistance(a, b){
+  if(!a || !b) return Infinity;
+  return Math.abs(a[0]-b[0])*3 + Math.abs(a[1]-b[1])*3 + Math.abs(a[2]-b[2])*3 + Math.abs(a[3]-b[3]) + Math.abs(a[4]-b[4])*1.5;
+}
 // Name a ball from the colours inside it. Solids 1–7 by colour, the 8 black, stripes 9–15 = colour with lots of white.
 const HUES = [{n:1,name:'yellow',h:52},{n:5,name:'orange',h:28},{n:3,name:'red',h:4},{n:4,name:'purple',h:285},{n:2,name:'blue',h:222},{n:6,name:'green',h:140}];
 export function classifyBall(img, w, h, cx, cy, r){
@@ -345,7 +363,7 @@ export function findBalls(img, w, h, poly, rAt){
       const ru = rAt(ux, uy) || r;
       const d = detectBall(img, w, h, ux, uy, ru);
       if(!d || d.fill < 0.45) continue;
-      out.push({x: d.x, y: d.y, r: ru, fill: d.fill, ...classifyBall(img, w, h, d.x, d.y, ru)});
+      out.push({x: d.x, y: d.y, r: ru, fill: d.fill, sig: ballSignature(img, w, h, d.x, d.y, ru), ...classifyBall(img, w, h, d.x, d.y, ru)});
     }
   }
   // two detections closer than a ball's width are the same ball
