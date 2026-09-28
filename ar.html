@@ -87,10 +87,10 @@ import {v3, m4mul, m4inv, m4point, m4identity, rayFromNDC, projectToNDC, rayPlan
 
 const $ = id => document.getElementById(id);
 // Stay current: if the server has a newer version of this page than the one running, load it.
-const BUILD = '20260928220337';
+const BUILD = '20260928221208';
 if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 fetch(location.pathname, {cache: 'no-store'}).then(r => r.text()).then(t => {
-  const m = t.match(/const BUILD = '20260928220337']+)'/);
+  const m = t.match(/^const BUILD\s*=\s*'([^']+)'/m);
   if(m && m[1] !== BUILD && !sessionStorage.getItem('reloaded-' + m[1])){ sessionStorage.setItem('reloaded-' + m[1], '1'); location.reload(); }
 }).catch(()=>{});
 const DEBUG = new URLSearchParams(location.search).has('debug');
@@ -122,7 +122,7 @@ let target = null;            // target pocket index
 let shot = null, picked = null;
 let seen = [];                // balls found in the camera picture: {p (pinned), label, cue, t}
 let objLabel = '';
-let track = null;             // the object ball being followed: {ref (a seen ball), label}
+let track = null;             // the two balls being followed: {cue, obj} (entries in `seen`), plus where each was last seen
 let manualPocket = false;     // you picked the pocket yourself: keep it until the balls move
 let settle = null;            // waiting for the balls to come to rest after they moved: {since, cue, obj}
 let camRowsDown = null;       // do the camera picture's rows run top-down? (worked out from the table itself)
@@ -257,15 +257,19 @@ function handleTap(tap, frame, view){
     if(near){
       const prev = {...balls}, prevLabel = objLabel, prevTarget = target;
       history.push(()=>{ balls = prev; objLabel = prevLabel; target = prevTarget; picked = null; setStep(balls.cue && balls.obj ? 'pocket' : 'balls'); });
-      if(near.b.cue) balls.cue = near.b.p;
-      else {
-        balls.obj = near.b.p; objLabel = near.b.label;
-        track = {ref: near.b, label: near.b.label, others: shown().filter(b => b !== near.b && !b.cue).map(b => b.p)};     // follow this ball from now on
-        const cue = shown().find(b => b.cue);
-        if(cue) balls.cue = cue.p;                      // the cue ball is picked for you
+      // No guessing which ball is which: the first ball you tap is the cue ball, the other one is the object ball.
+      // Tapping a ball again later makes that one the cue ball (to fix a mix-up).
+      const others = shown().filter(b => b !== near.b);
+      if(!track || !track.cue || (track.cue && track.obj)){
+        track = {cue: near.b, obj: others.length === 1 ? others[0] : null};
+      } else if(near.b !== track.cue){
+        track.obj = near.b;
       }
+      if(track.obj === track.cue) track.obj = null;
+      track.cueAt = track.cue.p; track.objAt = track.obj ? track.obj.p : null;
+      balls = {cue: track.cue.p, obj: track.obj ? track.obj.p : null};
       picked = null; manualPocket = false; settle = null;
-      newShot();
+      if(balls.obj) newShot(); else setStep('balls');
       return;
     }
     // near a pocket: aim at that one instead
@@ -281,10 +285,7 @@ function handleTap(tap, frame, view){
     }
     const c = findBall(tap, frame, view);
     if(!c) return;
-    // the cue ball is the white one; otherwise the first ball you tap
-    let slot = c.white === true ? 'cue' : c.white === false ? 'obj' : (!balls.cue ? 'cue' : 'obj');
-    const other = slot === 'cue' ? 'obj' : 'cue';
-    if(balls[slot] && !balls[other]) slot = other;     // colour guess already used: fill the empty one
+    const slot = !balls.cue ? 'cue' : 'obj';           // first tap is the cue ball, then the object ball
     const prev = {...balls};
     history.push(()=>{ balls = prev; picked = null; setStep(balls.cue && balls.obj ? 'pocket' : 'balls'); });
     balls[slot] = c.p;
@@ -408,37 +409,23 @@ if(worker) worker.onmessage = e => {
   scanBusy = false;
   const {id, balls: raw} = e.data, sc = scanCtx[id]; delete scanCtx[id];
   if(!sc || !table) return;
-  mergeSeen(raw.map(b => ({p: sc.onCloth(b.x, b.y), label: b.label, cue: b.cue, wf: b.wf})).filter(b => b.p));
+  mergeSeen(raw.map(b => ({p: sc.onCloth(b.x, b.y)})).filter(b => b.p));
 };
 // Keep a steady picture of the table: a ball has to be seen twice before it's shown, its position is smoothed,
-// its name is the one it's been given most often, and a ball out of sight for a moment (hand, cue) stays for 1.5 s.
-// There's only one of each ball, and two balls can't be closer than a ball's width.
+// a ball out of sight for a moment (hand, cue) stays for 1.5 s, and two balls can't be closer than a ball's width.
 function mergeSeen(found){
   const now = performance.now(), next = [];
   for(const b of found){
     const old = seen.filter(o => !next.includes(o)).map(o => ({o, d: v3.len(v3.sub(o.p, b.p))})).filter(x => x.d < 0.045).sort((a,c)=>a.d-c.d)[0];
-    if(old){
-      const o = old.o;
-      o.p = v3.add(v3.mul(o.p, 0.5), v3.mul(b.p, 0.5)); o.t = now; o.hits++;
-      o.votes[b.cue ? 'Cue' : b.label] = (o.votes[b.cue ? 'Cue' : b.label] || 0) + 1;
-      next.push(o);
-    } else next.push({p: b.p, t: now, hits: 1, votes: {[b.cue ? 'Cue' : b.label]: 1}});
+    if(old){ const o = old.o; o.p = v3.add(v3.mul(o.p, 0.5), v3.mul(b.p, 0.5)); o.t = now; o.hits++; next.push(o); }
+    else next.push({p: b.p, t: now, hits: 1});
   }
   for(const o of seen) if(!next.includes(o) && now - o.t < 1500) next.push(o);
-  // names by vote, one of each
-  for(const o of next){
-    const best = Object.entries(o.votes).filter(([k]) => k !== '?').sort((a,c)=>c[1]-a[1])[0];
-    o.label = best ? best[0] : '?'; o.score = best ? best[1] : 0; o.cue = o.label === 'Cue';
-  }
-  const owner = {};
-  for(const o of next) if(o.label !== '?' && (!owner[o.label] || o.score > owner[o.label].score)) owner[o.label] = o;
-  for(const o of next) if(o.label !== '?' && owner[o.label] !== o){ o.label = '?'; o.cue = false; }
-  // no two balls on top of each other
   const kept = [];
   for(const o of next.sort((a,c)=>c.hits-a.hits)) if(!kept.some(k => v3.len(v3.sub(k.p, o.p)) < 2*R*0.9)) kept.push(o);
   seen = kept;
   followBalls();
-  if(step === 'balls') setStep('balls');   // refresh the prompt (cue ball found or not)
+  if(step === 'balls') setStep('balls');   // refresh the prompt
 }
 const shown = () => seen.filter(b => b.hits >= 2);
 
@@ -503,10 +490,10 @@ function showDebug(img, w, h, best, rExp){
 const STEP_TEXT = {
   scan: 'Move the phone slowly over the table. When the ring sits flat on the cloth, <b>tap</b>.',
   table: () => `Tap the <b>${['first','next','across'][corners.length]}</b> corner pocket` + (corners.length===0 ? ' (any one).' : corners.length===1 ? ', along the same rail.' : ', on the other side from that one.'),
-  balls: () => (shown().some(b=>b.cue) && !balls.obj) ? 'Tap the <b>object ball</b>.' : (!balls.cue && !balls.obj && cameraAccess) ? 'Tap the <b>cue ball</b> and the <b>object ball</b>.' : `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
+  balls: () => `Tap the <b>${balls.cue ? 'object ball' : 'cue ball'}</b>` + (cameraAccess ? '.' : ', right in its centre.'),
   pocket: 'Tap the <b>pocket</b> you\'re aiming for.',
   call: () => 'How full do you hit it?' + (target !== null ? ' <span style="color:var(--muted)">Tap another pocket to change it.</span>' : ''),
-  reveal: () => track ? 'Shoot it, then set up the next one. It follows the ball.' : 'Move the balls and tap them again, or tap New shot.',
+  reveal: () => track ? 'Shoot it, then set up the next one. It follows both balls. Mixed up? Tap the cue ball.' : 'Move the balls and tap them again, or tap New shot.',
   realign: 'Tap the <b>middle of any pocket</b> to snap the table back onto it.',
 };
 const STEP_N = {scan:0, table:1, balls:2, pocket:3, call:4, reveal:4, realign:4};
@@ -545,20 +532,23 @@ function newShot(){
 // Called after every scan: keep following the chosen object ball and the cue ball, and start a new shot
 // on its own once they've been moved and come to rest.
 function followBalls(){
-  if(!track || !table) return;
+  if(!track || !track.cue || !table) return;
   const vis = shown();
-  let ob = vis.includes(track.ref) ? track.ref : null;
-  if(!ob && track.label && track.label !== '?') ob = vis.find(b => b.label === track.label) || null;       // same number, back on the table
-  if(!ob){
-    // a ball that wasn't on the table before: that's the one you put back (colours can read differently in a new spot)
-    const fresh = vis.filter(b => !b.cue && !(track.others || []).some(o => v3.len(v3.sub(o, b.p)) < 0.06));
-    if(fresh.length === 1) ob = fresh[0];
+  // Keep each ball as long as the scanner does. If one is lost (picked up, pocketed) and a ball turns up
+  // somewhere new, it's that one; if both are lost, match them to where each was last.
+  let cue = vis.includes(track.cue) ? track.cue : null, obj = track.obj && vis.includes(track.obj) ? track.obj : null;
+  const free = vis.filter(b => b !== cue && b !== obj);
+  if(!cue && obj && free.length === 1) cue = free[0];
+  else if(cue && !obj && free.length === 1) obj = free[0];
+  else if(!cue && !obj && free.length === 1) cue = free[0];   // one ball left after a shot: the object ball went in, so this is the cue ball
+  else if(!cue && !obj && free.length === 2 && track.cueAt && track.objAt){
+    const [a, b] = free, d = (p, q) => v3.len(v3.sub(p, q));
+    if(d(a.p, track.cueAt) + d(b.p, track.objAt) <= d(b.p, track.cueAt) + d(a.p, track.objAt)){ cue = a; obj = b; } else { cue = b; obj = a; }
   }
-  if(!ob){ const others = vis.filter(b => !b.cue); if(others.length === 1) ob = others[0]; }            // only one ball besides the cue
-  if(ob){ track.ref = ob; if(ob.label !== '?') track.label = ob.label; track.others = vis.filter(b => b !== ob && !b.cue).map(b => b.p); }
-  const cue = vis.find(b => b.cue);
-  const obP = ob ? ob.p : null, cueP = cue ? cue.p : null;
-  if(!obP || !cueP) return;                             // a ball is off the table (pocketed, in your hand): wait
+  if(cue){ track.cue = cue; track.cueAt = cue.p; }
+  if(obj){ track.obj = obj; track.objAt = obj.p; }
+  if(!cue || !obj) return;                              // a ball is off the table (pocketed, in your hand): wait
+  const obP = obj.p, cueP = cue.p;
   const moved = (a, b) => !a || !b || v3.len(v3.sub(a, b)) > 0.04;
   if(step === 'balls' || step === 'pocket' || step === 'call' || step === 'reveal'){
     const changed = moved(obP, balls.obj) || moved(cueP, balls.cue);
@@ -567,7 +557,7 @@ function followBalls(){
     const now = performance.now();
     if(!settle || moved(obP, settle.obj) || moved(cueP, settle.cue)){ settle = {since: now, obj: obP, cue: cueP}; return; }
     if(now - settle.since < 900) return;
-    balls = {cue: cueP, obj: obP}; objLabel = track.label; settle = null; manualPocket = false; history.length = 0;
+    balls = {cue: cueP, obj: obP}; settle = null; manualPocket = false; history.length = 0;
     newShot();
   }
 }
@@ -596,7 +586,7 @@ $('newshot').addEventListener('click', ()=>{ balls = {cue:null, obj:null}; objLa
 $('retable').addEventListener('click', ()=>{ corners = []; table = null; plane = null; anchors.forEach(a=>{ try{ a.delete(); }catch(e){} }); anchors = []; anchorAt = []; pin = m4identity(); unpin = m4identity(); nudge = [0,0,0];
   balls = {cue:null, obj:null}; track = null; manualPocket = false; settle = null; seen = []; camRowsDown = null; scanBusy = false; target = null; picked = null; shot = null; history.length = 0; setStep('scan'); });
 
-if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; }, get seen(){ return seen; }, get rows(){ return camRowsDown; }, get track(){ return track && {label: track.label, p: track.ref && track.ref.p}; }, get balls(){ return balls; }, get step(){ return step; }, get settle(){ return settle; } };
+if(DEBUG) window.__ar = { get pin(){ return Array.from(pin); }, get anchors(){ return anchors.length; }, get seen(){ return seen; }, get rows(){ return camRowsDown; }, get track(){ return track && {cue: track.cue && track.cue.p, obj: track.obj && track.obj.p}; }, get balls(){ return balls; }, get step(){ return step; }, get settle(){ return settle; } };
 let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2200); }
 
@@ -642,13 +632,14 @@ function draw(){
     const d = devicePixelRatio || 1;
     ctx.font = `600 ${13*d}px system-ui, sans-serif`; ctx.textAlign = 'center';
     for(const b of shown()){
-      const chosen = track ? b === track.ref : (balls.obj && v3.len(v3.sub(b.p, balls.obj)) < 0.03);
+      const isCue = track && b === track.cue, isObj = track && b === track.obj;
       const onCloth = v3.sub(b.p, v3.mul(plane.n, R));
-      path3(ringOnCloth(onCloth, R*1.45), b.cue ? '#ffffff' : chosen ? '#ffd34d' : 'rgba(255,255,255,.75)', chosen || b.cue ? 3 : 2);
+      path3(ringOnCloth(onCloth, R*1.45), isCue ? '#ffffff' : isObj ? '#ffd34d' : 'rgba(255,255,255,.6)', isCue || isObj ? 3 : 2);
+      if(!isCue) continue;
       const q = proj(v3.add(b.p, v3.mul(plane.n, R*2.2))); if(!q) continue;
-      const [x, y] = S(q), txt = b.cue ? 'Cue' : b.label;
-      ctx.lineWidth = 3*d; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.setLineDash([]); ctx.strokeText(txt, x, y);
-      ctx.fillStyle = b.cue ? '#ffffff' : chosen ? '#ffd34d' : '#ffffff'; ctx.fillText(txt, x, y);
+      const [x, y] = S(q);
+      ctx.lineWidth = 3*d; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.setLineDash([]); ctx.strokeText('Cue', x, y);
+      ctx.fillStyle = '#ffffff'; ctx.fillText('Cue', x, y);
     }
   }
   if(balls.cue) sphere(balls.cue, null, '#ffffff');
