@@ -1804,7 +1804,7 @@ try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persis
 <script>
 // Installable app: works offline and keeps its storage (scores, settings) like an app would.
 // the Live AR link only shows where the page is hosted on its own (not inside the claude.ai preview)
-if (location.protocol === 'https:' && window.top === window) document.getElementById('livelink').hidden = false;
+// Live AR is parked: the page still exists (ar.html) but isn't linked from here.
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
