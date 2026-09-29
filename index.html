@@ -338,7 +338,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="panel">
       <div class="seg modes" role="group" aria-label="Mode">
         <button id="task-sess" data-set="task" data-val="sess">Freeplay</button>
-        <button id="task-flash" data-set="task" data-val="flash">Flash ⚡️</button>
+        <button id="task-flash" data-set="task" data-val="flash">Flash ⚡️<span class="lock" id="flashlock" aria-label="locked until your baseline" hidden> 🔒</span></button>
       </div>
       <p class="q" id="question" hidden>How full do you hit the object ball?<small id="modehint"></small></p>
       <div class="sessrow" id="sessrow" hidden>
@@ -454,7 +454,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <button id="cam-aim" data-set="cam" data-val="aim">Aim line</button>
       </div>
     </div>
-    <div class="opt">Ghost ball
+    <div class="opt"><span>Ghost ball<span class="lock" id="ghostlock" hidden> 🔒</span></span>
       <div class="seg" role="group" aria-label="Show ghost ball">
         <button id="ghost-0" data-set="ghost" data-val="0">Off</button>
         <button id="ghost-1" data-set="ghost" data-val="1">On</button>
@@ -635,6 +635,31 @@ function generate(){
 // Once a baseline exists, every Freeplay and Flash session deals adaptively: more of the kinds of shots you usually
 // call wrong (a kind = fraction + cue-ball distance). How hard it leans on them is a dial per mode: each pocketed shot turns it up, each miss turns it down
 // (further), so it settles where you pocket about 3 in 4. Below zero it leans toward your strong shots instead.
+const BASE_LOCKED = ['view','table','len','cam','ghost','full'];   // can't be changed during the baseline
+const BASE_STD = {table:'9', len:'both', cam:'line', ghost:'0', full:'1'};   // the view is set per half: standing, then down
+// Aids come and go with your level (called right over your last 50 Freeplay shots): the better you read,
+// the fewer aids you get. Each locks at one score and only unlocks again a few points lower, so it doesn't flicker.
+const AIDS = [
+  {key:'walk',  name:'Looking around', lockAt:75, unlockAt:70},
+  {key:'ghost', name:'Ghost ball',     lockAt:60, unlockAt:55},
+];
+function skillScore(){
+  const L = stats.log.filter(e=>taskOf(e)==='sess' && !e.gh).slice(-50);   // ghost-ball shots aren't scored, so they don't count
+  return L.length >= 20 ? pct(L.filter(success).length, L.length) : null;
+}
+function aidLocked(key){ return baseRun() || !!(stats.aids && stats.aids[key]); }
+function updateAids(quiet){
+  if(!hasBaseline()) return;
+  const sc = skillScore(); if(sc === null) return;
+  stats.aids = stats.aids || {};
+  const changes = [];
+  AIDS.forEach(a=>{
+    const was = !!stats.aids[a.key], now = was ? sc >= a.unlockAt : sc >= a.lockAt;
+    if(now !== was){ stats.aids[a.key] = now; changes.push(`${now ? '🔒 ' : ''}${a.name} ${now ? 'locked' : 'unlocked'}`); }
+  });
+  if(stats.aids.ghost && settings.ghost==='1'){ settings.ghost = '0'; saveSettings(); if(shot) draw(answered); }
+  if(changes.length){ syncPressed(); if(!quiet) notice(changes.join(' · ')); }
+}
 const K_MIN = -1, K_MAX = 2, K_UP = 0.1, K_DOWN = 0.3, K_START = 1;
 const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
 const baselines = () => (stats.sessions||[]).filter(x=>x.base);
@@ -1135,7 +1160,7 @@ function updateControls(){
 }
 
 let laterT = 0;
-function laterSave(){ clearTimeout(laterT); laterT = setTimeout(()=>{ save(); renderStats(); }, 30); }   // after the answer has painted
+function laterSave(){ clearTimeout(laterT); laterT = setTimeout(()=>{ updateAids(); save(); renderStats(); }, 30); }   // after the answer has painted
 function logEntry(extra){
   const act = stats.active && stats.active.task===settings.task ? stats.active.id : undefined;
   stats.log.push({sid:act, t:settings.task, a:shot.answer.id, s:shot.side, v:settings.view,
@@ -1185,6 +1210,11 @@ function tone(out, freq, at, dur, gain, glideTo){
 const semis = (f, n)=>f*Math.pow(2, n/12);
 const STREAK_HOT = 6;   // "on a streak" means more than 5 right in a row
 let streakTimer = null;
+function notice(text){   // a brief note in the pill spot, e.g. an aid locking or unlocking
+  const el = $('streakpill'); clearTimeout(streakTimer);
+  el.classList.remove('hot','pop'); el.classList.add('over'); el.textContent = text; el.hidden = false;
+  streakTimer = setTimeout(syncStreakPill, 3200);
+}
 function showStreak(cur, endedAt){
   const el = $('streakpill'); clearTimeout(streakTimer);
   el.classList.remove('hot','over','pop');
@@ -1219,7 +1249,11 @@ function thock(good){ playSound(good ? 'made' : 'miss'); }
 // ---------- sessions ----------
 function startSession(size, base){
   stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now()};
-  if(base){ stats.active.base = 1; stats.active.view0 = settings.view; }
+  if(base){   // the baseline is played under fixed conditions: settings are borrowed, then given back
+    stats.active.base = 1;
+    stats.active.saved = Object.fromEntries(BASE_LOCKED.map(k=>[k, settings[k]]));
+    Object.assign(settings, BASE_STD); setTable(settings.table, settings.pockets);
+  }
   syncPressed();
   save(); $('sesscover').hidden = true; $('sessidlecover').hidden = true; renderSession(); syncStreakPill(); deal();
 }
@@ -1235,7 +1269,7 @@ function endSession(){
   $('endcover').hidden = false;
 }
 function closeEndPrompt(){ $('endcover').hidden = true; if(settings.task==='flash' && !answered && stats.active) startFlash(); }
-function restoreView(a){ if(a && a.base && a.view0){ settings.view = a.view0; saveSettings(); } }   // the baseline borrows the View setting
+function restoreView(a){ if(a && a.base && a.saved){ Object.assign(settings, a.saved); setTable(settings.table, settings.pockets); saveSettings(); } }
 function discardSession(){
   const a = stats.active; $('endcover').hidden = true;
   if(a) stats.log = stats.log.filter(e=>e.sid !== a.id);
@@ -1257,9 +1291,9 @@ function finishSession(){
     Object.assign(rec, {base:1, v:'both', ln:'both', stand: by('stand'), down: by('down')});
   }
   restoreView(a);
-  stats.active = null; syncPressed();
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
-  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
+  stats.active = null; syncPressed();
+  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); updateAids(); showSummary(rec);
 }
 function syncStreakPill(){ if(!$('streakpill')) return; const c = curStreak(); showStreak(c >= STREAK_HOT ? c : 0, 0); }
 function renderSession(){
@@ -1706,15 +1740,18 @@ const HINTS = {
   any: 'Any cut up to 66°. Call the nearest reference, then check whether it drops.',
 };
 function syncPressed(){
-  tableBox.classList.toggle('walkable', settings.task==='call' || settings.task==='sess');
+  tableBox.classList.toggle('walkable', walkOn());
+  const lockFlash = !hasBaseline();   // Flash opens once there's a baseline
+  $('task-flash').disabled = lockFlash; $('flashlock').hidden = !lockFlash;
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
-  document.querySelectorAll('[data-set="view"]').forEach(b=>b.disabled = baseRun());
+  document.querySelectorAll('[data-set]').forEach(b=>{ if(BASE_LOCKED.includes(b.dataset.set)) b.disabled = baseRun() || (b.dataset.set==='ghost' && aidLocked('ghost')); });
+  $('ghostlock').hidden = !aidLocked('ghost');
   $('modehint').textContent = isPlace()
     ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
     : HINTS[settings.mode];
 }
 function applySetting(key, val){
-  if(settings[key]===val || (key==='view' && baseRun())) return;
+  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && val==='1' && aidLocked('ghost'))) return;
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
   if(key==='ghost'){ if(shot) draw(answered); }
@@ -1740,7 +1777,7 @@ function nextShot(){
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) shoot(); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
-const walkOn = () => settings.task==='call' || settings.task==='sess';
+function walkOn(){ return (settings.task==='call' || settings.task==='sess') && !aidLocked('walk'); }   // locked during the baseline, and once your level is high enough
 function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
 svgEl.addEventListener('pointerdown', ev=>{
   if(anim || !walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
@@ -1809,7 +1846,7 @@ function showSub(t){
 document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('click', ()=>showSub(b.dataset.sub)));
 showSub(['overview','fractions','details'].includes(settings.sub) ? settings.sub : 'overview');
 showTab(settings.tab==='misses' ? 'stats' : ['shot','stats','settings'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
-$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(stats.adapt) delete stats.adapt[t]; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; syncPressed(); showSessIdle(); } save(); renderStats(); syncStreakPill(); });
+$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(stats.adapt) delete stats.adapt[t]; if(t==='sess') delete stats.aids; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; showSessIdle(); } if(!hasBaseline() && settings.task==='flash') applySetting('task','sess'); syncPressed(); save(); renderStats(); syncStreakPill(); });
 document.querySelectorAll('.statmode button').forEach(b=>b.addEventListener('click', ()=>{ settings.statTask = b.dataset.stat; saveSettings(); renderStats(); }));
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
@@ -1843,6 +1880,8 @@ settings.mode = 'ref';   // reference cuts only for now
 if(!['line','aim'].includes(settings.cam)) settings.cam='line';
 if(!['short','long','both'].includes(settings.len)) settings.len='both';
 if(!['0','1'].includes(settings.ghost)) settings.ghost='0';
+updateAids(true);
+if(stats.aids && stats.aids.ghost) settings.ghost='0';   // locked at your level
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 settings.throw='0';   // throw option removed
@@ -1851,7 +1890,7 @@ settings.pockets = 'std';   // pockets fixed at 4.5″: with reference cuts only
 setTable(settings.table, settings.pockets);
 if(!settings.sv){ settings.full='1'; settings.sv=2; }   // full-ball shots are now on by default
 if(settings.task==='call') settings.task = 'sess';   // Freeplay and Sessions merged: Freeplay is now played in sessions
-if(!['sess','flash'].includes(settings.task)) settings.task = 'sess';
+if(!['sess','flash'].includes(settings.task) || (settings.task==='flash' && !hasBaseline())) settings.task = 'sess';
 if(!settings.sv4){ stats.log.forEach(e=>{ if((e.t||'call')==='call') e.t = 'sess'; }); settings.sv4 = 1; save(); }   // old Freeplay shots join the new Freeplay
 if(stats.log.some(e=>e.t==='aim' || e.t==='tt')){ stats.log = stats.log.filter(e=>e.t!=='aim' && e.t!=='tt'); save(); }   // Aim and Thick/Thin were tried and dropped
 // one-time move: sessions played before Sessions became its own mode now belong to it
