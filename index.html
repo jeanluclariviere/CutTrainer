@@ -45,6 +45,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .sub{color:var(--muted);margin:4px 0 0;max-width:60ch}
 .seg{display:inline-flex;background:var(--chip);border-radius:8px;padding:3px;gap:3px;flex-wrap:wrap}
 .seg button{font:500 13px var(--body);border:0;background:transparent;color:var(--muted);padding:6px 12px;border-radius:6px;cursor:pointer}
+.seg button:disabled{opacity:.45;cursor:default}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .controls{display:flex;flex-wrap:wrap;gap:8px}
 .settings{border-top:1px solid var(--line);padding-top:16px}
@@ -120,6 +121,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .trend .xlab{position:absolute;top:calc(100% + 4px);font-size:11px;color:var(--muted);white-space:nowrap}
 .trend svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .trend .dot{position:absolute;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}
+.trend .dot.base{background:var(--bg);box-shadow:inset 0 0 0 2px var(--accent),0 0 0 2px var(--bg)}
 .trend .dot.on{width:12px;height:12px;margin:-6px 0 0 -6px}
 .trend .xhair{position:absolute;top:0;bottom:0;border-left:1px dashed var(--muted);opacity:.6;pointer-events:none}
 .trend .tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--ink);color:var(--bg);font-size:12px;line-height:1.3;padding:5px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:2}
@@ -314,7 +316,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
                 <button id="flash-750" data-set="flash" data-val="750">0.75 s</button>
               </div>
             </div>
-            <div class="sumbtns"><button class="startbtn" data-sess="50">50 shots</button><button class="startbtn" data-sess="100">100 shots</button></div>
+            <div class="sumbtns" id="sessbtns"><button class="startbtn" data-sess="50">50 shots</button><button class="startbtn" data-sess="100">100 shots</button></div>
+            <div class="sumbtns" id="basebtns" hidden><button class="startbtn" id="basestart">Baseline · 100 shots</button></div>
+            <button class="link endkeep" id="rebase" hidden>New baseline</button>
           </div>
         </div>
         <div class="cover sumcover" id="endcover" hidden>
@@ -474,12 +478,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <button id="full-1" data-set="full" data-val="1">On</button>
       </div>
     </div>
-    <div class="opt">Deal my misses more
-      <div class="seg" role="group" aria-label="Deal my misses more">
-        <button id="focus-0" data-set="focus" data-val="0">Off</button>
-        <button id="focus-1" data-set="focus" data-val="1">On</button>
-      </div>
-    </div>
     </div>
   </section>
       </div>
@@ -533,7 +531,7 @@ function segDist(p,a,b){const ab=sub(b,a);const t=Math.max(0,Math.min(1,dot(sub(
 function f2(n){return n.toFixed(2);}
 
 // ---------- settings & stats ----------
-const settings = {view:'stand', mode:'ref', flash:'0', throw:'0', focus:'0', full:'1', cam:'line', task:'sess', len:'both', table:'9', pockets:'std'};
+const settings = {view:'stand', mode:'ref', flash:'0', throw:'0', full:'1', cam:'line', task:'sess', len:'both', table:'9', pockets:'std'};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cutreader-settings')) || {}); }catch(e){}
 try{ const v = localStorage.getItem('cutreader-view'); if(v && !localStorage.getItem('cutreader-settings')) settings.view = v; }catch(e){}
 function saveSettings(){ try{ localStorage.setItem('cutreader-settings', JSON.stringify(settings)); }catch(e){} }
@@ -559,11 +557,7 @@ function nearestRef(theta){
 }
 
 function bucketWeights(){
-  const w = settings.focus!=='1' ? REFS.map(()=>1) : REFS.map(r=>{
-    const rec = stats.log.filter(e=>e.a===r.id && (e.t||'call')===settings.task).slice(-30);
-    const bad = rec.filter(e=>!success(e) || !e.m).length;
-    return 0.4 + 2.2*((bad+1)/(rec.length+2));
-  });
+  const w = REFS.map(()=>1);
   if(settings.full!=='1') w[0] = 0;
   return w;
 }
@@ -599,7 +593,8 @@ function cueScratches(c){
 function generate(){
   const w = bucketWeights();
   const throwOn = settings.throw==='1';
-  const lenCls = settings.len==='both' ? (Math.random()<.5 ? 'short' : 'long') : settings.len;
+  const lenSet = baseRun() ? 'both' : settings.len;   // the baseline always mixes short and long
+  const lenCls = lenSet==='both' ? (Math.random()<.5 ? 'short' : 'long') : lenSet;
   const k = H/100;
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
   let fallback = null;
@@ -633,6 +628,53 @@ function generate(){
     if(pocketInView(cand)) return cand;
   }
   return fallback;
+}
+
+// ---------- baseline & adaptive dealing ----------
+// The first Freeplay session is a 100-shot baseline (50 standing, then 50 down on the ball), dealt truly at random.
+// Once a baseline exists, every Freeplay and Flash session deals adaptively: more of the kinds of shots you usually
+// call wrong (a kind = fraction + cue-ball distance). How hard it leans on them is a dial per mode: each pocketed shot turns it up, each miss turns it down
+// (further), so it settles where you pocket about 3 in 4. Below zero it leans toward your strong shots instead.
+const K_MIN = -1, K_MAX = 2, K_UP = 0.1, K_DOWN = 0.3, K_START = 1;
+const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
+const baselines = () => (stats.sessions||[]).filter(x=>x.base);
+const hasBaseline = () => baselines().length > 0;
+const adaptiveOn = () => hasBaseline() && sessTask(settings.task) && !baseRun();
+function adaptK(){ const a = stats.adapt || {}; return typeof a[settings.task]==='number' ? a[settings.task] : K_START; }
+function turnDial(pocketed){
+  stats.adapt = stats.adapt || {};
+  stats.adapt[settings.task] = Math.max(K_MIN, Math.min(K_MAX, adaptK() + (pocketed ? K_UP : -K_DOWN)));
+}
+// A kind of shot is its fraction plus how far the cue ball is from the object ball (short / medium / long).
+const distBin = d => d < 24 ? 0 : d < 42 ? 1 : 2;
+const shotCell = s => s.answer.id + distBin(len(sub(s.ob, s.cb)));
+const entryCell = e => typeof e.dc==='number' ? e.a + distBin(e.dc) : null;
+// how much more often than usual you call each kind of shot wrong (1 = your average), from your recent shots
+function weakModel(){
+  let L = stats.log.filter(e=>!e.gh && taskOf(e)===settings.task && entryCell(e));
+  if(L.length < 40) L = stats.log.filter(e=>!e.gh && sessTask(taskOf(e)) && entryCell(e));
+  const view = L.filter(e=>e.v===settings.view);
+  if(view.length >= 40) L = view;
+  L = L.slice(-400);
+  const wrong = e => !success(e);
+  const m = Math.max(0.04, L.filter(wrong).length / Math.max(1, L.length));
+  const tally = key => { const c = {}; L.forEach(e=>{ const k = key(e), t = c[k] || (c[k] = {n:0, x:0}); t.n++; if(wrong(e)) t.x++; }); return c; };
+  const shrink = (t, prior, w) => (t.x + w*prior)/(t.n + w);
+  const byFrac = tally(e=>e.a), byDist = tally(e=>distBin(e.dc)), byCell = tally(entryCell);
+  const ratio = {};
+  REFS.forEach(r=>[0,1,2].forEach(d=>{
+    // with few shots in a cell, lean on how you do with that fraction and that distance generally
+    const rf = shrink(byFrac[r.id] || {n:0,x:0}, m, 8)/m, rd = shrink(byDist[d] || {n:0,x:0}, m, 8)/m;
+    const prior = Math.min(0.95, m*rf*rd);
+    ratio[r.id + d] = Math.max(1/3, Math.min(3, shrink(byCell[r.id + d] || {n:0,x:0}, prior, 6)/m));   // capped: at full lean a weak spot comes up at most ~9× as often as a strong one
+  }));
+  return ratio;
+}
+function dealShot(){
+  if(!adaptiveOn()) return generate();
+  const model = weakModel(), k = adaptK();
+  const cands = Array.from({length:20}, generate);
+  return cands[weightedIndex(cands.map(c=>Math.pow(model[shotCell(c)]||1, k)))];
 }
 
 // Play a pure hit at cut angle phiC from the real cue-ball position.
@@ -1044,7 +1086,8 @@ const tableBox = document.querySelector('.table-box');
 function deal(){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   walk = null; walkDrag = null;
-  shot = generate();
+  if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
+  shot = dealShot();
   answered = false;
   draw(false);
   document.querySelectorAll('#answers button').forEach(b=>{b.disabled=false;b.className='';});
@@ -1063,6 +1106,9 @@ function showSessIdle(){
   if(idle){
     $('sessidlehead').textContent = t==='flash' ? 'Flash ⚡️' : 'Freeplay';
     $('flashpick').hidden = t!=='flash';
+    const needBase = t==='sess' && !hasBaseline();
+    $('sessbtns').hidden = needBase; $('basebtns').hidden = !needBase;
+    $('rebase').hidden = t!=='sess' || needBase;
   }
 }
 let flashArmed = false;
@@ -1171,8 +1217,10 @@ function playSound(kind, streak){
 function thock(good){ playSound(good ? 'made' : 'miss'); }
 
 // ---------- sessions ----------
-function startSession(size){
+function startSession(size, base){
   stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now()};
+  if(base){ stats.active.base = 1; stats.active.view0 = settings.view; }
+  syncPressed();
   save(); $('sesscover').hidden = true; $('sessidlecover').hidden = true; renderSession(); syncStreakPill(); deal();
 }
 // Ending early asks: save what you've played (it counts like a finished session) or discard it (its shots are removed too).
@@ -1187,10 +1235,12 @@ function endSession(){
   $('endcover').hidden = false;
 }
 function closeEndPrompt(){ $('endcover').hidden = true; if(settings.task==='flash' && !answered && stats.active) startFlash(); }
+function restoreView(a){ if(a && a.base && a.view0){ settings.view = a.view0; saveSettings(); } }   // the baseline borrows the View setting
 function discardSession(){
   const a = stats.active; $('endcover').hidden = true;
   if(a) stats.log = stats.log.filter(e=>e.sid !== a.id);
-  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); deal();
+  restoreView(a);
+  stats.active = null; syncPressed(); save(); renderSession(); renderStats(); syncStreakPill(); deal();
 }
 function saveSessionEarly(){ $('endcover').hidden = true; finishSession(); }
 function sessionTick(ok, made){
@@ -1202,6 +1252,12 @@ function finishSession(){
   const a = stats.active;
   const rec = {id:a.id, task:a.task, size:a.size, n:a.n, early: a.n < a.size ? 1 : undefined, right:a.right, made:a.made, start:a.start + (a.pause||0), end:Date.now(),
     md:settings.mode, v:settings.view, ln:settings.len, tb:settings.table, pk:settings.pockets};
+  if(a.base && !rec.early){   // only a full 100 counts as a baseline
+    const L = stats.log.filter(e=>e.sid===a.id), by = v => { const x = L.filter(e=>e.v===v); return pct(x.filter(success).length, x.length); };
+    Object.assign(rec, {base:1, v:'both', ln:'both', stand: by('stand'), down: by('down')});
+  }
+  restoreView(a);
+  stats.active = null; syncPressed();
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
   stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
 }
@@ -1209,17 +1265,22 @@ function syncStreakPill(){ if(!$('streakpill')) return; const c = curStreak(); s
 function renderSession(){
   const a = stats.active && stats.active.task === settings.task ? stats.active : null;
   $('sessrow').hidden = !a; $('sesslive').hidden = !a;   // the progress row only shows during a session
-  if(a){ $('sesstext').textContent = `Session · ${a.n} / ${a.size}` + (a.n ? ` · ${pct(a.right, a.n)}%` : ''); $('sessfill').style.width = pct(a.n, a.size) + '%'; }
+  if(a){ $('sesstext').textContent = (a.base ? `Baseline · ${a.n < a.size/2 ? 'Standing' : 'Down'}` : 'Session') + ` · ${a.n} / ${a.size}` + (a.n ? ` · ${pct(a.right, a.n)}%` : ''); $('sessfill').style.width = pct(a.n, a.size) + '%'; }
 }
 function showSummary(rec){
   const L = stats.log.filter(e=>e.sid === rec.id);
   const score = pct(rec.right, rec.n);
-  $('sumhead').textContent = rec.early ? `Session ended early · ${rec.n} of ${rec.size} shots · ${MODE_LABEL[rec.task]}` : `Session complete · ${rec.size} shots · ${MODE_LABEL[rec.task]}`;
+  $('sumhead').textContent = rec.base ? `Baseline · ${rec.size} shots` : rec.early ? `Session ended early · ${rec.n} of ${rec.size} shots · ${MODE_LABEL[rec.task]}` : `Session complete · ${rec.size} shots · ${MODE_LABEL[rec.task]}`;
   $('sumbig').textContent = score + '%';
   $('sumsub').textContent = 'called right';
   const rows = [];   // [label, value, tone]
-  const prev = (stats.sessions || []).filter(x=>x.task===rec.task && x.size===rec.size && x.id!==rec.id).slice(-5);
-  if(prev.length){
+  const prev = (stats.sessions || []).filter(x=>x.task===rec.task && x.size===rec.size && x.id!==rec.id && !x.base===!rec.base).slice(-5);
+  if(rec.base){
+    rows.push(['Standing', `${rec.stand}%`, '']);
+    rows.push(['Down on the ball', `${rec.down}%`, '']);
+    const last = prev[prev.length-1];
+    if(last){ const d = score - pct(last.right, last.n); rows.push(['vs. last baseline', `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} pts <small>${pct(last.right,last.n)}%</small>`, d>=3?'up':d<=-3?'down':'']); }
+  } else if(prev.length){
     const avg = Math.round(prev.reduce((t,x)=>t+pct(x.right,x.n),0)/prev.length), d = score - avg;
     rows.push(['vs. your average', `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} pts <small>avg ${avg}%</small>`, d>=3?'up':d<=-3?'down':'']);
   } else rows.push(['vs. your average', 'Baseline set', '']);
@@ -1241,7 +1302,7 @@ function showSummary(rec){
   rows.push(['Time', `${mm}:${ss}`, '']);
   $('sumnotes').innerHTML = rows.map(([k,v,t])=>`<dt>${k}</dt><dd class="${t}">${v}</dd>`).join('');
 
-  $('sessagain').textContent = `Another ${rec.size}`;
+  $('sessagain').textContent = rec.base ? `Play ${rec.size}` : `Another ${rec.size}`;
   $('sessagain').dataset.size = rec.size;
   $('sesscover').hidden = false;
 }
@@ -1255,12 +1316,12 @@ function renderSessionHistory(){
   } else {
     const pts = S.map((x,i)=>({x: S.length===1 ? 50 : i/(S.length-1)*100, y: pct(x.right,x.n), s:x}));
     h += `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts.map(p=>`${p.x.toFixed(2)},${(100-p.y).toFixed(2)}`).join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
-    h += pts.map((p,i)=>`<span class="dot" data-i="${i}" style="left:${p.x}%;top:${100-p.y}%"></span>`).join('');
+    h += pts.map((p,i)=>`<span class="dot${p.s.base?' base':''}" data-i="${i}" style="left:${p.x}%;top:${100-p.y}%"></span>`).join('');
     h += `<span class="xlab" style="left:0">${fmt(S[0])}</span><span class="xlab" style="right:0">${fmt(S[S.length-1])}</span>`;
     el.innerHTML = h;
     el._pts = pts;
   }
-  $('sesslist').innerHTML = S.slice(-8).reverse().map(x=>`<div class="srow"><span>${new Date(x.end).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${x.size} shots</span><b>${pct(x.right,x.n)}%</b></div>`).join('') || `<span class="cap" style="margin:0">No finished sessions yet.</span>`;
+  $('sesslist').innerHTML = S.slice(-8).reverse().map(x=>`<div class="srow"><span>${new Date(x.end).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})} · ${x.base ? 'Baseline' : x.size+' shots'}</span><b>${pct(x.right,x.n)}%</b></div>`).join('') || `<span class="cap" style="margin:0">No finished sessions yet.</span>`;
 }
 // hover / touch: crosshair on the nearest session, with its date, length and score
 (function(){
@@ -1273,7 +1334,7 @@ function renderSessionHistory(){
     const p = pts[best]; clear();
     el.querySelector(`.dot[data-i="${best}"]`)?.classList.add('on');
     const x = p.s, d = new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-    el.insertAdjacentHTML('beforeend', `<div class="xhair" style="left:${p.x}%"></div><div class="tip" style="left:${Math.min(85,Math.max(15,p.x))}%;top:${100-p.y}%"><b>${p.y}%</b> · ${d} · ${x.size} shots</div>`);
+    el.insertAdjacentHTML('beforeend', `<div class="xhair" style="left:${p.x}%"></div><div class="tip" style="left:${Math.min(85,Math.max(15,p.x))}%;top:${100-p.y}%"><b>${p.y}%</b> · ${d} · ${x.base ? 'baseline' : x.size+' shots'}</div>`);
   });
   el.addEventListener('pointerleave', clear);
 })();
@@ -1296,6 +1357,7 @@ function answer(id){
   else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
   else thock(counted);
   logEntry({p:id, m:counted?1:0});
+  if(!aided && adaptiveOn() && stats.active && stats.active.task===settings.task) turnDial(counted);
   document.querySelectorAll('#answers button').forEach(b=>{ b.disabled = true; });
   const reveal = (animMs)=>{
     if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
@@ -1566,6 +1628,13 @@ function renderPatterns(){
   const all = groupStats(log), rows = [];   // [label, value, tone]
   const dash = ['—','none'];
   const wrong = all.thin + all.full;
+  if(statTask()==='sess'){
+    const B = baselines(), b = B[B.length-1];
+    if(b){
+      const s0 = pct(b.right, b.n), p0 = B.length > 1 ? pct(B[B.length-2].right, B[B.length-2].n) : null, d = p0===null ? 0 : s0 - p0;
+      rows.push(['Baseline', `${s0}% <small>${p0===null ? `standing ${b.stand}% · down ${b.down}%` : `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} vs last`}</small>`, p0===null ? '' : d>=3 ? 'up' : d<=-3 ? 'down' : '']);
+    } else rows.push(['Baseline', ...dash]);
+  }
   rows.push(['Misses lean', ...(wrong < 4 ? (all.n && !wrong ? ['No misses','up'] : dash)
     : all.thin/wrong >= .65 ? [`Too thin <small>${all.thin} of ${wrong}</small>`,'']
     : all.full/wrong >= .65 ? [`Too full <small>${all.full} of ${wrong}</small>`,'']
@@ -1639,12 +1708,13 @@ const HINTS = {
 function syncPressed(){
   tableBox.classList.toggle('walkable', settings.task==='call' || settings.task==='sess');
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
+  document.querySelectorAll('[data-set="view"]').forEach(b=>b.disabled = baseRun());
   $('modehint').textContent = isPlace()
     ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
     : HINTS[settings.mode];
 }
 function applySetting(key, val){
-  if(settings[key]===val) return;
+  if(settings[key]===val || (key==='view' && baseRun())) return;
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
   if(key==='ghost'){ if(shot) draw(answered); }
@@ -1739,7 +1809,7 @@ function showSub(t){
 document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('click', ()=>showSub(b.dataset.sub)));
 showSub(['overview','fractions','details'].includes(settings.sub) ? settings.sub : 'overview');
 showTab(settings.tab==='misses' ? 'stats' : ['shot','stats','settings'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
-$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(stats.active && stats.active.task===t){ stats.active = null; showSessIdle(); } save(); renderStats(); syncStreakPill(); });
+$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(stats.adapt) delete stats.adapt[t]; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; syncPressed(); showSessIdle(); } save(); renderStats(); syncStreakPill(); });
 document.querySelectorAll('.statmode button').forEach(b=>b.addEventListener('click', ()=>{ settings.statTask = b.dataset.stat; saveSettings(); renderStats(); }));
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
@@ -1750,13 +1820,15 @@ $('endcover').addEventListener('click', e=>e.stopPropagation());
 $('sessagain').addEventListener('click', e=>{ e.stopPropagation(); startSession(+e.currentTarget.dataset.size); });
 $('sessdone').addEventListener('click', e=>{ e.stopPropagation(); $('sesscover').hidden = true; deal(); });
 document.querySelectorAll('#sessidlecover [data-sess]').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); startSession(+b.dataset.sess); }));
+$('basestart').addEventListener('click', e=>{ e.stopPropagation(); startSession(100, true); });
+$('rebase').addEventListener('click', e=>{ e.stopPropagation(); startSession(100, true); });
 $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
   if(!$('endcover').hidden){ if(e.key==='Escape'){ closeEndPrompt(); e.preventDefault(); } return; }
-  if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ startSession(50); e.preventDefault(); } return; }
+  if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ if(settings.task==='sess' && !hasBaseline()) startSession(100, true); else startSession(50); e.preventDefault(); } return; }
   if(!$('sesscover').hidden){ if(e.key==='Enter'){ startSession(+$('sessagain').dataset.size); e.preventDefault(); } else if(e.key==='Escape'){ $('sesscover').hidden = true; deal(); } return; }
   if(!$('startcover').hidden){ if(e.key==='Enter' || e.key===' '){ startFlashMode(); e.preventDefault(); } return; }
   if((e.key==='r' || e.key==='R') && !$('cover').hidden){ replay(); e.preventDefault(); return; }
@@ -1794,7 +1866,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test') window.__ct = {generate, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, adaptK, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
