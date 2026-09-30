@@ -1865,7 +1865,9 @@ function animateShot(oc, done, obCol){
   const cbEnd = tl > 0.05 ? rayToCushion(g2, mul(tan, 1/tl), 26*tl) : g2;
   const cl = (x,a,b)=>Math.max(a, Math.min(b, x));
   const d1 = len(sub(g2, cb0)), d2 = jaw ? dJ + len(sub(obEnd, jaw)) : len(sub(obEnd, ob0)), d3 = len(sub(cbEnd, g2));
-  const V = s.speed ? ROLL_V[s.speed] : 75;       // one constant speed (inches per second) for every ball, start to finish
+  // one constant speed (inches per second) for every ball, scaled to the shot's length: short shots play slower so
+  // you can see (and hear) the contact and the pocket as two things; long firm shots still move at full pace
+  const V = Math.max(28, Math.min(s.speed ? ROLL_V[s.speed] : 75, d1/0.3));
   const T1 = d1/V, T2 = d2/V, T3 = d3/V;
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
   const cbRail = tl > 0.05 && len(sub(rayToCushion(g2, mul(tan, 1/tl)), cbEnd)) < 0.5;   // the cue ball's path reached a cushion
