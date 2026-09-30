@@ -600,6 +600,10 @@ function setTable(size, pockets){
 }
 setTable('9','std');
 const pocketR = p => p.side ? PK[1]*0.48 : PK[0]*0.58;   // drawn hole radius
+function pocketEdge(ob, P){   // where the line from the object ball to the pocket reaches the edge of the hole
+  const d = len(sub(P.t, ob)), u = norm(sub(P.t, ob)), q = sub(ob, P.c), b = dot(q, u), c = dot(q, q) - pocketR(P)**2, disc = b*b - c;
+  return disc > 0 ? add(ob, mul(u, Math.max(0, Math.min(d, -b - Math.sqrt(disc))))) : P.t;
+}
 const MISS = '#d9c2ff', NEAR_MISS_OK = '#d9c2ff';   // your call's path: informational, not a verdict
 
 const $ = id => document.getElementById(id);
@@ -705,6 +709,7 @@ function cueScratches(c){
   // where the cue ball really goes after a pocket-speed stun: along the tangent line, as far as its speed carries it
   // the cue ball's real (curving) path after contact must stay clear of every pocket
   const sim = simCue(c, c.gb, false), post = sim.pts.filter(q=>q.t >= sim.T1);
+  if(sim.pocket) return true;
   for(let i=1;i<post.length;i++) if(POCKETS.some(P => segDist(P.t, post[i-1].p, post[i].p) < pocketR(P) + 1.2)) return true;
   return false;
 }
@@ -830,7 +835,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 104;   // one per commit to main
+const BUILD = 105;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -981,7 +986,8 @@ function tableSVG(s, reveal){
   if(reveal){
     const {cb,ob,gb,u,v,n,theta} = s;
     const cueEnd = add(gb, mul(v, 7));
-    o += `<line x1="${f2(ob[0])}" y1="${f2(ob[1])}" x2="${f2(P.t[0])}" y2="${f2(P.t[1])}" stroke="#ffd34d" stroke-width=".3" stroke-dasharray="1 .7"/>`;
+    const pe = pocketEdge(ob, P);
+    o += `<line x1="${f2(ob[0])}" y1="${f2(ob[1])}" x2="${f2(pe[0])}" y2="${f2(pe[1])}" stroke="#ffd34d" stroke-width=".3" stroke-dasharray="1 .7"/>`;
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, end = add(ob, mul(pk.u2, s.L+3));
       o += `<line x1="${f2(ob[0])}" y1="${f2(ob[1])}" x2="${f2(end[0])}" y2="${f2(end[1])}" stroke="${col}" stroke-width=".3" stroke-dasharray="1 .7"/>`;
@@ -1197,8 +1203,8 @@ function perspSVG(s, reveal, view){
 
   // the correct path to the pocket draws itself from contact on, as if the object ball were rolling along it
   if(reveal || (s.anim && s.anim.run > 0)){
-    const full = len(sub(s.P.t, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed
-    const end = add(s.ob, mul(sub(s.P.t, s.ob), k));
+    const pe = pocketEdge(s.ob, s.P), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
+    const end = add(s.ob, mul(sub(pe, s.ob), k));
     if(k > 0.002) o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[end[0],end[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
   if(reveal){
@@ -1239,8 +1245,9 @@ function perspSVG(s, reveal, view){
   if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [s.gb[0], s.gb[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.9*lA).toFixed(3)}" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="3 4"/>`; }
   // balls, far to near
   const A = s.anim, F = reveal && !A ? s.final : null;
-  const items = tut.on && tut.zb > 0.5 ? [] : [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];   // the tutorial close-up looks from in front of the cue ball
-  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A && A.obZ < R ? 1 : A ? A.obScale : 1, z: A ? A.obZ : R, shadow: A ? A.obShadow : 1});
+  const cbP = A ? A.cb : F ? F.cb : s.cb;   // null once the cue ball has dropped into a pocket
+  const items = tut.on && tut.zb > 0.5 || !cbP ? [] : [{p: cbP, kind:'cb', z: A && A.cbZ != null ? Math.min(R, A.cbZ) : R, shadow: A && A.cbShadow != null ? A.cbShadow : 1, pocket: A && A.cbPocket}];   // the tutorial close-up looks from in front of the cue ball
+  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A && A.obZ < R ? 1 : A ? A.obScale : 1, z: A ? A.obZ : R, shadow: A ? A.obShadow : 1, pocket: A && A.obPocket});
   // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
@@ -1265,7 +1272,7 @@ function perspSVG(s, reveal, view){
     if(it.kind==='cb'){
       // red dots on the cue ball: they turn with its spin, so you can see the stun
       const sp = A ? A.spin : F ? F.spin : null;
-      const C = [it.p[0], it.p[1], R], toE = norm3([cam.E[0]-C[0], cam.E[1]-C[1], cam.E[2]-C[2]]);
+      const C = [it.p[0], it.p[1], it.z ?? R], toE = norm3([cam.E[0]-C[0], cam.E[1]-C[1], cam.E[2]-C[2]]);
       let dots = '';
       for(const d0 of CB_DOTS){
         const d = cbSpin(d0, sp), facing = d[0]*toE[0] + d[1]*toE[1] + d[2]*toE[2];
@@ -1295,7 +1302,7 @@ function perspSVG(s, reveal, view){
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#shine)"/>`;
     if((it.z ?? R) < R - 0.01){
       // dropping into the pocket: only what's inside the hole's opening shows, and it darkens as it goes down
-      const P = s.P, rr = pocketR(P), ring = z => Array.from({length:28}, (_, k)=>{ const a = k/28*2*Math.PI; return [P.c[0]+rr*Math.cos(a), P.c[1]+rr*Math.sin(a), z]; });
+      const P = it.pocket || s.P, rr = pocketR(P), ring = z => Array.from({length:28}, (_, k)=>{ const a = k/28*2*Math.PI; return [P.c[0]+rr*Math.cos(a), P.c[1]+rr*Math.sin(a), z]; });
       const hull = convexHull([...ring(0), ...ring(1.6)].map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj));
       const dark = Math.min(.9, (R - it.z)/(3*R));
       const ball = o.slice(ballStart);
@@ -1881,6 +1888,9 @@ function rollOut(v0){
 // ---------- the cue ball, simulated: hit 2/5 of a radius above centre it rolls from the start; after contact it keeps that roll,
 // so its path bends forward off the tangent line before it rolls straight (the natural-roll path) ----------
 const CUE_TIP = [0, .4];   // where the tip strikes, in radii from centre (x right, y up): natural roll
+// cushions (approximate): the speed into the rail comes back at CUSH_E of itself; the ball keeps its speed along the rail,
+// and keeps CUSH_SPIN of its roll into the rail, so a rolling ball bends again as it comes off
+const CUSH_E = .75, CUSH_SPIN = .6;
 const I3 = [[1,0,0],[0,1,0],[0,0,1]];
 function matRot(M, k, a){   // rotation by a about unit axis k, applied after M
   const c = Math.cos(a), sn = Math.sin(a), C = 1 - c, [x, y, z] = k;
@@ -1889,37 +1899,52 @@ function matRot(M, k, a){   // rotation by a about unit axis k, applied after M
 }
 const matVec = (M, v) => M.map(row=>row[0]*v[0] + row[1]*v[1] + row[2]*v[2]);
 function tipSpeed(Vc, d1){ return Math.sqrt(Vc*Vc + 2*A_ROLL*d1); }   // how hard it's hit so it arrives rolling at the object ball at Vc
+// One ball rolling free on the table: cloth friction, rebounds off the cushions, and the pockets.
+// Starts at p with velocity v and spin rv (the speed its surface turns at, as a table vector: rolling when rv = v).
+function simBall(p, v, rv, t, M, dt, withSpin, pts){
+  const bounces = [];
+  let pocket = null;
+  for(let k=0; k<12000; k++){
+    const u = sub(v, rv), ul = len(u);
+    if(ul > 0.05){   // sliding: it slows and its spin catches up, until it rolls
+      const uh = mul(u, 1/ul);
+      v = sub(v, mul(uh, MU_G*dt)); rv = add(rv, mul(uh, 2.5*MU_G*dt));
+      if(dot(sub(v, rv), uh) <= 0) rv = [...v];
+    } else { const vl = len(v); v = vl <= A_ROLL*dt ? [0,0] : mul(v, (vl - A_ROLL*dt)/vl); rv = [...v]; }
+    p = add(p, mul(v, dt)); t += dt;
+    if(withSpin){ const w = [-rv[1]/R, rv[0]/R, 0], wl = Math.hypot(w[0], w[1]); if(wl > 1e-9) M = matRot(M, [w[0]/wl, w[1]/wl, 0], wl*dt); }
+    pocket = POCKETS.find(P => len(sub(p, P.c)) < pocketR(P) - 0.3) || null;   // its centre is over the hole: it drops
+    if(pocket){ pts.push({t, p:[...p], M}); return {pts, bounces, pocket, v, end: pts[pts.length-1]}; }
+    for(const k of [0, 1]){   // off the cushions
+      const lo = R, hi = (k ? H : W) - R;
+      if(p[k] < lo || p[k] > hi){
+        const wall = p[k] < lo ? lo : hi;
+        p[k] = 2*wall - p[k]; bounces.push({t, vn: Math.abs(v[k])});
+        v[k] = -CUSH_E*v[k]; rv[k] = CUSH_SPIN*rv[k];
+      }
+    }
+    pts.push({t, p:[...p], M});
+    if(len(v) < 0.2) break;
+  }
+  return {pts, bounces, pocket, v, end: pts[pts.length-1]};
+}
 function simCue(s, g2, withSpin){
   const cb0 = s.cb, n2 = norm(sub(s.ob, g2)), d1 = len(sub(g2, cb0)), dA = d1 > 1e-6 ? mul(sub(g2, cb0), 1/d1) : [0,1];
   const Vc = contactSpeed(s), v0 = tipSpeed(Vc, d1), dt = withSpin ? 1/240 : 1/100;
-  let p = [...cb0], v = mul(dA, v0), rv = mul(dA, v0), t = 0, contact = d1 < 1e-6, T1 = 0, M = I3, rail = false;
-  const pts = [{t:0, p:[...p], M}];
-  for(let k=0; k<6000; k++){
-    // friction: while the ball slides (its speed and its spin disagree), it slows and its spin catches up; then it rolls
-    const u = sub(v, rv), ul = len(u);
-    if(ul > 0.05){
-      const uh = mul(u, 1/ul);
-      v = sub(v, mul(uh, MU_G*dt)); rv = add(rv, mul(uh, 2.5*MU_G*dt));
-      if(dot(sub(v, rv), uh) <= 0) rv = [...v];                    // slip gone: rolling
-    } else { const vl = len(v); v = vl <= A_ROLL*dt ? [0,0] : mul(v, (vl - A_ROLL*dt)/vl); rv = [...v]; }
-    let step = mul(v, dt), f = 1;
-    if(!contact){
-      const along = dot(sub(p, cb0), dA), da = dot(step, dA);
-      if(along + da >= d1){ f = Math.max(0, Math.min(1, (d1 - along)/Math.max(1e-9, da))); step = mul(step, f); }
-    }
-    p = add(p, step); t += dt*f;
-    if(withSpin){ const w = [-rv[1]/R, rv[0]/R, 0], wl = Math.hypot(w[0], w[1]); if(wl > 1e-9) M = matRot(M, [w[0]/wl, w[1]/wl, 0], wl*dt*f); }
-    if(!contact && f < 1){                                          // the hit: the object ball takes the speed along the line of centres
-      contact = true; T1 = t; p = [...g2]; v = sub(v, mul(n2, dot(v, n2)));
-      pts.push({t, p:[...p], M, hit:1}); continue;
-    }
-    if(contact){
-      if(p[0] < R || p[0] > W-R || p[1] < R || p[1] > H-R){ p = [Math.max(R, Math.min(W-R, p[0])), Math.max(R, Math.min(H-R, p[1]))]; rail = true; pts.push({t, p:[...p], M}); break; }
-      if(len(v) < 0.2){ pts.push({t, p:[...p], M}); break; }
-    }
-    pts.push({t, p:[...p], M});
+  // to the object ball: rolling in a straight line, slowing only by rolling resistance
+  const pts = [{t:0, p:[...cb0], M:I3}];
+  let M = I3, t = 0;
+  const T1 = (v0 - Vc)/A_ROLL, steps = Math.max(1, Math.ceil(T1/dt));
+  for(let k=1; k<=steps; k++){
+    const tk = T1*k/steps, x = v0*tk - A_ROLL*tk*tk/2, vk = v0 - A_ROLL*tk;
+    if(withSpin) M = matRot(M, [-dA[1], dA[0], 0], (x - (v0*t - A_ROLL*t*t/2))/R);
+    t = tk; pts.push({t, p: add(cb0, mul(dA, Math.min(d1, x))), M});
   }
-  return {pts, T1, rail, end: pts[pts.length-1]};
+  pts[pts.length-1].p = [...g2]; pts[pts.length-1].hit = 1;
+  // the hit: the object ball takes the speed along the line of centres; the cue ball keeps its roll
+  const vIn = mul(dA, Vc), v = sub(vIn, mul(n2, dot(vIn, n2)));
+  const r = simBall([...g2], v, vIn, T1, M, dt, withSpin, pts);
+  return {pts, T1, bounces: r.bounces, pocket: r.pocket, vDrop: r.v, end: r.end};
 }
 // the object-ball speed that gets it to a pocket d inches away arriving at about POCKET_ARRIVE in/s ("pocket speed")
 function pocketSpeedFor(d){
@@ -1928,12 +1953,19 @@ function pocketSpeedFor(d){
   if(vRoll*vRoll*k <= d) return vRoll;
   return Math.sqrt(va*va + 2*MU_G*d);                                    // so close it arrives still sliding
 }
+// a ball that's dropped into a pocket: it drifts on a little, falls under gravity, and its shadow slips over the edge
+const G_IN = 386, FALL = Math.sqrt(2*3.2*R/G_IN);
+function dropAt(pc, vd, tau){
+  const vl = len(vd), dir = vl > 1e-6 ? mul(vd, 1/vl) : [0,0];
+  return {p: add(pc, mul(dir, Math.min(vl*tau, 1.4))), z: R - G_IN*tau*tau/2, shadow: Math.max(0, 1 - tau/0.06)};
+}
+function railVol(vn){ return Math.max(.2, Math.min(1, vn/40)); }
 function animateShot(oc, done, obCol){
   const s = shot, cb0 = s.cb, ob0 = s.ob, g2 = oc.g2;
   const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
   const toPocket = dot(sub(s.P.t, ob0), oc.u2);
-  // the cue ball, simulated from the tip to where it stops: rolling, the hit, and its curving path after
-  const sim = simCue(s, g2, true), pts = sim.pts, T1 = sim.T1, tEnd = sim.end.t;
+  // the cue ball, simulated from the tip to where it stops: rolling, the hit, its curving path, the cushions, maybe a pocket
+  const sim = simCue(s, g2, true), pts = sim.pts, T1 = sim.T1;
   const Vc = contactSpeed(s), cosTrue = Math.cos(s.theta*RAD);
   // after contact the object ball leaves along the line of centres at Vc·cos(cut), with no spin: it slides, then rolls
   const cosC = Math.max(0.02, Math.min(1, dot(v2, n2)));
@@ -1941,57 +1973,70 @@ function animateShot(oc, done, obCol){
   const lat = Math.abs(oc.lat ?? 0);
   const sink = oc.made;
   const jawHit = !oc.made && toPocket > 4 && lat < s.tol + 2.4 && mOb.stop >= toPocket - 2.8;
-  let d2;
-  if(sink) d2 = toPocket + 2.6;
-  else if(jawHit) d2 = toPocket - (s.P.side ? 1.6 : 2.8);
-  else d2 = len(sub(rayToCushion(ob0, oc.u2), ob0));
-  const obRail = !sink && !jawHit && mOb.stop >= d2;
-  d2 = Math.min(d2, sink ? d2 : mOb.stop);
-  const obEnd = add(ob0, mul(oc.u2, d2));
+  // a miss that isn't a jaw: the object ball runs free, off the cushions, maybe into another pocket
+  const free = !sink && !jawHit ? simBall([...ob0], mul(oc.u2, Vc*cosC), [0,0], 0, I3, 1/120, false, [{t:0, p:[...ob0]}]) : null;
+  let d2 = sink ? toPocket + 2.6 : jawHit ? toPocket - (s.P.side ? 1.6 : 2.8) : 0;
+  const obEnd = free ? free.end.p : add(ob0, mul(oc.u2, d2));
   const obTime = d => mOb.tFor(Math.min(d, mOb.stop));
-  // into the pocket: once its centre is over the hole it falls under gravity, still drifting forward a little
+  // into the target pocket: once its centre is over the hole it falls under gravity, still drifting forward a little
   let xIn = null;
   if(sink){ const q = sub(ob0, s.P.c), b = dot(q, oc.u2), c = dot(q, q) - (pocketR(s.P) - 0.3)**2, disc = b*b - c; if(disc > 0) xIn = -b - Math.sqrt(disc); }
   if(xIn !== null && xIn < 0) xIn = 0;
-  const tIn = xIn !== null ? obTime(xIn) : null, G = 386, FALL = Math.sqrt(2*3.2*R/G);
-  const T2 = sink && tIn !== null ? tIn + FALL : obTime(d2);
+  const tIn = xIn !== null ? obTime(xIn) : null;
+  const T2 = free ? free.end.t + (free.pocket ? FALL : 0) : sink && tIn !== null ? tIn + FALL : obTime(d2);
+  const tEnd = sim.end.t + (sim.pocket ? FALL : 0);
   const total = Math.max(T1 + T2, tEnd) * 1000 + 280;   // short hold so you see where the balls stopped
+  // sounds: the contact, the pockets, the jaw, and every cushion either ball hits (softer the gentler the hit)
   const plan = [[T1, 'click', 1]];
   if(sink) plan.push([T1 + (tIn !== null ? tIn + FALL*0.7 : obTime(Math.max(0, toPocket - 1.2))), 'drop', 1]);
   else if(jawHit) plan.push([T1 + T2, 'jaw', 1]);
-  else if(obRail) plan.push([T1 + T2, 'rail', 1]);
+  else { free.bounces.forEach(b=>{ if(b.vn >= 3) plan.push([T1 + b.t, 'rail', railVol(b.vn)]); }); if(free.pocket) plan.push([T1 + free.end.t + FALL*0.7, 'drop', 1]); }
+  sim.bounces.forEach(b=>{ if(b.vn >= 3) plan.push([b.t, 'rail', .8*railVol(b.vn)]); });
+  if(sim.pocket) plan.push([sim.end.t + FALL*0.7, 'drop', 1]);
   const bus = tableSounds(plan, s.duck);
-  // the cue ball's trail after contact: a thinned copy of its path
+  // the trails: thinned copies of each ball's path
   const postPts = pts.filter((q, i)=>q.t > T1 && (i % 6 === 0 || i === pts.length-1));
-  const cueAt = t => {   // position and spin at time t, from the simulation
-    if(t >= tEnd) return sim.end;
-    let lo = 0, hi = pts.length - 1;
-    while(hi - lo > 1){ const m = (lo+hi) >> 1; if(pts[m].t <= t) lo = m; else hi = m; }
-    const a = pts[lo], b = pts[hi], k = b.t > a.t ? (t - a.t)/(b.t - a.t) : 0;
+  const obPts = free ? free.pts.filter((q, i)=>i % 3 === 0 || i === free.pts.length-1) : null;
+  const at = (arr, t) => {   // position (and spin) at time t along a simulated path
+    let lo = 0, hi = arr.length - 1;
+    if(t >= arr[hi].t) return arr[hi];
+    while(hi - lo > 1){ const m = (lo+hi) >> 1; if(arr[m].t <= t) lo = m; else hi = m; }
+    const a = arr[lo], b = arr[hi], k = b.t > a.t ? (t - a.t)/(b.t - a.t) : 0;
     return {p: add(a.p, mul(sub(b.p, a.p), k)), M: a.M};
+  };
+  const cueAt = t => {
+    if(sim.pocket && t > sim.end.t){ const d = dropAt(sim.end.p, sim.vDrop, t - sim.end.t); return {p: d.z < -3*R ? null : d.p, z: d.z, shadow: d.shadow, M: sim.end.M}; }
+    return at(pts, t);
   };
   const t0 = performance.now();
   const frame = now => {
     if(!anim) return;
     const t = (now - t0) / 1000;
-    let ob = ob0, obScale = 1, obZ = R, obShadow = 1;
+    let ob = ob0, obScale = 1, obZ = R, obShadow = 1, obPocket = null, obTrail = null;
     const c = cueAt(t), cb = c.p;
     if(t >= T1){
-      let x2 = Math.min(d2, mOb.x(t-T1));
-      if(sink && tIn !== null){
-        x2 = Math.min(x2, xIn + 1.4);                                   // the pocket's back stops its forward drift
-        const tf = (t - T1) - tIn; if(tf > 0) obZ = R - G*tf*tf/2;       // gravity
-        obShadow = Math.max(0, Math.min(1, (xIn - x2)/1.2 + 1));          // the shadow slips over the edge first
-        if(obZ < -3*R) obScale = 0;
-      } else if(sink){ const past = x2 - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
-      ob = add(ob0, mul(oc.u2, x2));
+      const tau = t - T1;
+      if(free){
+        if(free.pocket && tau > free.end.t){ const d = dropAt(free.end.p, free.v, tau - free.end.t); ob = d.p; obZ = d.z; obShadow = d.shadow; obPocket = free.pocket; if(obZ < -3*R) obScale = 0; }
+        else ob = at(free.pts, tau).p;
+        obTrail = [...obPts.filter(q=>q.t <= tau).map(q=>q.p), ob];
+      } else {
+        let x2 = Math.min(d2, mOb.x(tau));
+        if(sink && tIn !== null){
+          x2 = Math.min(x2, xIn + 1.4);                                   // the pocket's back stops its forward drift
+          const tf = tau - tIn; if(tf > 0) obZ = R - G_IN*tf*tf/2;         // gravity
+          obShadow = Math.max(0, Math.min(1, (xIn - x2)/1.2 + 1));          // the shadow slips over the edge first
+          if(obZ < -3*R) obScale = 0;
+        } else if(sink){ const past = x2 - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
+        ob = add(ob0, mul(oc.u2, x2)); obTrail = [ob0, ob];
+      }
     }
-    s.anim = {cb, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, run: t < T1 ? 0 : mIdeal.x(t-T1),
-      trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, ...postPts.filter(q=>q.t <= t).map(q=>q.p), cb], ob: t < T1 ? null : [ob0, ob], obCol}};
+    s.anim = {cb, cbZ: c.z, cbShadow: c.shadow, cbPocket: sim.pocket, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, obPocket, run: t < T1 ? 0 : mIdeal.x(t-T1),
+      trail: {cb: t < T1 ? [cb0, ...(cb ? [cb] : [])] : [cb0, g2, ...postPts.filter(q=>q.t <= t).map(q=>q.p), ...(cb ? [cb] : [])], ob: obTrail, obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
-  s.final = {cb: sim.end.p, spin: {M: sim.end.M}, ob: sink ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, ...postPts.map(q=>q.p)]}};
+  s.final = {cb: sim.pocket ? null : sim.end.p, spin: {M: sim.end.M}, ob: sink || (free && free.pocket) ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, ...postPts.map(q=>q.p)]}};
   anim = {done, t0, total, bus, raf: requestAnimationFrame(frame)};
 }
 function finishAnim(){
