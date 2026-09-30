@@ -2270,7 +2270,8 @@ let forceFrac = null;
 function tutShot(id){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   forceFrac = id;
-  let s1 = null; for(let k=0; k<40 && (!s1 || s1.answer.id !== id); k++) s1 = generate();
+  let s1 = null;
+  for(let k=0; k<200; k++){ const c = generate(); if(c.answer.id !== id) continue; s1 = c; if(c.L >= 16 && len(sub(c.ob, c.cb)) >= 14) break; }   // keep the balls apart and off the pocket, so the labels read
   forceFrac = null;
   shot = s1; shot.t0 = performance.now();
   shot.color = pick([OB_COLORS[1], OB_COLORS[2], OB_COLORS[3], OB_COLORS[5]]);   // never yellow: the lit-up overlap is yellow
@@ -2342,21 +2343,37 @@ function tutLayer(cam, s, reveal){
   const st = tstep(); let o = '';
   const scr = P3 => { const c = cam.toCam(P3); return c[2] > NEAR ? [...cam.proj(c), cam.focal*R/c[2]] : null; };
   const halo = 'stroke="#0a1a28" stroke-width="4" paint-order="stroke" stroke-linejoin="round"';
-  const label = (P3, text, side) => {
-    const p = scr(P3); if(!p) return '';
-    const [x, y, r] = p, dx = (side ?? (x < VW/2 ? -1 : 1))*70, lx = Math.max(60, Math.min(VW-60, x + dx)), ly = Math.max(24, y - 58);
-    const a = Math.atan2(y - ly, x - lx), ex = x - Math.cos(a)*(r+5), ey = y - Math.sin(a)*(r+5);
-    return `<line x1="${lx.toFixed(1)}" y1="${(ly+6).toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#ffd34d" stroke-width="2"/><circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="3" fill="#ffd34d"/>
-      <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="17" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d" ${halo}>${text}</text>`;
-  };
+  // labels: placed one by one around their target, never overlapping each other, a ball, or the edge of the view
+  const FS = 15, targets = [], placed = [];
+  const want = [];
   for(const l of st.labels || []){
-    if(l==='cb') o += label([s.cb[0], s.cb[1], R], 'cue ball', -1);
-    if(l==='ob') o += label([s.ob[0], s.ob[1], R], 'object ball', 1);
-    if(l==='pocket') o += label([s.P.c[0], s.P.c[1], 1.6], 'pocket');
-    if(l==='ghost') o += label([s.gb[0], s.gb[1], R], 'ghost ball', -1);
-    if(l==='line') o += label([(s.cb[0]+s.gb[0])/2, (s.cb[1]+s.gb[1])/2, .03], 'guide line', 1);
-    if(l==='drag') o += `<text x="${VW/2}" y="${VH-28}" text-anchor="middle" font-size="19" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d" ${halo}>⟵ drag to walk around ⟶</text>`;
+    if(l==='pocket') want.push([[s.P.c[0], s.P.c[1], 1.6], 'pocket']);
+    if(l==='ob') want.push([[s.ob[0], s.ob[1], R], 'object ball']);
+    if(l==='cb') want.push([[s.cb[0], s.cb[1], R], 'cue ball']);
+    if(l==='ghost') want.push([[s.gb[0], s.gb[1], R], 'ghost ball']);
+    if(l==='line') want.push([[(s.cb[0]+s.gb[0])/2, (s.cb[1]+s.gb[1])/2, .03], 'guide line']);
   }
+  want.forEach(([P3, t])=>{ const p = scr(P3); if(p) targets.push({x:p[0], y:p[1], r:Math.max(p[2], 6), t}); });
+  const hits = (bx) => placed.some(q => bx.x0 < q.x1 + 6 && bx.x1 > q.x0 - 6 && bx.y0 < q.y1 + 4 && bx.y1 > q.y0 - 4)
+    || targets.some(t => t.x > bx.x0 - t.r - 4 && t.x < bx.x1 + t.r + 4 && t.y > bx.y0 - t.r - 4 && t.y < bx.y1 + t.r + 4);
+  for(const t of targets){
+    const w = t.t.length*FS*0.58, h = FS*1.2;
+    let best = null;
+    for(const dist of [44, 64, 90]) for(const ang of [-135,-45,-160,-20,135,45,180,0,-90,90]){
+      const cx = t.x + Math.cos(ang*RAD)*(t.r + dist), cy = t.y + Math.sin(ang*RAD)*(t.r + dist);
+      const bx = {x0: cx - w/2, x1: cx + w/2, y0: cy - h/2, y1: cy + h/2, cx, cy};
+      if(bx.x0 < 6 || bx.x1 > VW - 6 || bx.y0 < 6 || bx.y1 > VH - 6 || hits(bx)) continue;
+      best = bx; break;
+    }
+    if(!best) continue;
+    placed.push(best);
+    // leader: from the label's edge to just short of the target
+    const a = Math.atan2(t.y - best.cy, t.x - best.cx), k = Math.min(Math.abs((w/2+3)/(Math.cos(a)||1e-6)), Math.abs((h/2+3)/(Math.sin(a)||1e-6)));
+    const sx = best.cx + Math.cos(a)*k, sy = best.cy + Math.sin(a)*k, ex = t.x - Math.cos(a)*(t.r + 4), ey = t.y - Math.sin(a)*(t.r + 4);
+    o += `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" stroke="#ffd34d" stroke-width="1.5"/><circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="2.5" fill="#ffd34d"/>
+      <text x="${best.cx.toFixed(1)}" y="${(best.cy + FS*0.36).toFixed(1)}" text-anchor="middle" font-size="${FS}" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d" ${halo}>${t.t}</text>`;
+  }
+  if((st.labels || []).includes('drag')) o += `<text x="${VW/2}" y="${VH-28}" text-anchor="middle" font-size="17" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d" ${halo}>⟵ drag to walk around ⟶</text>`;
   if(st.overlap){
     const g = scr([s.gb[0], s.gb[1], R]), b = scr([s.ob[0], s.ob[1], R]);
     if(g && b) o += `<clipPath id="tovl"><circle cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="${b[2].toFixed(1)}"/></clipPath>
