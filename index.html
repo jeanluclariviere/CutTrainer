@@ -201,6 +201,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
 .table-box > svg{display:block;width:100%;height:100%}
+/* the pulsing pocket ring sits in its own layer over the table, so the pulse never repaints the table */
+.table-box > #tablefx{position:absolute;inset:0;pointer-events:none;will-change:opacity}
 .cover{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#10283d;color:#ffd34d;font:700 30px var(--display);letter-spacing:.04em}
 .cover small{font:400 13px var(--body);color:#b9cad6;letter-spacing:0}
 .tablecol{min-width:0}
@@ -416,6 +418,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="tablecol">
       <div class="table-box">
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
+        <svg id="tablefx" class="pulse" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
         <div class="cover" id="cover" hidden>Call it<button class="replay" id="replay" aria-label="Replay the shot"><svg class="replayicon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.5 13.5a8.5 8.5 0 1 0 2.4-7.4L3 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3.5V9h5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">5 left</span></button></div>
         <div class="cover sumcover" id="sesscover" hidden>
           <div class="sumcard">
@@ -835,7 +838,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 110;   // one per commit to main
+const BUILD = 111;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1171,9 +1174,10 @@ function perspSVG(s, reveal, view){
     const segs = tableSegs();
     const ringArc = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
     const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
-    pcache = {key, back: perspBack(cam, s, reveal, segs, ring), front: perspFront(cam, s, reveal, segs, ring)};
+    pcache = {key, back: perspBack(cam, s, reveal, segs, ring), front: perspFront(cam, s, reveal, segs, ring),
+      fx: ring && !reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : ''};
   }
-  return {back: pcache.back, dyn: perspDyn(cam, s, reveal), front: pcache.front, top: perspTop(cam, s, reveal)};
+  return {fx: pcache.fx, back: pcache.back, dyn: perspDyn(cam, s, reveal), front: pcache.front, top: perspTop(cam, s, reveal)};
 }
 function perspBack(cam, s, reveal, segs, ring){
   let o = `<defs>
@@ -1214,7 +1218,7 @@ function perspBack(cam, s, reveal, segs, ring){
   }
   for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
   for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
-  o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
+  o += ring && reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';   // before the call it pulses in #tablefx
 
   return o;
 }
@@ -1354,7 +1358,7 @@ function perspFront(cam, s, reveal, segs, ring){
     for(const p of POCKETS) o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
     for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
     for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
-    o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
+    o += ring && reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
   }
   return o;
 }
@@ -1391,7 +1395,7 @@ function draw(reveal){
   const box = document.querySelector('.table-box'), svg = $('table'), v = settings.view;
   document.querySelector('.main').classList.toggle('persp', v!=='top');
   box.classList.toggle('persp', v!=='top');
-  if(v==='top'){ svg.setAttribute('viewBox', viewBoxFor(shot)); svg.innerHTML = tableSVG(shot, reveal); }
+  if(v==='top'){ svg.setAttribute('viewBox', viewBoxFor(shot)); svg.innerHTML = tableSVG(shot, reveal); $('tablefx').innerHTML = ''; layerHTML.fx = ''; }
   else {
     if(vbDirty) fitViewBox();
     const vb = `0 0 ${VW} ${VH}`; if(svg.getAttribute('viewBox') !== vb) svg.setAttribute('viewBox', vb);
@@ -1399,6 +1403,9 @@ function draw(reveal){
     if(!svg.querySelector(':scope > #lyD')){ svg.innerHTML = '<g id="lyB"></g><g id="lyD"></g><g id="lyF"></g><g id="lyT"></g>'; layerHTML = {}; }
     for(const [id, html] of [['lyB', L.back], ['lyD', L.dyn], ['lyF', L.front], ['lyT', L.top]])
       if(layerHTML[id] !== html){ svg.querySelector('#' + id).innerHTML = html; layerHTML[id] = html; }   // only the layers that changed
+    const fx = $('tablefx');
+    if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
+    if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
   }
 }
 let layerHTML = {}, vbDirty = true;
