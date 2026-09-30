@@ -1874,7 +1874,8 @@ function animateShot(oc, done, obCol){
   const spinA = t => -(V/R)*(t - t*t/(2*T1));                     // backspin angle, slowing to a stop at contact
   const ALPHA = 150;                                               // rad/s²: how fast friction spins the sliding ball up
   const tRoll = vCb/R/(ALPHA + aCb/R);                             // when sliding turns into rolling
-  const spinC = t => d3 <= 0.01 ? 0 : t <= tRoll ? ALPHA*t*t/2 : ALPHA*tRoll*tRoll/2 + (xAt(vCb, aCb, Math.min(t, T3), d3) - xAt(vCb, aCb, tRoll, d3))/R;
+  const spinC = t => (t = Math.min(t, T3), d3 <= 0.01) ? 0 : t <= tRoll ?   // stops turning when the cue ball stops (at the cushion or wherever it ends)
+    ALPHA*t*t/2 : ALPHA*tRoll*tRoll/2 + (xAt(vCb, aCb, Math.min(t, T3), d3) - xAt(vCb, aCb, tRoll, d3))/R;
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
   const cbRail = tl > 0.05 && len(sub(rayToCushion(g2, mul(tan, 1/tl)), cbEnd)) < 0.5;   // the cue ball's path reached a cushion
   const bus = tableSounds(shotPlan(s, oc, T1, sink ? tAt(vOb, aOb, Math.max(0, toPocket - 1.2)) : T2, T3, cbRail, jawHit), s.duck);
