@@ -201,7 +201,6 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .q{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.15;margin:0}
 .q small{display:block;font-family:var(--body);font-weight:400;font-size:14px;color:var(--muted);margin-top:4px}
 .answers{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.answers.eight{grid-template-columns:repeat(4,1fr)}
 .answers button{font-family:var(--display);font-weight:700;font-size:28px;line-height:1;padding:12px 0 8px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:border-color .12s,background .12s}
 .answers button span{font:500 11px var(--mono);color:var(--muted);letter-spacing:.02em}
 .answers button:hover:not(:disabled){border-color:var(--accent)}
@@ -533,7 +532,7 @@ const TABLES = {'7':[39,78], '8':[44,88], '9':[50,100]};
 const POCKET_SIZES = {bar:[5,5.5], std:[4.5,5], tight:[4.25,4.75], pro:[4,4.5]};
 let W = 50, H = 100, PK = POCKET_SIZES.std;
 const RAD = Math.PI/180;
-// Every fraction, fullest first. The five core ones are the whole game until B; from B it's all eight, at any angle.
+// Every fraction, fullest first. You call the five core ones; the eighths only remain so older stats still show.
 const ALL = [
   {id:'full', label:'Full', f:1, core:1},
   {id:'78', label:'⅞', f:.875},
@@ -616,7 +615,7 @@ function weightedIndex(w){
 }
 function chooseAim(i){
   const r = REFS[i];
-  if(eighthsOn()){ const [lo, hi] = BOUNDS[i]; return rnd(lo > 0 ? lo + 1 : 0, hi - 1); }   // any angle, but never within 1° of a boundary: every answer is clear
+  if(anyOn()){ const [lo, hi] = BOUNDS[i]; return rnd(lo > 0 ? lo + 1 : 0, hi - 1); }   // any angle, but never within 1° of a boundary: every answer is clear
   return r.id==='full' ? rnd(0,1) : r.deg + rnd(-1,1);
 }
 
@@ -666,10 +665,11 @@ function generate(){
     if(segDist(cb, ob, P.t) < 2*R+0.4) continue;
     if(len(sub(cb,ob)) < 4*R) continue;
     const right = [-v[1], v[0]];
-    const cand = {any: eighthsOn(), len:lenCls, theta:phi, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
+    const cand = {any: anyOn(), len:lenCls, theta:phi, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
       L: dist, tol: pocketTol(P,u), side: dot(u,right)>0?'R':'L',
       color: pick(OB_COLORS), answer: nearestRef(phi), pick:null};
     if(!fallback) fallback = cand;
+    if(cand.any && !outcome(cand, cand.answer.deg).made) continue;   // any angle: only cuts the plain fraction still pockets
     if(cueScratches(cand)) continue;                   // don't deal shots where the cue ball rolls into a pocket
     if(Math.abs(u[0]) > 0.85 && dist > W*0.55) continue;   // no long runs across the table along an end rail: that layout only ever came up as a thin cut, so it gave the answer away
     if(pocketInView(cand)) return cand;
@@ -694,7 +694,7 @@ const AID_TIP = {
   walk: 'Drag the table to walk around the shot and see it from other angles.',
 };
 const FAST_FLASH_AT = 6;
-const EIGHTHS_AT = 7;                                        // from B: any angle, eight fractions                                      // 0.75 s Flash opens at B-
+const ANY_AT = 7;                                            // from B: cuts at any angle (the right call always pockets)                                      // 0.75 s Flash opens at B-
 const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
 const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
 const baselines = () => (stats.sessions||[]).filter(x=>x.base);
@@ -705,7 +705,7 @@ const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
 const longShare = () => !adaptiveOn() || level()===null ? 0.5 : 0.25 + 0.05*level();   // D- 25% long shots … A+ 80%
 const leanK = () => 0.5 + (level()||0)*(1.5/11);                                       // how hard it leans on weak spots
 const aidLocked = key => baseRun() || (level()!==null && level() >= AID_LOCK[key]);
-const eighthsOn = () => adaptiveOn() && level()!==null && level() >= EIGHTHS_AT;
+const anyOn = () => adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
 function enforceLocks(){
   if(baseRun()) return;
@@ -739,8 +739,8 @@ function showLevel(d, from){
   for(const k in AID_LOCK){ const at = AID_LOCK[k]; if(from < at && to >= at) notes.push(`🔒 ${AID_NAME[k]}`); if(from >= at && to < at) notes.push(`${AID_NAME[k]} unlocked`); }
   if(from < FAST_FLASH_AT && to >= FAST_FLASH_AT) notes.push('⚡️ 0.75 s Flash unlocked');
   if(from >= FAST_FLASH_AT && to < FAST_FLASH_AT) notes.push('🔒 0.75 s Flash');
-  if(from < EIGHTHS_AT && to >= EIGHTHS_AT) notes.push('⅝ Eighths, any angle');
-  if(from >= EIGHTHS_AT && to < EIGHTHS_AT) notes.push('Back to five fractions');
+  if(from < ANY_AT && to >= ANY_AT) notes.push('📐 Any angle');
+  if(from >= ANY_AT && to < ANY_AT) notes.push('Cuts back on the fractions');
   enforceLocks(); syncPressed(); renderBadge(true);
   $('lvlhead').textContent = d > 0 ? 'Level up' : 'Down a grade';
   $('lvlgrade').textContent = GRADES[to];
@@ -766,7 +766,7 @@ function weakModel(){
   const shrink = (t, prior, w) => (t.x + w*prior)/(t.n + w);
   const byFrac = tally(e=>e.a), byDist = tally(e=>distBin(e.dc)), byCell = tally(entryCell);
   const ratio = {};
-  ALL.forEach(r=>[0,1,2].forEach(d=>{
+  CORE.forEach(r=>[0,1,2].forEach(d=>{
     // with few shots in a cell, lean on how you do with that fraction and that distance generally
     const rf = shrink(byFrac[r.id] || {n:0,x:0}, m, 8)/m, rd = shrink(byDist[d] || {n:0,x:0}, m, 8)/m;
     const prior = Math.min(0.95, m*rf*rd);
@@ -1873,10 +1873,8 @@ function applySetting(key, val){
 document.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click', ()=>applySetting(b.dataset.set, b.dataset.val)));
 
 function syncRefs(){
-  const want = eighthsOn() ? ALL : CORE;
-  if(want === REFS && $('answers').children.length) return;
-  REFS = want; BOUNDS = boundsFor(REFS);
-  $('answers').classList.toggle('eight', REFS.length > 5);
+  if($('answers').children.length) return;
+  REFS = CORE; BOUNDS = boundsFor(REFS);
   $('answers').innerHTML = REFS.map((r,i)=>`<button data-id="${r.id}" id="ans-${r.id}" aria-label="${r.label} ball, key ${i+1}"><kbd class="key" aria-hidden="true">${i+1}</kbd>${r.label}<span>${r.deg.toFixed(r.deg%1?1:0)}°</span></button>`).join('');
 }
 syncRefs();
@@ -2028,7 +2026,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, eighthsOn, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
