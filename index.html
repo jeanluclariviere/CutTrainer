@@ -595,7 +595,9 @@ BOUNDS = boundsFor(REFS);
 const VIEW_LABEL = {top:'Overhead', stand:'Standing', down:'Down on the ball'};
 const OB_COLORS = [['#f2b705','1'],['#1f4fbf','2'],['#d22b2b','3'],['#6b2fa0','4'],['#f07a12','5'],['#1d8a4a','6'],['#8a1f24','7']];
 let POCKETS = [];
+let curTable = null;
 function setTable(size, pockets){
+  curTable = TABLES[size] ? size : '9';
   [W, H] = TABLES[size] || TABLES['9'];
   PK = POCKET_SIZES[pockets] || POCKET_SIZES.std;
   POCKETS = [
@@ -1337,13 +1339,32 @@ const PLACE_HINT = `Tap or drag around the object ball to set the ghost ball. Fi
 const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?'};
 const tableBox = document.querySelector('.table-box');
 
+function packShot(s){
+  const o = {...s, P: POCKETS.indexOf(s.P), answer: s.answer.id, tb: curTable, seenAt: Date.now()};
+  delete o.pick; delete o.anim; delete o.final; delete o.t0; delete o.place;
+  return o;
+}
+function unpackShot(o){
+  if(curTable !== o.tb) setTable(o.tb, settings.pockets);
+  const s = {...o, P: POCKETS[o.P], answer: ALL.find(r=>r.id===o.answer), pick: null};
+  delete s.tb; delete s.seenAt;
+  return s;
+}
 function deal(){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   walk = null; walkDrag = null;
   if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
   syncRefs();
-  shot = dealShot();
-  shot.t0 = performance.now(); scheduleFades();
+  // A session keeps its unanswered shot: reloading, or changing a setting, brings back the same shot instead of a new one.
+  const act = stats.active && stats.active.task===settings.task ? stats.active : null;
+  const kept = act && act.pending ? unpackShot(act.pending) : null;
+  if(kept){ shot = kept; shot.t0 = performance.now() - Math.max(0, Date.now() - act.pending.seenAt); }
+  else {
+    if(curTable !== settings.table) setTable(settings.table, settings.pockets);
+    shot = dealShot(); shot.t0 = performance.now();
+    if(act){ act.pending = packShot(shot); save(); }
+  }
+  scheduleFades();
   answered = false;
   draw(false);
   document.querySelectorAll('#answers button, #mods button').forEach(b=>{b.disabled=false;b.className='';});
@@ -1355,7 +1376,12 @@ function deal(){
   tableBox.classList.remove('tappable');
   tableBox.classList.toggle('placing', isPlace());
   updateControls();
-  if(settings.task==='flash' && stats.active && stats.active.task==='flash') startFlash(); else endFlash();   // the flash timer only runs inside a session
+  if(settings.task==='flash' && stats.active && stats.active.task==='flash'){   // the flash timer only runs inside a session
+    if(kept){   // you've already seen this one: a second look costs a replay, and with none left it comes back covered
+      if(replaysLeft() > 0){ stats.active.replays = (stats.active.replays||0) + 1; shot.replays = (shot.replays||0) + 1; save(); startFlash(); }
+      else { endFlash(); $('cover').hidden = false; syncReplay(); }
+    } else startFlash();
+  } else endFlash();
   showSessIdle();
 }
 // fading aids: redraw while they fade out (only before you answer)
@@ -1671,6 +1697,7 @@ function answer(id, mod){
   else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
   else thock(counted);
   logEntry({p:id, m:counted?1:0, ...(phys ? {pm:mod} : {})});
+  if(stats.active && stats.active.pending) delete stats.active.pending;
   if(!aided && settings.task==='sess' && level()!==null && stats.active && stats.active.task==='sess' && !stats.active.base){
     const from = level(); stats.level.bestBefore = bestLevel(); const d = levelPoint(ok);
     if(d) setTimeout(()=>showLevel(d, from), 350); else renderBadge();
@@ -2064,9 +2091,9 @@ function applySetting(key, val){
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
-  else if(key==='view' || key==='cam'){ if(shot && !answered) deal(); else if(shot) draw(answered); }
-  else if(key==='table' || key==='pockets'){ setTable(settings.table, settings.pockets); deal(); }
-  else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();
+  else if(key==='view' || key==='cam'){ if(shot) draw(answered); }   // same shot, new viewpoint
+  else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
+  else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
   renderStats();
 }
 document.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click', ()=>applySetting(b.dataset.set, b.dataset.val)));
