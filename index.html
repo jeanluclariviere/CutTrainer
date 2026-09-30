@@ -856,7 +856,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 126;   // one per commit to main
+const BUILD = 127;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1201,6 +1201,19 @@ function perspSVG(s, reveal, view){
   }
   return {fx: pcache.fx, back: pcache.back, dyn: perspDyn(cam, s, reveal), front: pcache.front, top: perspTop(cam, s, reveal)};
 }
+// the jaws: the cushion carried round from each point into the pocket, face and top, in cushion blue
+function jawsSVG(cam, onlySide){
+  let o = '';
+  for(const g of railGeom()) if(g.jaw && (!onlySide || (g.n[0] === onlySide[0] && g.n[1] === onlySide[1]))){
+    const f = norm(sub(g.b, g.a)), depth = Math.min(len(sub(g.b, g.a)), 1.6/Math.max(.1, dot(f, g.out))), b = add(g.a, mul(f, depth));
+    const fn = [-f[1], f[0]], face = dot(fn, g.away) < 0 ? fn : mul(fn, -1), mid = mul(add(g.a, b), .5);
+    if(face[0]*(cam.E[0]-mid[0]) + face[1]*(cam.E[1]-mid[1]) > 0)   // the face looks into the pocket: drawn when it faces you
+      o += `<path d="${polyD(cam,[[g.a[0],g.a[1],0],[b[0],b[1],0],[b[0],b[1],1.5],[g.a[0],g.a[1],1.5]])}" fill="#16446d"/>`;
+    const r = add(g.a, mul(g.out, 1.6));
+    o += `<path d="${polyD(cam,[[g.a[0],g.a[1],1.5],[b[0],b[1],1.5],[r[0],r[1],1.5]])}" fill="#1d5a8f"/>`;
+  }
+  return o;
+}
 function perspBack(cam, s, reveal, segs, ring){
   let o = `<defs>
     <linearGradient id="pfelt" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stop-color="#1b5286"/><stop offset="1" stop-color="#2b76b4"/></linearGradient>
@@ -1238,6 +1251,7 @@ function perspBack(cam, s, reveal, segs, ring){
   for(const p of POCKETS){
     o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
   }
+  o += jawsSVG(cam);
   for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
   for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
   o += ring && reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';   // before the call it sits in #tablefx
@@ -1379,6 +1393,7 @@ function perspFront(cam, s, reveal, segs, ring){
       o += `<path d="${polyD(cam, sd.rail.map(q=>[q[0],q[1],1.6]))}" fill="#3a2618"/>`;
     }
     for(const p of POCKETS) o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
+    for(const sd of near) o += jawsSVG(cam, sd.n);
     for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
     for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
     o += ring && reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
@@ -1997,7 +2012,7 @@ function railGeom(){
     for(const [pt, other] of [[a, b], [b, a]]){
       const away = norm(sub(other, pt)), out = mul(n, -1);
       const corner = [[0,0],[W,0],[0,H],[W,H]].some(c=>len(sub(c, pt)) < 5), J = (corner ? 142 : 104)*RAD;
-      segs.push({a: pt, b: add(pt, mul(add(mul(away, Math.cos(J)), mul(out, Math.sin(J))), 2.2)), jaw:true});
+      segs.push({a: pt, b: add(pt, mul(add(mul(away, Math.cos(J)), mul(out, Math.sin(J))), 2.2)), jaw:true, away, out, n});
     }
   }
   railCache = {key, segs};
@@ -2064,9 +2079,10 @@ function pocketSpeedFor(d){
 }
 // a ball that's dropped into a pocket: it drifts on a little, falls under gravity, and its shadow slips over the edge
 const G_IN = 386, FALL = Math.sqrt(2*3.2*R/G_IN);
-function dropAt(pc, vd, tau){
-  const vl = len(vd), dir = vl > 1e-6 ? mul(vd, 1/vl) : [0,0];
-  return {p: add(pc, mul(dir, Math.min(vl*tau, 1.4))), z: R - G_IN*tau*tau/2, shadow: Math.max(0, 1 - tau/0.06)};
+function dropAt(pc, vd, tau, P){   // a ball that has dropped: it drifts on toward the middle of the hole (never back out over the rail), falls under gravity, and its shadow slips over the edge
+  const toward = P ? sub(holeOf(P).c, pc) : vd, dl = len(toward), dir = dl > 1e-6 ? mul(toward, 1/dl) : [0,0];
+  const reach = P ? Math.min(1.4, dl) : 1.4;
+  return {p: add(pc, mul(dir, Math.min(Math.max(8, len(vd))*tau, reach))), z: R - G_IN*tau*tau/2, shadow: Math.max(0, 1 - tau/0.06)};
 }
 function railVol(vn){ return Math.max(.2, Math.min(1, vn/40)); }
 function animateShot(oc, done, obCol){
@@ -2104,7 +2120,7 @@ function animateShot(oc, done, obCol){
     return {p: add(a.p, mul(sub(b.p, a.p), k)), M: a.M};
   };
   const cueAt = t => {
-    if(sim.pocket && t > sim.end.t){ const d = dropAt(sim.end.p, sim.vDrop, t - sim.end.t); return {p: d.z < -3*R ? null : d.p, z: d.z, shadow: d.shadow, M: sim.end.M}; }
+    if(sim.pocket && t > sim.end.t){ const d = dropAt(sim.end.p, sim.vDrop, t - sim.end.t, sim.pocket); return {p: d.z < -3*R ? null : d.p, z: d.z, shadow: d.shadow, M: sim.end.M}; }
     return at(pts, t);
   };
   const t0 = performance.now();
@@ -2114,13 +2130,13 @@ function animateShot(oc, done, obCol){
     let ob = ob0, obScale = 1, obZ = R, obShadow = 1, obPocket = null, obTrail = null, obGhost = null;
     if(rightSim && t >= T1){
       const tau = t - T1;
-      if(rightSim.pocket && tau > rightSim.end.t){ const d = dropAt(rightSim.end.p, rightSim.v, tau - rightSim.end.t); if(d.z > -3*R) obGhost = d; }
+      if(rightSim.pocket && tau > rightSim.end.t){ const d = dropAt(rightSim.end.p, rightSim.v, tau - rightSim.end.t, rightSim.pocket); if(d.z > -3*R) obGhost = d; }
       else obGhost = {p: at(rightSim.pts, tau).p, z: R, shadow: 1};
     }
     const c = cueAt(t), cb = c.p;
     if(t >= T1){
       const tau = t - T1;
-      if(free.pocket && tau > free.end.t){ const d = dropAt(free.end.p, free.v, tau - free.end.t); ob = d.p; obZ = d.z; obShadow = d.shadow; obPocket = free.pocket; if(obZ < -3*R) obScale = 0; }
+      if(free.pocket && tau > free.end.t){ const d = dropAt(free.end.p, free.v, tau - free.end.t, free.pocket); ob = d.p; obZ = d.z; obShadow = d.shadow; obPocket = free.pocket; if(obZ < -3*R) obScale = 0; }
       else ob = at(free.pts, tau).p;
       obTrail = [...obPts.filter(q=>q.t <= tau).map(q=>q.p), ob];
     }
@@ -2453,9 +2469,9 @@ function nextShot(){
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) shoot(); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
 function walkOn(){ return (settings.task==='call' || settings.task==='sess') && !baseRun(); }   // always on, except during the baseline
-function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
+function walkRedraw(){ if(walkRaf || anim) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }   // while a shot runs, its own frames redraw
 svgEl.addEventListener('pointerdown', ev=>{
-  if(anim || !walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
+  if(!walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
   // a drag across the full width of the table swings you half way round the object ball
   walkDrag = {x: ev.clientX, y: ev.clientY, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth), kv: (12*RAD) / Math.max(150, svgEl.clientHeight*0.45)};
 });
@@ -2478,14 +2494,14 @@ function walkRelease(){
     if(!walk) return;
     const u = Math.min(1, (now-start)/dur), ease = 1-Math.pow(1-u,3);
     walk.blend = from*(1-ease);
-    if(shot) draw(answered);
-    if(u < 1) requestAnimationFrame(step); else { walk = null; if(shot) draw(answered); }
+    if(shot && !anim) draw(answered);
+    if(u < 1) requestAnimationFrame(step); else { walk = null; if(shot && !anim) draw(answered); }
   };
   requestAnimationFrame(step);
 }
 svgEl.addEventListener('pointerup', walkRelease);
 svgEl.addEventListener('pointercancel', walkRelease);
-tableBox.addEventListener('click', ()=>{ if(anim){ finishAnim(); return; } if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) deal(); });
+tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) deal(); });
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
 const MAX_REPLAYS = 5;   // per Flash session
 function replaysLeft(){ const a = stats.active; return a && a.task==='flash' ? Math.max(0, MAX_REPLAYS - (a.replays||0)) : 0; }
@@ -2820,7 +2836,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, simBall, railGeom, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, simBall, railGeom, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 if(!settings.tut && !(stats.log || []).length && !baselines().length) startTut();   // first visit (no shots yet): the tutorial comes first
