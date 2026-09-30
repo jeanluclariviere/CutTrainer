@@ -1868,10 +1868,10 @@ function animateShot(oc, done, obCol){
   const tAt = (v, a, x) => a < 1e-6 ? x/v : (v - Math.sqrt(Math.max(0, v*v - 2*a*x)))/a;   // time to cover x
   const xAt = (v, a, t, d) => Math.min(d, v*t - a*t*t/2);                                    // distance covered by time t
   const T1 = d1/V, T2 = tAt(vOb, aOb, d2), T3 = d3 > 0.01 ? tAt(vCb, aCb, d3) : 0;
-  // cue ball spin: struck with backspin that wears off exactly at contact (a stun), then the cloth builds forward roll
+  // cue ball spin: none on the way in (it slides), then after contact the cloth builds forward roll
   const dirA = d1 > 0.01 ? mul(sub(g2, cb0), 1/d1) : [0,1], kA = [-dirA[1], dirA[0], 0];
   const dirT = d3 > 0.01 ? mul(sub(cbEnd, g2), 1/d3) : [0,1], kC = [-dirT[1], dirT[0], 0];
-  const spinA = t => -(V/R)*(t - t*t/(2*T1));                     // backspin angle, slowing to a stop at contact
+  const spinA = t => 0;                                            // a firm stun: the cue ball slides to the object ball without turning
   const ALPHA = 150;                                               // rad/s²: how fast friction spins the sliding ball up
   const tRoll = vCb/R/(ALPHA + aCb/R);                             // when sliding turns into rolling
   const spinC = t => (t = Math.min(t, T3), d3 <= 0.01) ? 0 : t <= tRoll ?   // stops turning when the cue ball stops (at the cushion or wherever it ends)
