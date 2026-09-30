@@ -838,7 +838,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 112;   // one per commit to main
+const BUILD = 113;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1265,13 +1265,14 @@ function perspDyn(cam, s, reveal){
   // once the balls meet: a faint mark where the object ball started, so the lines out of it start from something
   // (always yellow, like the line to the pocket: a ball's own colour can vanish on the cloth)
   const obNow = A ? A.ob : F ? F.ob : null;
-  if((contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: 1});
+  const refA = A ? Math.max(0, Math.min(1, (A.tHit ?? 0)/REF_FADE)) : 1;   // the reference balls fade in just after the hit
+  if((contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: refA});
   // on a miss, a see-through object ball rolls the path the right call would have sent it on, into the pocket
   if(A && A.obGhost) items.push({p: A.obGhost.p, kind:'ob', ghost: true, z: A.obGhost.z, shadow: A.obGhost.shadow, pocket: s.P});
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
   // once the balls meet, the ghost ball shows where your call actually made contact (on a miss that's not the ideal spot)
   const hit = (A && contact) || (reveal && !A), yours = hit && s.pick && s.pick.far;
-  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p: yours ? s.pick.g2 : s.gb, kind:'ghost', a: hit ? 1 : gA});
+  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p: yours ? s.pick.g2 : s.gb, kind:'ghost', a: hit ? Math.max(refA, yours ? 0 : gA) : gA});
   if(!reveal && s.place) items.push({p:s.place, kind:'user'});
   items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],it.z ?? R]);});
   items.sort((a,b)=>b.c[2]-a.c[2]);
@@ -1383,6 +1384,7 @@ function perspTop(cam, s, reveal){
 // a dashed path on the cloth, as one continuous line so the dashes run evenly round curves and corners
 // (split into pieces only when part of it is behind the eye)
 const DASH_W = 1.3;
+const REF_FADE = 0.3;   // seconds for the ghost ball and the object ball's start mark to fade in after the hit
 function dashedLine(cam, pts, col, op, dash){
   const attrs = `fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width="${DASH_W}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${dash}"`;
   const cs = pts.map(q=>cam.toCam([q[0], q[1], .03]));
@@ -2091,7 +2093,7 @@ function animateShot(oc, done, obCol){
         ob = add(ob0, mul(oc.u2, x2)); obTrail = [ob0, ob];
       }
     }
-    s.anim = {obGhost, cb, cbZ: c.z, cbShadow: c.shadow, cbPocket: sim.pocket, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, obPocket, run: t < T1 ? 0 : mIdeal.x(t-T1),
+    s.anim = {tHit: Math.max(0, t - T1), obGhost, cb, cbZ: c.z, cbShadow: c.shadow, cbPocket: sim.pocket, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, obPocket, run: t < T1 ? 0 : mIdeal.x(t-T1),
       trail: {cb: t < T1 ? [cb0, ...(cb ? [cb] : [])] : [cb0, g2, ...postPts.filter(q=>q.t <= t).map(q=>q.p), ...(cb ? [cb] : [])], ob: obTrail, obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
