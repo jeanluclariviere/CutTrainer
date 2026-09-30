@@ -823,7 +823,11 @@ const LADDER_TEXT = ['Ghost ball, aim line and aim-line stance all on', 'Ghost b
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
 function setGradeForTesting(i){
-  stats.level = {g: i, best: i, pts: 0, v: 2}; save();
+  if(!hasBaseline()){   // #dev skips the baseline: record a stand-in so everything that needs one opens up
+    const p0 = GRADE_FROM[Math.min(i, GRADE_FROM.length-1)];
+    stats.sessions = (stats.sessions||[]).concat({id:'dev', task:'sess', size:100, n:100, right:p0, made:p0, start:Date.now(), end:Date.now(), base:1, dev:1, stand:p0, down:p0, grade:i});
+  }
+  stats.level = {g: i, best: i, pts: 0, v: 2}; save(); showSessIdle();
   enforceLocks(); syncPressed(); renderBadge(true); renderProgress(); renderStats();
   if(!answered) deal();
 }
@@ -1371,6 +1375,7 @@ function showSessIdle(){
     $('sessidlehead').textContent = t==='flash' ? 'Flash ⚡️' : 'Freeplay';
     $('flashpick').hidden = t!=='flash';
     const needBase = t==='sess' && !hasBaseline();
+    $('basestart').textContent = DEV ? 'Pick a grade' : 'Baseline · 100 shots';
     $('sessbtns').hidden = needBase; $('basebtns').hidden = !needBase;
   }
 }
@@ -1590,7 +1595,7 @@ function showSummary(rec){
   $('sesscover').hidden = false;
 }
 function renderSessionHistory(){
-  const S = (stats.sessions || []).filter(x=>x.task===statTask());
+  const S = (stats.sessions || []).filter(x=>x.task===statTask() && !x.dev);
   const el = $('trend');
   const fmt = x => new Date(x.end).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   let h = [0,50,100].map(v=>`<div class="grid${v===0?' base':''}" style="top:${100-v}%"></div><span class="ylab" style="top:${100-v}%">${v}%</span>`).join('');
@@ -1948,7 +1953,7 @@ function renderPatterns(){
   const wrong = all.thin + all.full;
   if(statTask()==='sess'){
     const b = baselines()[0];
-    rows.push(['Baseline', ...(b ? [`${GRADES[b.grade ?? gradeFor(pct(b.right,b.n))]} <small>${pct(b.right,b.n)}% · standing ${b.stand}% · down ${b.down}%</small>`,''] : dash)]);
+    rows.push(['Baseline', ...(b && b.dev ? ['Skipped <small>testing</small>',''] : b ? [`${GRADES[b.grade ?? gradeFor(pct(b.right,b.n))]} <small>${pct(b.right,b.n)}% · standing ${b.stand}% · down ${b.down}%</small>`,''] : dash)]);
   }
   rows.push(['Misses lean', ...(wrong < 4 ? (all.n && !wrong ? ['No misses','up'] : dash)
     : all.thin/wrong >= .65 ? [`Too thin <small>${all.thin} of ${wrong}</small>`,'']
@@ -2178,7 +2183,7 @@ $('endcover').addEventListener('click', e=>e.stopPropagation());
 $('sessagain').addEventListener('click', e=>{ e.stopPropagation(); startSession(+e.currentTarget.dataset.size); });
 $('sessdone').addEventListener('click', e=>{ e.stopPropagation(); $('sesscover').hidden = true; deal(); });
 document.querySelectorAll('#sessidlecover [data-sess]').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); startSession(+b.dataset.sess); }));
-$('basestart').addEventListener('click', e=>{ e.stopPropagation(); startSession(100, true); });
+$('basestart').addEventListener('click', e=>{ e.stopPropagation(); if(DEV) openProg(true); else startSession(100, true); });
 $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
@@ -2187,7 +2192,7 @@ document.addEventListener('keydown', e=>{
   if(!$('prog').hidden){ if(e.key==='Escape'){ openProg(false); e.preventDefault(); } return; }
   if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
   if(!$('endcover').hidden){ if(e.key==='Escape'){ closeEndPrompt(); e.preventDefault(); } return; }
-  if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ if(settings.task==='sess' && !hasBaseline()) startSession(100, true); else startSession(50); e.preventDefault(); } return; }
+  if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ if(settings.task==='sess' && !hasBaseline()){ if(DEV) openProg(true); else startSession(100, true); } else startSession(50); e.preventDefault(); } return; }
   if(!$('sesscover').hidden){ if(e.key==='Enter'){ startSession(+$('sessagain').dataset.size); e.preventDefault(); } else if(e.key==='Escape'){ $('sesscover').hidden = true; deal(); } return; }
   if(!$('startcover').hidden){ if(e.key==='Enter' || e.key===' '){ startFlashMode(); e.preventDefault(); } return; }
   if((e.key==='r' || e.key==='R') && !$('cover').hidden){ replay(); e.preventDefault(); return; }
@@ -2239,6 +2244,7 @@ sizeTable();
 if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
+if(DEV && !hasBaseline()) openProg(true);   // #dev: no baseline, straight to the grade picker
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
 })();
