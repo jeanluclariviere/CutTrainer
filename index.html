@@ -57,6 +57,20 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 @keyframes lvlin{0%{opacity:0}8%{opacity:1}80%{opacity:1}100%{opacity:0}}
 @keyframes lvlpop{0%{transform:scale(.4)}100%{transform:scale(1)}}
 .gradebadge{cursor:pointer}
+.helpbtn{font:700 20px var(--display)}
+.tutwrap{justify-content:center;align-items:center;padding:16px}
+.tutcard{width:min(100%,520px);max-height:calc(100dvh - 32px);overflow-y:auto}
+.tutfig{border-radius:12px;overflow:hidden;background:#1f5f96}
+.tutfig svg{display:block;width:100%;height:auto}
+.tuttext{margin:0;font-size:15px;line-height:1.5;color:var(--ink);min-height:4.5em}
+.tuttext b{font-weight:700}
+.tutnav{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tutnav .sumdone{color:var(--ink);border-color:var(--line)}
+.tutnav .startbtn{font-size:18px;padding:8px 24px}
+.tutnav button:disabled{visibility:hidden}
+.tutdots{display:flex;gap:6px}
+.tutdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.tutdots i.on{background:var(--accent)}
 .progcard{max-height:calc(100dvh - 90px);overflow-y:auto}
 .ladder{list-style:none;margin:0;padding:0;position:relative}
 .ladder::before{content:"";position:absolute;left:21px;top:14px;bottom:14px;width:2px;background:var(--line)}
@@ -348,6 +362,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <a class="livelink" href="ar.html" id="livelink" hidden>Live AR ›</a>
     <div class="hright">
       <div class="gradebadge" id="badge" hidden role="button" tabindex="0" aria-label="Your grade: open progress"><b id="badgeg"></b><span class="bbar"><i id="badgefill"></i></span></div>
+      <button class="cog helpbtn" id="help" aria-label="How to read a cut">?</button>
       <button class="cog" id="cog" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.8h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9-2.6-.5v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     </div>
   </header>
@@ -390,6 +405,14 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     </div>
   </div>
 
+  <div class="menu tutwrap" id="tut" hidden>
+    <div class="menucard tutcard" role="dialog" aria-label="How to read a cut">
+      <div class="menuhead"><span id="tuttitle"></span><button class="menuclose" id="tutclose" aria-label="Close">✕</button></div>
+      <div class="tutfig" id="tutfig"></div>
+      <p class="tuttext" id="tuttext"></p>
+      <div class="tutnav"><button class="sumdone tutback" id="tutback">Back</button><span class="tutdots" id="tutdots"></span><button class="startbtn tutnext" id="tutnext">Next</button></div>
+    </div>
+  </div>
   <div class="menu" id="prog" hidden>
     <div class="menucard progcard" role="dialog" aria-label="Progress">
       <div class="menuhead"><span>Progress</span><button class="menuclose" id="progclose" aria-label="Close">✕</button></div>
@@ -768,7 +791,7 @@ const GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S']
 const GRADE_FROM = [0,30,35,40,45,50,55,60,66,72,78,84];   // baseline % for each starting grade (F … A; A+ and S are earned)
 // Each aid: forced on, then fading away (after a delay, in ms), then gone for good and yours to switch on as practice.
 const AIDS = {
-  ghost:  {name:'Ghost ball', fade:{4:3000, 5:1500}, goneAt:6, tip:'Shows where the cue ball has to be at contact.'},
+  ghost:  {name:'Ghost ball', fade:{4:1500, 5:750}, goneAt:6, tip:'Shows where the cue ball has to be at contact.'},
   line:   {name:'Aim line',   fade:{1:1500, 2:750}, goneAt:3, tip:'A line drawn from the cue ball along the shot line, to the ghost ball.'},
   stance: {name:'Aim-line stance', fade:{},          goneAt:7, tip:'You look from directly behind the cue, on the line it travels, so the overlap is plain to see. From the ball line you stand behind the cue ball instead, as in a real read.'},
 };
@@ -816,11 +839,11 @@ function enforceLocks(){
 }
 // what reaching each grade brings (first time only for aids going away)
 const LADDER_UP = {1:'Aim line fades after 1.5 s', 2:'Aim line fades after 0.75 s', 3:'Aim line gone: now an optional aid',
-  4:'👻 Ghost ball fades after 3 s', 5:'👻 Ghost ball fades after 1.5 s', 6:'Ghost ball gone: now an optional aid',
+  4:'👻 Ghost ball fades after 1.5 s', 5:'👻 Ghost ball fades after 0.75 s', 6:'Ghost ball gone: now an optional aid',
   7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Speed & throw', 10:'All three speeds',
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
 const LADDER_TEXT = ['Aim line, ghost ball and aim-line stance all on', 'Aim line fades after 1.5 s', 'Aim line fades after 0.75 s', 'Aim line gone: now an optional aid',
-  'Ghost ball fades after 3 s', 'Ghost ball fades after 1.5 s', 'Ghost ball gone: now an optional aid', 'Ball line: read it from behind the cue ball',
+  'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone: now an optional aid', 'Ball line: read it from behind the cue ball',
   'Any angle', 'Speed & throw, medium speed', 'All three speeds', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
@@ -1504,8 +1527,8 @@ function playSound(kind, streak){
     if(kind === 'made'){ const o = audioOut(0.22); tone(o, 880, 0, 0.22, 1); tone(o, 1318.5, 0.075, 0.32, 0.9); }
     else if(kind === 'miss'){ const o = audioOut(0.22); tone(o, 392, 0, 0.30, 0.9, 330); }
     else if(kind === 'streak'){
-      // a bright rising arpeggio that climbs a semitone with every shot of the streak (capped at an octave)
-      const o = audioOut(0.2), r = semis(659.25, Math.min(12, (streak||6) - 6));
+      // a bright rising arpeggio that climbs a semitone for the first four shots of the streak, then holds
+      const o = audioOut(0.2), r = semis(659.25, Math.min(3, (streak||6) - 6));
       [0, 4, 7, 12].forEach((n,i)=>tone(o, semis(r, n), i*0.055, i===3 ? 0.42 : 0.2, i===3 ? 1 : 0.85));
     }
     else if(kind === 'levelup'){
@@ -2066,7 +2089,7 @@ function syncPressed(){
   // aids: forced / fading ones show as on and can't be changed; earned ones are yours to switch
   const SCHED = {
     line: 'F: always on. D-: fades after 1.5 s. D: after 0.75 s. From D+ it is yours to switch on; shots with it on are practice.',
-    ghost: 'Up to D+: always on. C-: fades after 3 s. C: after 1.5 s. From C+ it is yours to switch on; shots with it on are practice.',
+    ghost: 'Up to D+: always on. C-: fades after 1.5 s. C: after 0.75 s. From C+ it is yours to switch on; shots with it on are practice.',
     stance: 'Up to C+: you stand on the aim line. From B- you read from the ball line; the aim-line stance is yours to switch on, as practice.',
   };
   const btn = {ghost:['ghost-0','ghost-1'], line:['line-0','line-1'], stance:['cam-line','cam-aim']};
@@ -2196,6 +2219,112 @@ document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()
 $('sessend').addEventListener('click', endSession);
 const menuOpen = () => !$('menu').hidden;
 function openMenu(v){ $('menu').hidden = !v; if(v) $('menuclose').focus({preventScroll:true}); else $('cog').focus({preventScroll:true}); }
+
+// ---------- tutorial: how to read a cut ----------
+const TUT_OB = '#d22b2b', TUT_CB = '#f4efe0';
+const tf = n => (+n).toFixed(2);
+function tutArrow(x1, y1, x2, y2, col, w, head){   // a line with an arrowhead at (x2,y2)
+  const a = Math.atan2(y2-y1, x2-x1), h = head || w*4;
+  const p1 = [x2 - h*Math.cos(a-0.45), y2 - h*Math.sin(a-0.45)], p2 = [x2 - h*Math.cos(a+0.45), y2 - h*Math.sin(a+0.45)];
+  return `<line x1="${tf(x1)}" y1="${tf(y1)}" x2="${tf(x2 - h*0.6*Math.cos(a))}" y2="${tf(y2 - h*0.6*Math.sin(a))}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/><path d="M${tf(x2)} ${tf(y2)} L${tf(p1[0])} ${tf(p1[1])} L${tf(p2[0])} ${tf(p2[1])} Z" fill="${col}"/>`;
+}
+// shooter's view: object ball and the cue ball at contact (dashed), covered part lit up
+function tutOverlap(cx, cy, r, f, id){
+  const lat = 2*r*(1-f), gx = cx - lat/2, ox = cx + lat/2;
+  return `<defs><clipPath id="${id}"><circle cx="${tf(ox)}" cy="${tf(cy)}" r="${tf(r)}"/></clipPath></defs>
+    <circle cx="${tf(ox)}" cy="${tf(cy)}" r="${tf(r)}" fill="${TUT_OB}"/>
+    <circle cx="${tf(gx)}" cy="${tf(cy)}" r="${tf(r)}" fill="#fff" fill-opacity=".55" clip-path="url(#${id})"/>
+    <circle cx="${tf(gx)}" cy="${tf(cy)}" r="${tf(r)}" fill="none" stroke="#fff" stroke-width="${tf(r*.05)}" stroke-dasharray="${tf(r*.16)} ${tf(r*.11)}"/>`;
+}
+const TUT_TXT = 'font-family="IBM Plex Sans, sans-serif" fill="#fff"';
+const TUT = [
+  {title:'The fraction is the overlap', fig: ()=>{
+    const r = 1, f = .25, lat = 2*r*(1-f), cx = 0, gx = cx - lat/2, ox = cx + lat/2, y1 = 1.3, y2 = 1.95;
+    const brk = (x1, x2, y, col, w) => `<line x1="${tf(x1)}" y1="${y}" x2="${tf(x2)}" y2="${y}" stroke="${col}" stroke-width="${w}"/><line x1="${tf(x1)}" y1="${tf(y-.1)}" x2="${tf(x1)}" y2="${tf(y+.1)}" stroke="${col}" stroke-width="${w}"/><line x1="${tf(x2)}" y1="${tf(y-.1)}" x2="${tf(x2)}" y2="${tf(y+.1)}" stroke="${col}" stroke-width="${w}"/>`;
+    return `<svg viewBox="-3.3 -1.75 6.6 4.35" aria-label="A quarter-ball hit: a quarter of the object ball is covered, three quarters showing">
+      <rect x="-3.3" y="-1.75" width="6.6" height="4.35" fill="#1f5f96"/>
+      <line x1="${tf(gx)}" y1="-1.3" x2="${tf(gx)}" y2="1.05" stroke="#fff" stroke-opacity=".6" stroke-width=".03" stroke-dasharray=".08 .08"/>
+      ${tutOverlap(cx, 0, r, f, 'tc1')}
+      <text x="${tf(gx)}" y="-1.4" font-size=".2" text-anchor="middle" ${TUT_TXT} fill-opacity=".85">cue ball at contact</text>
+      <text x="${tf(ox)}" y="-1.4" font-size=".2" text-anchor="middle" ${TUT_TXT} fill-opacity=".85">object ball</text>
+      ${brk(ox-r, gx+r, y1, '#ffd34d', .05)}
+      <text x="${tf(gx+r+.2)}" y="${tf(y1+.08)}" font-size=".24" font-weight="700" ${TUT_TXT} fill="#ffd34d">¼ covered</text>
+      ${brk(gx+r, ox+r, y2, '#fff', .04)}
+      <text x="${tf(ox+r+.15)}" y="${tf(y2+.08)}" font-size=".24" ${TUT_TXT}>¾ showing</text>
+    </svg>`; },
+    text:'Picture the cue ball at the moment it hits, seen from behind along the line it travels. It covers part of the object ball. <b>That covered part is the fraction.</b> Here ¾ of the object ball is still showing, so it’s a <b>¼-ball hit</b>.'},
+  {title:'Count what’s covered', fig: ()=>{
+    const fr = [[1,'Full'],[.75,'¾'],[.5,'½'],[.25,'¼'],[.125,'⅛']], r = .34;
+    return `<svg viewBox="0 0 10 2.6" aria-label="Full, three quarter, half, quarter and eighth ball overlaps"><rect width="10" height="2.6" fill="#1f5f96"/>
+      ${fr.map(([f,l],i)=>tutOverlap(1 + i*2, 1.15, r, f, 'tc2'+i) + `<text x="${1+i*2}" y="2.25" font-size=".42" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif" fill="#fff">${l}</text>`).join('')}
+    </svg>`; },
+    text:'Full ball covers all of it, ¾ covers three quarters, ½ half, ¼ a quarter, and ⅛ just a sliver. The thinner the hit, the more it cuts: a full hit goes straight on, a ⅛ sends the ball off at about 61°.'},
+  {title:'Find the ghost ball', fig: ()=>{
+    const P = [9,9], O = [44,30], R = 3.4, d = Math.hypot(O[0]-P[0], O[1]-P[1]), u = [(O[0]-P[0])/d, (O[1]-P[1])/d], G = [O[0]+u[0]*2*R, O[1]+u[1]*2*R], C = [74,58];
+    const E = [G[0]+u[0]*8, G[1]+u[1]*8];
+    return `<svg viewBox="0 0 100 66" aria-label="Top view: the ghost ball sits against the object ball, directly opposite the pocket">
+      <rect width="100" height="66" fill="#1f5f96"/>
+      <path d="M0 0 H100 V3 H3 V66 H0 Z" fill="#3a2618"/>
+      <circle cx="${P[0]}" cy="${P[1]}" r="5.2" fill="#0b0b0b"/>
+      <line x1="${P[0]}" y1="${P[1]}" x2="${tf(E[0])}" y2="${tf(E[1])}" stroke="#ffd34d" stroke-width=".6" stroke-dasharray="1.4 1.2"/>
+      ${tutArrow(O[0]-u[0]*(R+1), O[1]-u[1]*(R+1), P[0]+u[0]*7, P[1]+u[1]*7, '#ffd34d', .8, 3)}
+      ${tutArrow(C[0], C[1]-R-.6, G[0]+(C[0]-G[0])*(R+1.2)/Math.hypot(C[0]-G[0],C[1]-G[1]), G[1]+(C[1]-G[1])*(R+1.2)/Math.hypot(C[0]-G[0],C[1]-G[1]), '#fff', .7, 2.8)}
+      <circle cx="${O[0]}" cy="${O[1]}" r="${R}" fill="${TUT_OB}"/>
+      <circle cx="${tf(G[0])}" cy="${tf(G[1])}" r="${R}" fill="#fff" fill-opacity=".22" stroke="#fff" stroke-width=".5" stroke-dasharray="1.2 .9"/>
+      <circle cx="${C[0]}" cy="${C[1]}" r="${R}" fill="${TUT_CB}"/>
+      <text x="${P[0]+7}" y="${P[1]-1.2}" font-size="3" ${TUT_TXT}>pocket</text>
+      <text x="${O[0]+5}" y="${O[1]-3}" font-size="3" ${TUT_TXT}>object ball</text>
+      <text x="${tf(G[0]+5)}" y="${tf(G[1]+2)}" font-size="3" ${TUT_TXT}>ghost ball</text>
+      <text x="${C[0]+5}" y="${C[1]+1}" font-size="3" ${TUT_TXT}>cue ball</text>
+    </svg>`; },
+    text:'The object ball leaves straight away from where the cue ball touches it. So picture a <b>ghost ball</b> touching the object ball, directly opposite the pocket. Send the cue ball there, then ask how much of the object ball it would cover.'},
+  {title:'Or use aim points', fig: ()=>{
+    const O = [40,28], R = 10, pts = [[0,'Full'],[.5,'¾'],[1,'½'],[1.5,'¼'],[1.75,'⅛']];
+    return `<svg viewBox="0 0 100 62" aria-label="Aim points for the centre of the cue ball: centre, halfway, edge, and outside the edge">
+      <rect width="100" height="62" fill="#1f5f96"/>
+      <circle cx="${O[0]}" cy="${O[1]}" r="${R}" fill="${TUT_OB}"/>
+      <line x1="${O[0]-R-4}" y1="${O[1]}" x2="${O[0]+R*2+6}" y2="${O[1]}" stroke="#fff" stroke-opacity=".35" stroke-width=".35"/>
+      ${pts.map(([k,l],i)=>{ const x = O[0] + k*R, top = i%2 ? 9 : 4;
+        return `<line x1="${tf(x)}" y1="${O[1]}" x2="${tf(x)}" y2="60" stroke="#fff" stroke-opacity=".55" stroke-width=".45" stroke-dasharray="1.2 1"/>
+          <line x1="${tf(x)}" y1="${top+2}" x2="${tf(x)}" y2="${O[1]-1.2}" stroke="#ffd34d" stroke-opacity=".6" stroke-width=".3"/>
+          <circle cx="${tf(x)}" cy="${O[1]}" r="1.1" fill="#ffd34d"/>
+          <text x="${tf(x)}" y="${top}" font-size="4.2" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif" fill="#ffd34d">${l}</text>`; }).join('')}
+      <text x="${O[0]-R-1}" y="${O[1]+R+8}" font-size="3" text-anchor="end" ${TUT_TXT} fill-opacity=".85">the cue ball’s</text>
+      <text x="${O[0]-R-1}" y="${O[1]+R+12}" font-size="3" text-anchor="end" ${TUT_TXT} fill-opacity=".85">centre goes up</text>
+      <text x="${O[0]-R-1}" y="${O[1]+R+16}" font-size="3" text-anchor="end" ${TUT_TXT} fill-opacity=".85">these lines</text>
+    </svg>`; },
+    text:'The same thing as aim points for the cue ball’s centre: <b>Full</b> at the object ball’s centre, <b>¾</b> halfway to its edge, <b>½</b> right at the edge, <b>¼</b> half a ball outside it, <b>⅛</b> three-quarters of a ball outside.'},
+  {title:'How the trainer works', fig: ()=>{
+    const l = ['Full','¾','½','¼','⅛'];
+    return `<svg viewBox="0 0 100 36" aria-label="Pick the fraction; your grade climbs as you read well"><rect width="100" height="36" fill="#1f5f96"/>
+      ${l.map((t,i)=>`<rect x="${6+i*15}" y="8" width="13" height="14" rx="2" fill="${i===2?'#e3f3e8':'#f4f6f8'}" stroke="${i===2?'#2f9e5b':'#c9d3db'}" stroke-width=".6"/><text x="${12.5+i*15}" y="18" font-size="6" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif" fill="#10283d">${t}</text>`).join('')}
+      <rect x="82" y="7" width="13" height="16" rx="2.5" fill="#10283d"/><text x="88.5" y="17.6" font-size="7" font-weight="700" text-anchor="middle" font-family="Barlow Condensed, sans-serif" fill="#ffd34d">B-</text>
+      <text x="44" y="30" font-size="3.2" text-anchor="middle" ${TUT_TXT} fill-opacity=".85">tap the fraction (or press 1–5)</text>
+      <text x="88.5" y="30" font-size="3.2" text-anchor="middle" ${TUT_TXT} fill-opacity=".85">your grade</text>
+    </svg>`; },
+    text:'Read the shot, then tap the fraction. It plays out: <b>green</b> if it drops, <b>red</b> if it misses. Drag the table to walk around the shot. Your first 100 shots set your grade; tap the grade to see what each level brings.'},
+];
+let tutAt = 0;
+function renderTut(){
+  const t = TUT[tutAt];
+  $('tuttitle').textContent = t.title;
+  $('tutfig').innerHTML = t.fig();
+  $('tuttext').innerHTML = t.text;
+  $('tutdots').innerHTML = TUT.map((_,i)=>`<i class="${i===tutAt?'on':''}"></i>`).join('');
+  $('tutback').disabled = tutAt === 0;
+  $('tutnext').textContent = tutAt === TUT.length-1 ? 'Done' : 'Next';
+}
+function openTut(v){
+  if(v){ tutAt = 0; renderTut(); $('tut').hidden = false; $('tutnext').focus({preventScroll:true}); }
+  else { $('tut').hidden = true; if(!settings.tut){ settings.tut = 1; saveSettings(); } }
+}
+function tutStep(d){ const n = tutAt + d; if(n < 0) return; if(n >= TUT.length) return openTut(false); tutAt = n; renderTut(); }
+$('help').addEventListener('click', ()=>openTut(true));
+$('tutclose').addEventListener('click', ()=>openTut(false));
+$('tutnext').addEventListener('click', ()=>tutStep(1));
+$('tutback').addEventListener('click', ()=>tutStep(-1));
+$('tut').addEventListener('click', e=>{ if(e.target === $('tut')) openTut(false); });
+
 $('cog').addEventListener('click', ()=>openMenu(true));
 function openProg(v){ if(v) renderProgress(); $('prog').hidden = !v; if(v){ $('progclose').focus({preventScroll:true}); const h = $('ladder').querySelector('.here'); if(h) h.scrollIntoView({block:'center'}); } else $('badge').focus({preventScroll:true}); }
 $('badge').addEventListener('click', ()=>openProg(true));
@@ -2217,6 +2346,7 @@ $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
+  if(!$('tut').hidden){ if(e.key==='Escape'){ openTut(false); e.preventDefault(); } else if(e.key==='ArrowRight' || e.key==='Enter'){ tutStep(1); e.preventDefault(); } else if(e.key==='ArrowLeft'){ tutStep(-1); e.preventDefault(); } return; }
   if(menuOpen()){ if(e.key==='Escape'){ openMenu(false); e.preventDefault(); } return; }
   if(!$('prog').hidden){ if(e.key==='Escape'){ openProg(false); e.preventDefault(); } return; }
   if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
@@ -2274,6 +2404,7 @@ if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, lean
 deal();
 syncStreakPill();
 if(DEV && !hasBaseline()) openProg(true);   // #dev: no baseline, straight to the grade picker
+else if(!hasBaseline() && !settings.tut) openTut(true);   // first visit: how to read a cut, before the baseline
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
 })();
