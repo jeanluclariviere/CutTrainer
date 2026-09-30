@@ -729,7 +729,8 @@ function generate(){
     if(P.side){ if(dot(u, mul(P.n,-1)) < Math.cos(38*RAD)) continue; }
     else { const bis = norm([Math.sign(P.c[0]-W/2), Math.sign(P.c[1]-H/2)]); if(dot(u,bis) < Math.cos(44*RAD)) continue; }
     // with speed & throw, the dealt angle is the cut as it looks (the ghost-ball geometry); the hit it needs is thinner
-    const tp = phi, cut = phys ? contactFor(speed, tp) : phi;
+    // with throw, the spread is around the hit the shot needs (so thick and thin both come up); the angle it looks is thicker by the throw
+    const cut = phi, tp = phys ? Math.max(0, cut - throwAt(speed, cut)) : phi;
     const sign = Math.random()<.5?-1:1;
     const v = rot(u, sign*tp*RAD);                      // cue direction
     const n = rot(v, -sign*cut*RAD);                    // line of centres at contact
@@ -747,6 +748,8 @@ function generate(){
     if(phys){
       // center if the plain fraction pockets at this speed; otherwise which way the hit has to move
       cand.mod = outcome(cand, cand.answer.deg).made ? 'center' : cut > cand.answer.deg ? 'thin' : 'thick';
+      // a thick or thin call has to be a readable adjustment: no shots where the plain fraction misses by a hair
+      if(cand.mod !== 'center' && Math.abs(cut - cand.answer.deg) < MOD_DEG/2) continue;
       // the same hit named from the neighbouring fraction: between full and ¾, "full thin" and "¾ thick" are both right
       const k = CORE.indexOf(cand.answer), nb = cand.mod==='thin' ? CORE[k+1] : cand.mod==='thick' ? CORE[k-1] : null;
       // (only when the hit really sits between them: about as close to the neighbour as to the fraction it looks like)
@@ -834,7 +837,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 119;   // one per commit to main
+const BUILD = 120;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
