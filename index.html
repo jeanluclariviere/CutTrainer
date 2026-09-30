@@ -835,7 +835,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 107;   // one per commit to main
+const BUILD = 108;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1257,8 +1257,12 @@ function perspDyn(cam, s, reveal){
   const cbP = A ? A.cb : F ? F.cb : s.cb;   // null once the cue ball has dropped into a pocket
   const items = tut.on && tut.zb > 0.5 || !cbP ? [] : [{p: cbP, kind:'cb', z: A && A.cbZ != null ? Math.min(R, A.cbZ) : R, shadow: A && A.cbShadow != null ? A.cbShadow : 1, pocket: A && A.cbPocket}];   // the tutorial close-up looks from in front of the cue ball
   if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A && A.obZ < R ? 1 : A ? A.obScale : 1, z: A ? A.obZ : R, shadow: A ? A.obShadow : 1, pocket: A && A.obPocket});
-  // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
+  // once the balls meet: a faint mark where the object ball started, so the lines out of it start from something
+  const obNow = A ? A.ob : F ? F.ob : null;
+  if((contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark'});
+  // on a miss, a see-through object ball rolls the path the right call would have sent it on, into the pocket
+  if(A && A.obGhost) items.push({p: A.obGhost.p, kind:'ob', ghost: true, z: A.obGhost.z, shadow: A.obGhost.shadow, pocket: s.P});
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
   // once the balls meet, the ghost ball shows where your call actually made contact (on a miss that's not the ideal spot)
   const hit = (A && contact) || (reveal && !A), yours = hit && s.pick && s.pick.far;
@@ -1274,7 +1278,9 @@ function perspDyn(cam, s, reveal){
     if(it.kind==='refob'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${s.color[0]}" fill-opacity=".32" stroke="${s.color[0]}" stroke-opacity=".85" stroke-width="1"/>`; continue; }
     if(it.kind==='user'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".3" stroke="#fff" stroke-width="1.2"/>`; continue; }
     if(it.kind==='callghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="${s.pick.made ? NEAR_MISS_OK : MISS}" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
+    if(it.kind==='obmark'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${s.color[0]}" fill-opacity=".18" stroke="${s.color[0]}" stroke-opacity=".8" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
     if(it.kind==='ghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity="${(.22*(it.a ?? 1)).toFixed(3)}" stroke="#fff" stroke-opacity="${(it.a ?? 1).toFixed(3)}" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
+    const itemStart = o.length, uid = items.indexOf(it);   // uid keeps clip ids apart when two balls need them
     if((it.shadow ?? 1) > 0.01) o += `<path d="${polyD(cam, circ3([it.p[0]+.2,it.p[1]+.2], R*.95*(it.scale ?? 1), .02, 20))}" fill="#000" fill-opacity="${(.35*(it.shadow ?? 1)).toFixed(3)}"/>`;
     const ballStart = o.length;
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${it.kind==='cb'?'url(#cbg)':s.color[0]}"/>`;
@@ -1290,7 +1296,7 @@ function perspDyn(cam, s, reveal){
         const [sx, sy] = cam.proj(Sc), rd = r*.2, a = Math.atan2(sy - y, sx - x)/RAD;
         dots += `<g transform="translate(${sx.toFixed(1)} ${sy.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${facing.toFixed(3)} 1)"><circle r="${rd.toFixed(2)}" fill="#c8102e"/></g>`;
       }
-      if(dots) o += `<clipPath id="cbclip"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/></clipPath><g clip-path="url(#cbclip)">${dots}</g>`;
+      if(dots) o += `<clipPath id="cbclip${uid}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/></clipPath><g clip-path="url(#cbclip${uid})">${dots}</g>`;
     }
     if(it.kind==='ob'){
       // the number spot is painted on the ball: it rolls with it, and turns away as you walk around
@@ -1304,7 +1310,7 @@ function perspDyn(cam, s, reveal){
         if(Sc[2] > NEAR){
           const [sx, sy] = cam.proj(Sc), rs = r*.44, a = Math.atan2(sy - y, sx - x)/RAD;
           const tf = `translate(${sx.toFixed(1)} ${sy.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${facing.toFixed(3)} 1) rotate(${(-a).toFixed(1)})`;
-          o += `<clipPath id="obclip"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/></clipPath><g clip-path="url(#obclip)"><g transform="${tf}"><circle r="${rs.toFixed(1)}" fill="#fff"/><text y="${(r*.03).toFixed(1)}" font-size="${(r*.56).toFixed(1)}" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#111">${s.color[1]}</text></g></g>`;
+          o += `<clipPath id="obclip${uid}"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/></clipPath><g clip-path="url(#obclip${uid})"><g transform="${tf}"><circle r="${rs.toFixed(1)}" fill="#fff"/><text y="${(r*.03).toFixed(1)}" font-size="${(r*.56).toFixed(1)}" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#111">${s.color[1]}</text></g></g>`;
         }
       }
     }
@@ -1315,9 +1321,10 @@ function perspDyn(cam, s, reveal){
       const hull = convexHull([...ring(0), ...ring(1.6)].map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj));
       const dark = Math.min(.9, (R - it.z)/(3*R));
       const ball = o.slice(ballStart);
-      o = o.slice(0, ballStart) + (hull.length > 2 ? `<clipPath id="holeclip"><path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z"/></clipPath><g clip-path="url(#holeclip)">` : '<g>')
+      o = o.slice(0, ballStart) + (hull.length > 2 ? `<clipPath id="holeclip${uid}"><path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z"/></clipPath><g clip-path="url(#holeclip${uid})">` : '<g>')
         + ball + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#000" fill-opacity="${dark.toFixed(3)}"/></g>`;
     }
+    if(it.ghost) o = o.slice(0, itemStart) + `<g opacity=".5">${o.slice(itemStart)}</g>`;
   }
   return o;
 }
@@ -2021,7 +2028,12 @@ function animateShot(oc, done, obCol){
   const tIn = xIn !== null ? obTime(xIn) : null;
   const T2 = free ? free.end.t + (free.pocket ? FALL : 0) : sink && tIn !== null ? tIn + FALL : obTime(d2);
   const tEnd = sim.end.t + (sim.pocket ? FALL : 0);
-  const total = Math.max(T1 + T2, tEnd) * 1000 + 280;   // short hold so you see where the balls stopped
+  // a miss: the see-through object ball that shows the right call's path, rolling at the right call's speed into the pocket
+  let gIn = null, tGIn = null;
+  const uI = norm(sub(s.P.t, ob0));
+  if(!sink){ const q = sub(ob0, s.P.c), b = dot(q, uI), c = dot(q, q) - (pocketR(s.P) - 0.3)**2, disc = b*b - c; if(disc > 0){ gIn = Math.max(0, -b - Math.sqrt(disc)); tGIn = mIdeal.tFor(gIn); } }
+  const TG = tGIn !== null ? tGIn + FALL : 0;
+  const total = Math.max(T1 + T2, tEnd, T1 + TG) * 1000 + 280;   // short hold so you see where the balls stopped
   // sounds: the contact, the pockets, the jaw, and every cushion either ball hits (softer the gentler the hit)
   const plan = [[T1, 'click', 1]];
   if(sink) plan.push([T1 + (tIn !== null ? tIn + FALL*0.7 : obTime(Math.max(0, toPocket - 1.2))), 'drop', 1]);
@@ -2048,7 +2060,11 @@ function animateShot(oc, done, obCol){
   const frame = now => {
     if(!anim) return;
     const t = (now - t0) / 1000;
-    let ob = ob0, obScale = 1, obZ = R, obShadow = 1, obPocket = null, obTrail = null;
+    let ob = ob0, obScale = 1, obZ = R, obShadow = 1, obPocket = null, obTrail = null, obGhost = null;
+    if(tGIn !== null && t >= T1){
+      const tau = t - T1, gx = Math.min(mIdeal.x(tau), gIn + 1.4), tf = tau - tGIn, gz = tf > 0 ? R - G_IN*tf*tf/2 : R;
+      if(gz > -3*R) obGhost = {p: add(ob0, mul(uI, gx)), z: gz, shadow: Math.max(0, Math.min(1, (gIn - gx)/1.2 + 1))};
+    }
     const c = cueAt(t), cb = c.p;
     if(t >= T1){
       const tau = t - T1;
@@ -2067,7 +2083,7 @@ function animateShot(oc, done, obCol){
         ob = add(ob0, mul(oc.u2, x2)); obTrail = [ob0, ob];
       }
     }
-    s.anim = {cb, cbZ: c.z, cbShadow: c.shadow, cbPocket: sim.pocket, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, obPocket, run: t < T1 ? 0 : mIdeal.x(t-T1),
+    s.anim = {obGhost, cb, cbZ: c.z, cbShadow: c.shadow, cbPocket: sim.pocket, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, obPocket, run: t < T1 ? 0 : mIdeal.x(t-T1),
       trail: {cb: t < T1 ? [cb0, ...(cb ? [cb] : [])] : [cb0, g2, ...postPts.filter(q=>q.t <= t).map(q=>q.p), ...(cb ? [cb] : [])], ob: obTrail, obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
