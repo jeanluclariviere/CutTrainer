@@ -617,7 +617,8 @@ function throwAt(speed, phi){ if(!speed || phi <= 0) return 0; const x = phi/32;
 function throwFor(s, phi){ return s && s.speed ? throwAt(s.speed, phi) : 0; }
 // the contact cut needed so that, after throw, the object ball leaves at the geometric cut tp
 function contactFor(speed, tp){ let c = tp; for(let i=0;i<6;i++) c = tp + throwAt(speed, c); return c; }
-const MOD_DEG = 3;                                   // how far a "thick" or "thin" call moves the hit, in degrees of cut
+const MOD_DEG = 3;
+const PHYS_SPREAD = 4;                              // speed & throw shots look within this many degrees of a fraction                                   // how far a "thick" or "thin" call moves the hit, in degrees of cut
 const MODS = [{id:'thick', label:'Thick', key:'←'}, {id:'center', label:'Center', key:'↓'}, {id:'thin', label:'Thin', key:'→'}];
 
 function nearestRef(theta){
@@ -639,6 +640,7 @@ function weightedIndex(w){
 }
 function chooseAim(i){
   const r = REFS[i];
+  if(physOn()){ const [lo, hi] = BOUNDS[i]; return rnd(Math.max(lo > 0 ? lo + 1 : 0, r.deg - PHYS_SPREAD), Math.min(hi - 1, r.deg + PHYS_SPREAD)); }   // close to a fraction: speed & throw decide the adjustment
   if(anyOn()){ const [lo, hi] = BOUNDS[i]; return rnd(lo > 0 ? lo + 1 : 0, hi - 1); }   // any angle, but never within 1° of a boundary: every answer is clear
   return r.id==='full' ? rnd(0,1) : r.deg + rnd(-1,1);
 }
@@ -696,6 +698,11 @@ function generate(){
     if(phys){
       // center if the plain fraction pockets at this speed; otherwise which way the hit has to move
       cand.mod = outcome(cand, cand.answer.deg).made ? 'center' : cut > cand.answer.deg ? 'thin' : 'thick';
+      // the same hit named from the neighbouring fraction: between full and ¾, "full thin" and "¾ thick" are both right
+      const k = CORE.indexOf(cand.answer), nb = cand.mod==='thin' ? CORE[k+1] : cand.mod==='thick' ? CORE[k-1] : null;
+      // (only when the hit really sits between them: about as close to the neighbour as to the fraction it looks like)
+      cand.alt = nb && (cand.mod==='thin' ? cut < nb.deg : cut > nb.deg) && Math.abs(cut - nb.deg) <= Math.abs(cut - cand.answer.deg) + 1.5
+        ? {id: nb.id, mod: cand.mod==='thin' ? 'thick' : 'thin'} : null;
       cand.throwDeg = cut - tp;
     }
     if(!fallback) fallback = cand;
@@ -1193,9 +1200,11 @@ const MODE_LABEL = {call:'Freeplay', sess:'Freeplay', flash:'Flash', place:'Ghos
 const taskOf = e => e.t || 'call';
 const sessTask = t => t==='sess' || t==='flash';   // both modes are played as 50- or 100-shot sessions
 const isPlace = () => settings.task==='place';
-function success(e){ return taskOf(e)==='place' ? !!e.m : e.p===e.a && (!e.am || e.pm===e.am); }
+const viaAlt = e => !!e.aa && e.p===e.aa && e.pm===e.aam;
+function success(e){ return taskOf(e)==='place' ? !!e.m : (e.p===e.a && (!e.am || e.pm===e.am)) || viaAlt(e); }
 function lean(e){          // +1 too thin (overcut), -1 too full (undercut), 0 right
   if(taskOf(e)==='place') return e.m ? 0 : (e.e>0 ? 1 : -1);
+  if(success(e)) return 0;
   const d = idx(e.p)-idx(e.a); if(d) return d>0 ? 1 : -1;
   if(e.am && e.pm && e.pm!==e.am){ const o = {thick:-1, center:0, thin:1}; return o[e.pm] > o[e.am] ? 1 : -1; }
   return 0;
@@ -1284,7 +1293,7 @@ function logEntry(extra){
   const act = stats.active && stats.active.task===settings.task ? stats.active.id : undefined;
   stats.log.push({sid:act, t:settings.task, a:shot.answer.id, s:shot.side, v:settings.view,
     c: settings.view==='top' ? '-' : (isPlace() ? 'line' : settings.cam),
-    md:shot.any ? 'any' : 'ref', ...(shot.phys ? {am: shot.mod, sp: shot.speed, tw: +shot.throwDeg.toFixed(1)} : {}), th:settings.throw, ln:shot.len, rp:shot.replays||0, wk: shot.walked ? 1 : 0, dc:Math.round(len(sub(shot.ob,shot.cb))), dp:Math.round(shot.L), ag:+shot.theta.toFixed(1), pt:shot.P.side?'s':'c', gh: settings.ghost==='1' ? 1 : 0, tb:settings.table, pk:settings.pockets, ...extra});
+    md:shot.any ? 'any' : 'ref', ...(shot.phys ? {am: shot.mod, sp: shot.speed, tw: +shot.throwDeg.toFixed(1), ...(shot.alt ? {aa: shot.alt.id, aam: shot.alt.mod} : {})} : {}), th:settings.throw, ln:shot.len, rp:shot.replays||0, wk: shot.walked ? 1 : 0, dc:Math.round(len(sub(shot.ob,shot.cb))), dp:Math.round(shot.L), ag:+shot.theta.toFixed(1), pt:shot.P.side?'s':'c', gh: settings.ghost==='1' ? 1 : 0, tb:settings.table, pk:settings.pockets, ...extra});
   if(stats.log.length > 3000) stats.log = stats.log.slice(-3000);
   laterSave();
 }
@@ -1527,7 +1536,10 @@ function answer(id, mod){
   endFlash();
   const picked = ALL.find(r=>r.id===id);
   const phys = !!shot.phys;
-  const rightF = id === shot.answer.id, ok = rightF && (!phys || mod === shot.mod);
+  const alt = phys ? shot.alt : null;
+  const viaAlt = !!alt && id === alt.id && mod === alt.mod;
+  const rightF = id === shot.answer.id || (!!alt && id === alt.id), ok = viaAlt || (id === shot.answer.id && (!phys || mod === shot.mod));
+  const showF = viaAlt ? alt.id : shot.answer.id, showM = viaAlt ? alt.mod : shot.mod;   // which right call to light up
   // the hit that gets played: the right call plays the hit the shot needs; otherwise your fraction, moved by your modifier
   const contact = phys ? (ok ? shot.theta : picked.deg + (mod==='thin' ? MOD_DEG : mod==='thick' ? -MOD_DEG : 0)) : picked.deg;
   const oc = outcome(shot, contact);
@@ -1570,17 +1582,17 @@ function answer(id, mod){
   showResult(msg, cls, counted, oc.lat, over, exactLine, tipText);
   const quickHTML = `<div class="ql"><b class="${counted?'ok':'no'}">${counted ? 'Pocketed' : 'Missed'}</b>`
     + (!ok ? `<span class="out">${over?'Too thin':'Too full'}${counted ? '' : ', by '+Math.abs(oc.lat).toFixed(1)+'″'}</span>` : '')
-    + (phys ? `<span>${lbl(shot.answer)} ${shot.mod} · throw ${shot.throwDeg.toFixed(1)}°</span></div>` : `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`)
+    + (phys ? `<span>${lbl(shot.answer)} ${shot.mod}${alt ? ` / ${lbl(ALL.find(r=>r.id===alt.id))} ${alt.mod}` : ''} · throw ${shot.throwDeg.toFixed(1)}°</span></div>` : `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`)
     + (tip ? `<div class="ql"><span class="tipq">Hit it a touch ${adjust}</span><span>A pure ${lbl(picked)} misses ${Math.abs(oc.lat).toFixed(1)}″</span></div>` : '');
   // the verdict lands on the call, not after the animation: sound, result, button colours, streak
   $('quick').innerHTML = quickHTML;
   document.querySelectorAll('#answers button').forEach(b=>{
-    if(b.dataset.id===shot.answer.id) b.className='right';
+    if(b.dataset.id===showF) b.className='right';
     else if(b.dataset.id===id) b.className='wrong';
     else b.className='';
   });
   if(phys) document.querySelectorAll('#mods button').forEach(b=>{
-    b.className = b.dataset.mod===shot.mod ? 'right' : b.dataset.mod===mod ? 'wrong' : '';
+    b.className = b.dataset.mod===showM ? 'right' : b.dataset.mod===mod ? 'wrong' : '';
   });
   if(!aided) showStreak(newStreak, !ok && prevStreak >= STREAK_HOT ? prevStreak : 0);
   if(settings.animate !== '0'){ animateShot(ok ? outcome(shot, shot.theta) : oc, reveal, ok ? '#ffd34d' : MISS); updateControls(); }   // Next shot works straight away
@@ -1791,7 +1803,7 @@ function renderPatterns(){
   const SR = statRefs(log), si = id => SR.findIndex(r=>r.id===id);
   const M = SR.map(()=>SR.map(()=>0));
   if(!place){
-    log.forEach(e=>{ const i=si(e.a), j=si(e.p); if(i>=0&&j>=0) M[i][j]++; });
+    log.forEach(e=>{ const i=si(e.a), j=si(viaAlt(e) ? e.a : e.p); if(i>=0&&j>=0) M[i][j]++; });
     let t = `<tr><th></th><th class="axis" colspan="${SR.length}">You called</th></tr><tr><th class="axis rowh">Real</th>${SR.map(r=>`<th>${r.label}</th>`).join('')}</tr>`;
     SR.forEach((r,i)=>{
       const tot = M[i].reduce((a,b)=>a+b,0);
