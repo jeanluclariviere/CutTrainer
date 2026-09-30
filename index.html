@@ -1593,15 +1593,16 @@ const SFX = {
   jaw:    (o, t, v)=>{ sfxTone(o, t, .06, 430, 300, .6*v, 'triangle'); sfxTone(o, t + .08, .06, 370, 260, .5*v, 'triangle'); sfxTone(o, t + .16, .28, 220, 90, .55*v); },   // clack-clack-bwomp
 };
 // schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
-function tableSounds(plan){
+function tableSounds(plan, vol){
   if(settings.sound === '0') return null;
   try{
     audioCtx();
-    const bus = actx.createGain(); bus.gain.value = 0.55;
+    const bus = actx.createGain(); bus.gain.value = 0.55*(vol ?? 1);
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
     const dly = actx.createDelay(); dly.delayTime.value = 0.08; const fb = actx.createGain(); fb.gain.value = 0.16;
     bus.connect(lp); lp.connect(actx.destination); lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(actx.destination);   // a touch of room
-    plan.forEach(([t, kind, v])=>SFX[kind](bus, Math.max(0, t), v ?? 1));
+    const lead = (actx.outputLatency || actx.baseLatency || 0) + 0.015;   // what the speaker adds, taken off so sound lands with the picture
+    plan.forEach(([t, kind, v])=>SFX[kind](bus, Math.max(0, t - lead), v ?? 1));
     return bus;
   }catch(e){ return null; }
 }
@@ -1780,9 +1781,10 @@ function answer(id, mod){
   const prevStreak = aided ? 0 : curStreak();
   const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
   // sound first: nothing else runs before it
-  if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);   // chimes are for streaks; the shot itself sounds like a shot
-  else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
-  if(settings.animate === '0') tableSounds(shotPlan(shot, ok ? outcome(shot, shot.theta) : oc, .12, .3, 0, false, false));
+  shot.duck = 1;
+  if(!aided && ok && newStreak >= STREAK_HOT){ playSound('streak', newStreak); shot.duck = 0.25; }   // chimes are for streaks; the table sounds step back under them
+  else if(!aided && !ok && prevStreak >= STREAK_HOT){ playSound('streakEnd'); shot.duck = 0.25; }
+  if(settings.animate === '0') tableSounds(shotPlan(shot, ok ? outcome(shot, shot.theta) : oc, .12, .3, 0, false, false), shot.duck);
   logEntry({p:id, m:counted?1:0, ...(phys ? {pm:mod} : {})});
   if(stats.active && stats.active.pending) delete stats.active.pending;
   if(!aided && settings.task==='sess' && level()!==null && stats.active && stats.active.task==='sess' && !stats.active.base){
@@ -1866,7 +1868,7 @@ function animateShot(oc, done, obCol){
   const T1 = d1/V, T2 = d2/V, T3 = d3/V;
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
   const cbRail = tl > 0.05 && len(sub(rayToCushion(g2, mul(tan, 1/tl)), cbEnd)) < 0.5;   // the cue ball's path reached a cushion
-  const bus = tableSounds(shotPlan(s, oc, T1, sink ? toPocket/V : T2, T3, cbRail, jawHit));
+  const bus = tableSounds(shotPlan(s, oc, T1, sink ? Math.max(0, toPocket - 1.2)/V : T2, T3, cbRail, jawHit), s.duck);
   const easeOut = u => u;   // linear: no speeding up or slowing down
   const t0 = performance.now();
   const frame = now => {
