@@ -704,7 +704,10 @@ function rotAxis(v, k, a){   // rotate v about unit axis k by angle a (Rodrigues
   return [0,1,2].map(i=>v[i]*c + kx[i]*sn + k[i]*kd*(1-c));
 }
 function cueScratches(c){
-  const end = cuePathEnd(c.gb, c.v, c.n);
+  // where the cue ball really goes after a pocket-speed stun: along the tangent line, as far as its speed carries it
+  const tan = sub(c.v, mul(c.n, dot(c.v, c.n))), tl = len(tan);
+  const reach = tl > 0.05 ? rollOut(Math.max(0.01, contactSpeed(c)*Math.sin(c.theta*RAD))).stop : 0;
+  const end = tl > 0.05 ? rayToCushion(c.gb, mul(tan, 1/tl), reach + 1) : c.gb;
   if(len(sub(end, c.gb)) < 0.5) return false;
   return POCKETS.some(P => segDist(P.t, c.gb, end) < pocketR(P) + 2.5);
 }
@@ -1160,7 +1163,13 @@ function perspSVG(s, reveal, view){
     const pts = [...pocketArc(p, pocketR(p), 1.6, true), ...pocketArc(p, pocketR(p), -0.4, true)]
       .map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
     const hull = convexHull(pts);
-    if(hull.length>2) o += `<path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z" fill="#050505"/>`;
+    if(hull.length>2){
+      // depth: black at the bottom, the far inner wall catching a little light
+      const bc = cam.toCam([p.c[0], p.c[1], -0.4]), top = cam.toCam([p.c[0], p.c[1], 1.6]);
+      const gid = 'pk' + POCKETS.indexOf(p), ys = hull.map(q=>q[1]), yTop = Math.min(...ys), yBot = Math.max(...ys);
+      o += `<linearGradient id="${gid}" gradientUnits="userSpaceOnUse" x1="0" y1="${yTop.toFixed(1)}" x2="0" y2="${yBot.toFixed(1)}"><stop offset="0" stop-color="#2b2723"/><stop offset=".45" stop-color="#0d0c0b"/><stop offset="1" stop-color="#020202"/></linearGradient>`;
+      o += `<path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z" fill="url(#${gid})"/>`;
+    }
   }
   const e = PK[0]/Math.SQRT2, sd = PK[1]/2;
   const segs = [
@@ -1178,7 +1187,10 @@ function perspSVG(s, reveal, view){
   }
   o += `<path d="${polyD(cam,rect3(6,1.6))}${polyD(cam,rect3(1.6,1.6))}" fill="#3a2618" fill-rule="evenodd"/>`;
   o += `<path d="${polyD(cam,rect3(6,1.6))}" fill="none" stroke="#553a26" stroke-width="0.75"/>`;
-  for(const p of POCKETS) o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
+  for(const p of POCKETS){
+    o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.61, true))}" fill="#080808"/>`;
+    o += `<path d="${polyD(cam, pocketArc(p, pocketR(p), 1.62, false))}" fill="none" stroke="#4a3322" stroke-width="1.6" stroke-linecap="round"/>`;   // the leather lip where the rail is cut away
+  }
   for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
   for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
   const ringArc = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
@@ -1225,7 +1237,7 @@ function perspSVG(s, reveal, view){
   // balls, far to near
   const A = s.anim, F = reveal && !A ? s.final : null;
   const items = tut.on && tut.zb > 0.5 ? [] : [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];   // the tutorial close-up looks from in front of the cue ball
-  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A ? A.obScale : 1});
+  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A && A.obZ < R ? 1 : A ? A.obScale : 1, z: A ? A.obZ : R, shadow: A ? A.obShadow : 1});
   // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
@@ -1233,7 +1245,7 @@ function perspSVG(s, reveal, view){
   const hit = (A && contact) || (reveal && !A), yours = hit && s.pick && s.pick.far;
   if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p: yours ? s.pick.g2 : s.gb, kind:'ghost', a: hit ? 1 : gA});
   if(!reveal && s.place) items.push({p:s.place, kind:'user'});
-  items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],R]);});
+  items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],it.z ?? R]);});
   items.sort((a,b)=>b.c[2]-a.c[2]);
   for(const it of items){
     if(it.c[2] < NEAR) continue;
@@ -1244,7 +1256,8 @@ function perspSVG(s, reveal, view){
     if(it.kind==='user'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".3" stroke="#fff" stroke-width="1.2"/>`; continue; }
     if(it.kind==='callghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="${s.pick.made ? NEAR_MISS_OK : MISS}" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
     if(it.kind==='ghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity="${(.22*(it.a ?? 1)).toFixed(3)}" stroke="#fff" stroke-opacity="${(it.a ?? 1).toFixed(3)}" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
-    o += `<path d="${polyD(cam, circ3([it.p[0]+.2,it.p[1]+.2], R*.95*(it.scale ?? 1), .02, 20))}" fill="#000" fill-opacity=".35"/>`;
+    if((it.shadow ?? 1) > 0.01) o += `<path d="${polyD(cam, circ3([it.p[0]+.2,it.p[1]+.2], R*.95*(it.scale ?? 1), .02, 20))}" fill="#000" fill-opacity="${(.35*(it.shadow ?? 1)).toFixed(3)}"/>`;
+    const ballStart = o.length;
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${it.kind==='cb'?'url(#cbg)':s.color[0]}"/>`;
     if(it.kind==='cb'){
       // red dots on the cue ball: they turn with its spin, so you can see the stun
@@ -1265,7 +1278,7 @@ function perspSVG(s, reveal, view){
       const moved = sub(it.p, s.ob), dl = len(moved);
       let sp = s.spot || [0,0,1];
       if(dl > 0.01) sp = rotAxis(sp, [-moved[1], moved[0], 0], dl/R);
-      const C = [it.p[0], it.p[1], R], toE = norm3([cam.E[0]-C[0], cam.E[1]-C[1], cam.E[2]-C[2]]);
+      const C = [it.p[0], it.p[1], it.z ?? R], toE = norm3([cam.E[0]-C[0], cam.E[1]-C[1], cam.E[2]-C[2]]);
       const facing = sp[0]*toE[0] + sp[1]*toE[1] + sp[2]*toE[2];
       if(facing > 0.04){
         const Sc = cam.toCam([C[0]+sp[0]*R, C[1]+sp[1]*R, C[2]+sp[2]*R]);
@@ -1277,6 +1290,15 @@ function perspSVG(s, reveal, view){
       }
     }
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#shine)"/>`;
+    if((it.z ?? R) < R - 0.01){
+      // dropping into the pocket: only what's inside the hole's opening shows, and it darkens as it goes down
+      const P = s.P, rr = pocketR(P), ring = z => Array.from({length:28}, (_, k)=>{ const a = k/28*2*Math.PI; return [P.c[0]+rr*Math.cos(a), P.c[1]+rr*Math.sin(a), z]; });
+      const hull = convexHull([...ring(0), ...ring(1.6)].map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj));
+      const dark = Math.min(.9, (R - it.z)/(3*R));
+      const ball = o.slice(ballStart);
+      o = o.slice(0, ballStart) + (hull.length > 2 ? `<clipPath id="holeclip"><path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z"/></clipPath><g clip-path="url(#holeclip)">` : '<g>')
+        + ball + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#000" fill-opacity="${dark.toFixed(3)}"/></g>`;
+    }
   }
   // Rails between the eye and the balls hide the bottom of anything behind them: redraw the near side on top.
   const sides = [
@@ -1872,6 +1894,7 @@ function animateShot(oc, done, obCol){
   // after contact the speed splits by the cut: object ball Vc·cos(cut), cue ball Vc·sin(cut)
   const cosC = Math.max(0.02, Math.min(1, dot(v2, n2))), sinC = Math.sqrt(1 - cosC*cosC);
   const mOb = rollOut(Vc*cosC), vCb = Vc*sinC, mCb = rollOut(Math.max(0.01, vCb));
+  const mIdeal = rollOut(Vc*cosTrue);   // the right call's object ball, for drawing the correct path at its pace
   // where the object ball ends: in the pocket, on the jaw, at a cushion, or wherever it stops rolling
   const lat = Math.abs(oc.lat ?? 0);
   const sink = oc.made;
@@ -1891,7 +1914,12 @@ function animateShot(oc, done, obCol){
   const cbRail = d3 > 0 && mCb.stop >= cbCush;
   const cbEnd = add(g2, mul(dirT, d3));
   const obTime = d => mOb.tFor(Math.min(d, mOb.stop));
-  const T2 = obTime(d2), T3 = d3 > 0 ? mCb.tFor(d3) : 0;
+  // into the pocket: once its centre is over the hole it falls under gravity, still drifting forward a little
+  let xIn = null;
+  if(sink){ const q = sub(ob0, s.P.c), b = dot(q, oc.u2), c = dot(q, q) - (pocketR(s.P) - 0.3)**2, disc = b*b - c; if(disc > 0) xIn = -b - Math.sqrt(disc); }
+  if(xIn !== null && xIn < 0) xIn = 0;
+  const tIn = xIn !== null ? obTime(xIn) : null, G = 386, FALL = Math.sqrt(2*3.2*R/G);   // time to drop about three ball-radii
+  const T2 = sink && tIn !== null ? tIn + FALL : obTime(d2), T3 = d3 > 0 ? mCb.tFor(d3) : 0;
   // cue ball spin: backspin that wears off by contact, then after contact the cloth builds forward roll
   const dirA = d1 > 0.01 ? mul(sub(g2, cb0), 1/d1) : [0,1], kA = [-dirA[1], dirA[0], 0], kC = [-dirT[1], dirT[0], 0];
   const ALPHA = 2.5*MU_G/R;                                         // rad/s²: how fast sliding friction changes the spin (5/2·μg/R)
@@ -1900,7 +1928,7 @@ function animateShot(oc, done, obCol){
     return t <= mCb.ts ? ALPHA*t*t/2 : ALPHA*mCb.ts*mCb.ts/2 + (mCb.x(t) - mCb.x(mCb.ts))/R; };
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
   const plan = [[T1, 'click', 1]];
-  if(sink) plan.push([T1 + obTime(Math.max(0, toPocket - 1.2)), 'drop', 1]);
+  if(sink) plan.push([T1 + (tIn !== null ? tIn + FALL*0.7 : obTime(Math.max(0, toPocket - 1.2))), 'drop', 1]);   // as it lands in the pocket
   else if(jawHit) plan.push([T1 + T2, 'jaw', 1]);
   else if(obRail) plan.push([T1 + T2, 'rail', 1]);
   const bus = tableSounds(plan, s.duck);
@@ -1908,16 +1936,22 @@ function animateShot(oc, done, obCol){
   const frame = now => {
     if(!anim) return;
     const t = (now - t0) / 1000;
-    let cb, ob = ob0, obScale = 1;
+    let cb, ob = ob0, obScale = 1, obZ = R, obShadow = 1;
     if(t < T1){ cb = add(cb0, mul(sub(g2, cb0), d1 > 0 ? Math.min(d1, xA(t))/d1 : 1)); }
     else {
-      const x2 = Math.min(d2, mOb.x(t-T1)), x3 = d3 > 0 ? Math.min(d3, mCb.x(t-T1)) : 0;
+      let x2 = Math.min(d2, mOb.x(t-T1));
+      const x3 = d3 > 0 ? Math.min(d3, mCb.x(t-T1)) : 0;
+      if(sink && tIn !== null){
+        x2 = Math.min(x2, xIn + 1.4);                                   // the pocket's back stops its forward drift
+        const tf = (t - T1) - tIn; if(tf > 0) obZ = R - G*tf*tf/2;       // gravity
+        obShadow = Math.max(0, Math.min(1, (xIn - x2)/1.2 + 1));          // the shadow slips over the edge first
+        if(obZ < -3*R) obScale = 0;
+      } else if(sink){ const past = x2 - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
       ob = add(ob0, mul(oc.u2, x2));
       cb = add(g2, mul(dirT, x3));
-      if(sink){ const past = x2 - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
     }
     const spin = {kA, kC, aA: spinA(Math.min(t, T1)), aC: t > T1 ? spinC(t - T1) : 0};
-    s.anim = {cb, spin, ob: obScale > 0.02 ? ob : null, obScale, run: t < T1 ? 0 : Vc*cosTrue*(t-T1),   // run: how far the correct path has drawn since contact
+    s.anim = {cb, spin, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, run: t < T1 ? 0 : mIdeal.x(t-T1),   // run: how far the correct path has drawn: as far as a correctly hit object ball would have rolled by now
       trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : [ob0, ob], obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
@@ -2545,7 +2579,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__ct = {renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 if(DEV && !hasBaseline()) openProg(true);   // #dev: no baseline, straight to the grade picker
