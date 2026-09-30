@@ -609,9 +609,10 @@ function setTable(size, pockets){
 }
 setTable('9','std');
 const pocketR = p => p.side ? PK[1]*0.48 : PK[0]*0.58;   // drawn hole radius
-function pocketEdge(ob, P){   // where the line from the object ball to the pocket reaches the edge of the hole
-  const d = len(sub(P.t, ob)), u = norm(sub(P.t, ob)), q = sub(ob, P.c), b = dot(q, u), c = dot(q, q) - pocketR(P)**2, disc = b*b - c;
-  return disc > 0 ? add(ob, mul(u, Math.max(0, Math.min(d, -b - Math.sqrt(disc))))) : P.t;
+function pocketEdge(ob, P, T){   // where the line from the object ball to the pocket (aimed at T) reaches the edge of the hole
+  T = T || P.t;
+  const d = len(sub(T, ob)), u = norm(sub(T, ob)), q = sub(ob, P.c), b = dot(q, u), c = dot(q, q) - pocketR(P)**2, disc = b*b - c;
+  return disc > 0 ? add(ob, mul(u, Math.max(0, Math.min(d, -b - Math.sqrt(disc))))) : T;
 }
 const MISS = '#d9c2ff', NEAR_MISS_OK = '#d9c2ff';   // your call's path: informational, not a verdict
 
@@ -657,6 +658,7 @@ const MU_G = 108;                                     // sliding friction μ·g,
 const A_ROLL = 6;                                     // rolling resistance, in/s²
 const POCKET_ARRIVE = 14;                             // pocket speed: how fast the object ball is still going as it drops, in/s
 const MOD_DEG = 3;
+const CHEAT_SHARE = 0.4;   // any-angle shots aimed at one side of the pocket instead of the middle
 const PHYS_SPREAD = 4;                              // speed & throw shots look within this many degrees of a fraction                                   // how far a "thick" or "thin" call moves the hit, in degrees of cut
 const MODS = [{id:'thick', label:'Thick', key:'←'}, {id:'center', label:'Center', key:'↓'}, {id:'thin', label:'Thin', key:'→'}];
 
@@ -734,7 +736,10 @@ function generate(){
     const phi = chooseAim(weightedIndex(w));
     const P = pick(POCKETS);
     const ob = [rnd(3,W-3), rnd(3,H-3)];
-    const toP = sub(P.t, ob), dist = len(toP);
+    // any angle: some shots cheat the pocket, aimed at one side of it instead of the middle (well inside what still drops)
+    const uC = norm(sub(P.t, ob)), tolC = pocketTol(P, uC), cheat = anyOn() && Math.random() < CHEAT_SHARE ? rnd(-1, 1)*0.7*tolC : 0;
+    const T = add(P.t, mul([-uC[1], uC[0]], cheat));
+    const toP = sub(T, ob), dist = len(toP);
     if(dist < RANGE.p[0] || dist > RANGE.p[1]) continue;
     const u = norm(toP);
     if(P.side){ if(dot(u, mul(P.n,-1)) < Math.cos(38*RAD)) continue; }
@@ -750,11 +755,11 @@ function generate(){
     const d = rnd(RANGE.d[0], RANGE.d[1]);
     const cb = sub(gb, mul(v, d));
     if(cb[0]<2||cb[0]>W-2||cb[1]<2||cb[1]>H-2) continue;
-    if(segDist(cb, ob, P.t) < 2*R+0.4) continue;
+    if(segDist(cb, ob, T) < 2*R+0.4) continue;
     if(len(sub(cb,ob)) < 4*R) continue;
     const right = [-v[1], v[0]];
     const cand = {any: anyOn(), phys, speed, len:lenCls, theta:cut, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
-      L: dist, tol: pocketTol(P,u), side: dot(u,right)>0?'R':'L',
+      L: dist, tol: tolC, T, uC, cheat, side: dot(u,right)>0?'R':'L',
       color: pick(OB_COLORS), answer: nearestRef(tp), pick:null, spot: spotToward(sub(cb, ob))};
     if(phys){
       // center if the plain fraction pockets at this speed; otherwise which way the hit has to move
@@ -768,6 +773,7 @@ function generate(){
         ? {id: nb.id, mod: cand.mod==='thin' ? 'thick' : 'thin'} : null;
       cand.throwDeg = cut - tp;
     }
+    if(!outcome(cand, cut).made) continue;                // the right call has to drop
     if(!fallback) fallback = cand;
     if(cand.any && !phys && !outcome(cand, cand.answer.deg).made) continue;   // any angle: only cuts the plain fraction still pockets
     if(cueScratches(cand)) continue;                   // don't deal shots where the cue ball rolls into a pocket
@@ -850,7 +856,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 124;   // one per commit to main
+const BUILD = 125;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -949,10 +955,11 @@ function outcome(s, phiC){
   const g2 = add(s.cb, mul(v2,t));
   const u2 = rot(v2, -s.sign*(phiC - throwFor(s, phiC))*RAD);
   const err = Math.atan2(s.u[0]*u2[1]-s.u[1]*u2[0], dot(s.u,u2));
-  const lat = s.L*Math.sin(err);
+  const lat = s.L*Math.sin(err);   // off the shot's line (which may cheat the pocket)
+  const uC = s.uC || s.u, errC = Math.atan2(uC[0]*u2[1]-uC[1]*u2[0], dot(uC,u2)), latC = s.L*Math.sin(errC);   // off the pocket's middle: what decides it
   // pocket speed: a hit thinner than the right one sends the object ball off slower, and it can die short of the pocket
   const reach = rollOut(contactSpeed(s)*Math.cos(phiC*RAD)).stop, short = reach < s.L - 0.5;
-  return {v2, g2, u2, lat, made: Math.abs(lat) <= s.tol && !short, short: Math.abs(lat) <= s.tol && short};
+  return {v2, g2, u2, lat, latC, made: Math.abs(latC) <= s.tol && !short, short: Math.abs(latC) <= s.tol && short};
 }
 // the cue ball's speed at contact for a pocket-speed shot: the right hit gets the object ball to the pocket, arriving slowly
 function contactSpeed(s){ return pocketSpeedFor(Math.max(1, s.L))/Math.max(0.2, Math.cos(s.theta*RAD)); }
@@ -1002,7 +1009,7 @@ function tableSVG(s, reveal){
   if(reveal){
     const {cb,ob,gb,u,v,n,theta} = s;
     const cueEnd = add(gb, mul(v, 7));
-    const pe = pocketEdge(ob, P);
+    const pe = pocketEdge(ob, P, s.T);
     o += `<line x1="${f2(ob[0])}" y1="${f2(ob[1])}" x2="${f2(pe[0])}" y2="${f2(pe[1])}" stroke="#ffd34d" stroke-width=".3" stroke-dasharray="1 .7"/>`;
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, end = add(ob, mul(pk.u2, s.L+3));
@@ -1239,7 +1246,7 @@ function perspDyn(cam, s, reveal){
   let o = '';
   // the correct path to the pocket draws itself from contact on, as if the object ball were rolling along it
   if(reveal || (s.anim && s.anim.run > 0)){
-    const pe = pocketEdge(s.ob, s.P), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
+    const pe = pocketEdge(s.ob, s.P, s.T), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
     const end = add(s.ob, mul(sub(pe, s.ob), k));
     if(k > 0.002) o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[end[0],end[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
@@ -2038,7 +2045,7 @@ function animateShot(oc, done, obCol){
   // after contact the object ball leaves along the line of centres at Vc·cos(cut), with no spin: it slides, then rolls
   const cosC = Math.max(0.02, Math.min(1, dot(v2, n2)));
   const mOb = rollOut(Vc*cosC), mIdeal = rollOut(Vc*cosTrue);
-  const lat = Math.abs(oc.lat ?? 0);
+  const lat = Math.abs(oc.latC ?? oc.lat ?? 0);
   const sink = oc.made;
   const jawHit = !oc.made && toPocket > 4 && lat < s.tol + 2.4 && mOb.stop >= toPocket - 2.8;
   // a miss that isn't a jaw: the object ball runs free, off the cushions, maybe into another pocket
@@ -2055,7 +2062,7 @@ function animateShot(oc, done, obCol){
   const tEnd = sim.end.t + (sim.pocket ? FALL : 0);
   // a miss: the see-through object ball that shows the right call's path, rolling at the right call's speed into the pocket
   let gIn = null, tGIn = null;
-  const uI = norm(sub(s.P.t, ob0));
+  const uI = norm(sub(s.T || s.P.t, ob0));
   if(!sink){ const q = sub(ob0, s.P.c), b = dot(q, uI), c = dot(q, q) - (pocketR(s.P) - 0.3)**2, disc = b*b - c; if(disc > 0){ gIn = Math.max(0, -b - Math.sqrt(disc)); tGIn = mIdeal.tFor(gIn); } }
   const TG = tGIn !== null ? tGIn + FALL : 0;
   const total = Math.max(T1 + T2, tEnd, T1 + TG) * 1000 + 280;   // short hold so you see where the balls stopped
