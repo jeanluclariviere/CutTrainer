@@ -556,8 +556,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-aids" hidden>
   <section class="aids">
-    <div class="aid"><span class="aidname" tabindex="0" id="tip-line">Aim line<small class="aidat" id="at-line"></small></span>
-      <div class="seg" role="group" aria-label="Aim line">
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-line">Guide line<small class="aidat" id="at-line"></small></span>
+      <div class="seg" role="group" aria-label="Guide line">
         <button id="line-0" data-set="line" data-val="0">Off</button>
         <button id="line-1" data-set="line" data-val="1">On</button>
       </div>
@@ -792,7 +792,7 @@ const GRADE_FROM = [0,30,35,40,45,50,55,60,66,72,78,84];   // baseline % for eac
 // Each aid: forced on, then fading away (after a delay, in ms), then gone for good and yours to switch on as practice.
 const AIDS = {
   ghost:  {name:'Ghost ball', fade:{4:1500, 5:750}, goneAt:6, tip:'Shows where the cue ball has to be at contact.'},
-  line:   {name:'Aim line',   fade:{1:1500, 2:750}, goneAt:3, tip:'A line drawn from the cue ball along the shot line, to the ghost ball.'},
+  line:   {name:'Guide line', fade:{1:1500, 2:750}, goneAt:3, tip:'A dotted line drawn from the cue ball to the ghost ball.'},
   stance: {name:'Aim-line stance', fade:{},          goneAt:7, tip:'You look from directly behind the cue, on the line it travels, so the overlap is plain to see. From the ball line you stand behind the cue ball instead, as in a real read.'},
 };
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
@@ -833,16 +833,22 @@ const stanceAim = () => aidAlpha('stance') > 0;
 const physOn = () => adaptiveOn() && level()!==null && level() >= PHYS_AT;
 const anyOn = () => adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
+const AID_SET = {ghost:['ghost','0'], line:['line','0'], stance:['cam','line']};
+function aidsOffBelow(from, to){   // aids whose grade you've just reached for the first time start off
+  let ch = false;
+  for(const k in AIDS){ const at = AIDS[k].goneAt; if(from < at && to >= at){ const [key, off] = AID_SET[k]; if(settings[key] !== off){ settings[key] = off; ch = true; } } }
+  if(ch) saveSettings();
+}
 function enforceLocks(){
   if(baseRun()) return;
   if(fastFlashLocked() && settings.flash==='750'){ settings.flash = '1500'; saveSettings(); }
 }
 // what reaching each grade brings (first time only for aids going away)
-const LADDER_UP = {1:'Aim line fades after 1.5 s', 2:'Aim line fades after 0.75 s', 3:'Aim line gone: now an optional aid',
+const LADDER_UP = {1:'Guide line fades after 1.5 s', 2:'Guide line fades after 0.75 s', 3:'Guide line gone: now an optional aid',
   4:'👻 Ghost ball fades after 1.5 s', 5:'👻 Ghost ball fades after 0.75 s', 6:'Ghost ball gone: now an optional aid',
   7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Speed & throw', 10:'All three speeds',
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
-const LADDER_TEXT = ['Aim line, ghost ball and aim-line stance all on', 'Aim line fades after 1.5 s', 'Aim line fades after 0.75 s', 'Aim line gone: now an optional aid',
+const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide line fades after 1.5 s', 'Guide line fades after 0.75 s', 'Guide line gone: now an optional aid',
   'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone: now an optional aid', 'Ball line: read it from behind the cue ball',
   'Any angle', 'Speed & throw, medium speed', 'All three speeds', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
@@ -854,6 +860,7 @@ function setGradeForTesting(i){
     const p0 = GRADE_FROM[Math.min(i, GRADE_FROM.length-1)];
     stats.sessions = (stats.sessions||[]).concat({id:'dev', task:'sess', size:100, n:100, right:p0, made:p0, start:Date.now(), end:Date.now(), base:1, dev:1, stand:p0, down:p0, grade:i});
   }
+  aidsOffBelow(-1, i);   // testing: every aid you're past starts off
   stats.level = {g: i, best: i, pts: 0, v: 2}; save(); showSessIdle();
   enforceLocks(); syncPressed(); renderBadge(true); renderProgress(); renderStats();
   if(!answered) deal();
@@ -889,6 +896,7 @@ function renderBadge(pop){
 let lvlTimer = 0;
 function showLevel(d, from){
   const to = level(), notes = [];
+  if(d > 0) aidsOffBelow(stats.level.bestBefore ?? from, to);
   if(d > 0){ const n = LADDER_UP[to]; if(n && !(to <= 7 && stats.level.bestBefore >= to)) notes.push(n); }   // aid steps only the first time
   else if(LADDER_DOWN[from]) notes.push(LADDER_DOWN[from]);
   enforceLocks(); syncPressed(); renderBadge(true);
@@ -1597,7 +1605,7 @@ function finishSession(){
   restoreView(a);
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
   stats.active = null; syncPressed();
-  if(rec.base){ const g0 = gradeFor(pct(rec.right, rec.n)); stats.level = {g: g0, best: g0, pts: 0, v: 2}; rec.grade = stats.level.g; enforceLocks(); syncPressed(); renderBadge(true); playSound('levelup'); }
+  if(rec.base){ const g0 = gradeFor(pct(rec.right, rec.n)); stats.level = {g: g0, best: g0, pts: 0, v: 2}; aidsOffBelow(-1, g0); rec.grade = stats.level.g; enforceLocks(); syncPressed(); renderBadge(true); playSound('levelup'); }
   else if(a.task==='sess' && a.g0!=null){ rec.g0 = a.g0; rec.grade = level(); }
   stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
 }
@@ -2400,7 +2408,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test' || DEV) window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 if(DEV && !hasBaseline()) openProg(true);   // #dev: no baseline, straight to the grade picker
