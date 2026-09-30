@@ -835,7 +835,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 105;   // one per commit to main
+const BUILD = 106;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1205,14 +1205,14 @@ function perspSVG(s, reveal, view){
   if(reveal || (s.anim && s.anim.run > 0)){
     const pe = pocketEdge(s.ob, s.P), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
     const end = add(s.ob, mul(sub(pe, s.ob), k));
-    if(k > 0.002) o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[end[0],end[1],.03])}" stroke="#ffd34d" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 4"/>`;
+    if(k > 0.002) o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[end[0],end[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
   if(reveal){
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
       const into = dot(sub(s.P.t, s.ob), pk.u2);   // lines end at the cushion, or in the pocket if it drops
-      const pts = stop ? [s.ob, stop] : [s.ob, pk.made ? add(s.ob, mul(pk.u2, into)) : rayToCushion(s.ob, pk.u2)];
-      for(let k=0;k<pts.length-1;k++) o += `<path d="${segD(cam,[pts[k][0],pts[k][1],.03],[pts[k+1][0],pts[k+1][1],.03])}" stroke="${col}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 4"/>`;
+      const pts = stop ? [s.ob, stop] : pk.made ? [s.ob, add(s.ob, mul(pk.u2, into))] : s.final && s.final.obPath ? s.final.obPath : [s.ob, rayToCushion(s.ob, pk.u2)];   // a miss: the whole path it ran, cushions and all
+      o += dashedLine(cam, pts, col, 1, '3 4');
       const gc = cam.toCam([pk.g2[0],pk.g2[1],R]);
       if(gc[2] > NEAR){ const [gx,gy] = cam.proj(gc); o += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="${(cam.focal*R/gc[2]).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.125" stroke-dasharray="4 3"/>`; }
     }
@@ -1226,23 +1226,13 @@ function perspSVG(s, reveal, view){
   // trails: where the balls have travelled (during the animation, and the cue ball's path afterwards)
   const trail = s.anim ? s.anim.trail : (reveal && s.final ? s.final.trail : null);
   if(trail){
-    // one continuous line (so the dashes run evenly round the curve), unless part of it is behind the eye
-    const cs = trail.cb.map(q=>cam.toCam([q[0], q[1], .03]));
-    if(cs.every(c=>c[2] > NEAR)){
-      const d = cs.map((c,i)=>{ const [x,y] = cam.proj(c); return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); }).join('');
-      o += `<path d="${d}" fill="none" stroke="#f4efe0" stroke-opacity=".6" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 4"/>`;
-    } else for(let k=0;k<trail.cb.length-1;k++){
-      const a = trail.cb[k], b = trail.cb[k+1];
-      if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" stroke="#f4efe0" stroke-opacity=".6" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2 4"/>`;
-    }
-    if(trail.ob) for(let k=0;k<trail.ob.length-1;k++){
-      const a = trail.ob[k], b = trail.ob[k+1];
-      if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" stroke="${trail.obCol}" stroke-opacity=".9" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="3 4"/>`;
-    }
+    o += dashedLine(cam, trail.cb, '#f4efe0', .6, '2 4');
+    if(trail.ob && trail.obCol !== '#ffd34d') o += dashedLine(cam, trail.ob, trail.obCol, .9, '3 4');   // on a right call the yellow line already grows along it
   }
+
   // the aim-line aid: a line on the cloth from the cue ball along the shot line to the ghost ball (may be fading away)
   const lA = reveal || s.anim ? 0 : aidAlpha('line');
-  if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [s.gb[0], s.gb[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.9*lA).toFixed(3)}" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="3 4"/>`; }
+  if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [s.gb[0], s.gb[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.9*lA).toFixed(3)}" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`; }
   // balls, far to near
   const A = s.anim, F = reveal && !A ? s.final : null;
   const cbP = A ? A.cb : F ? F.cb : s.cb;   // null once the cue ball has dropped into a pocket
@@ -1351,6 +1341,17 @@ function perspSVG(s, reveal, view){
   return o;
 }
 
+// a dashed path on the cloth, as one continuous line so the dashes run evenly round curves and corners
+// (split into pieces only when part of it is behind the eye)
+const DASH_W = 1.3;
+function dashedLine(cam, pts, col, op, dash){
+  const attrs = `fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width="${DASH_W}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${dash}"`;
+  const cs = pts.map(q=>cam.toCam([q[0], q[1], .03]));
+  if(cs.every(c=>c[2] > NEAR)) return `<path d="${cs.map((c,i)=>{ const [x,y] = cam.proj(c); return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); }).join('')}" ${attrs}/>`;
+  let o = '';
+  for(let k=0;k<pts.length-1;k++){ const a = pts[k], b = pts[k+1]; if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" ${attrs}/>`; }
+  return o;
+}
 function draw(reveal){
   const box = document.querySelector('.table-box'), svg = $('table'), v = settings.view;
   document.querySelector('.main').classList.toggle('persp', v!=='top');
@@ -2036,7 +2037,7 @@ function animateShot(oc, done, obCol){
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
-  s.final = {cb: sim.pocket ? null : sim.end.p, spin: {M: sim.end.M}, ob: sink || (free && free.pocket) ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, ...postPts.map(q=>q.p)]}};
+  s.final = {obPath: free ? obPts.map(q=>q.p).concat([free.end.p]) : null, cb: sim.pocket ? null : sim.end.p, spin: {M: sim.end.M}, ob: sink || (free && free.pocket) ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, ...postPts.map(q=>q.p)]}};
   anim = {done, t0, total, bus, raf: requestAnimationFrame(frame)};
 }
 function finishAnim(){
