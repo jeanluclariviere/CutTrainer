@@ -48,7 +48,7 @@ function nz(o, at, dur, type, freq, q, gain){
   s.connect(f).connect(g).connect(o); s.start(t, Math.random()*.5); s.stop(t + dur + .02);
 }
 const SETS = {
-  A: {name:'A · Arcade', note:'Pitched blips with a light echo', echo:.16, sfx:{
+  A: {name:'A · Arcade (in the trainer now, no strike)', note:'Pitched blips with a light echo', echo:.16, sfx:{
     strike:(o,t)=>{ tn(o,t,.075,330,140,.9,'triangle'); nz(o,t,.02,'bandpass',3000,1,.3); },
     click:(o,t)=>{ tn(o,t,.12,1568,0,.55); tn(o,t,.08,2349,0,.3); tn(o,t,.025,3136,0,.12,'triangle'); },
     drop:(o,t)=>{ tn(o,t,.14,540,170,.8,'triangle'); tn(o,t+.13,.16,1046.5,0,.45); tn(o,t+.21,.3,1568,0,.45); },
@@ -76,7 +76,7 @@ const SETS = {
     rail:(o,t)=>{ nz(o,t,.08,'lowpass',500,.9,.6); tn(o,t,.1,140,90,.6); },
     jaw:(o,t)=>{ nz(o,t,.04,'bandpass',900,2,.5); tn(o,t,.06,260,200,.45,'triangle'); nz(o,t+.07,.05,'bandpass',800,2,.4); tn(o,t+.12,.16,150,90,.4); },
   }},
-  F: {name:'F · Few notes (in the trainer now)', note:'Warm tones: 1 strike, 1 contact, 3 pocket, 1 rail, 2 jaw', echo:.1, sfx:{
+  F: {name:'F · Few notes', note:'Warm tones: 1 strike, 1 contact, 3 pocket, 1 rail, 2 jaw', echo:.1, sfx:{
     strike:(o,t)=>{ tn(o,t,.08,226,143,.7,'triangle'); },
     click:(o,t)=>{ tn(o,t,.07,1397,1250,.45); },
     drop:(o,t)=>{ tn(o,t,.1,293.66,0,.5,'triangle'); tn(o,t+.09,.1,392,0,.5,'triangle'); tn(o,t+.18,.26,493.88,0,.55,'triangle'); },

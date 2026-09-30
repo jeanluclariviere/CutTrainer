@@ -1585,13 +1585,12 @@ function sfxTone(out, at, dur, f0, f1, gain, type){   // a short pitched knock t
   g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
-// few notes, warm tones: one for the strike, one for contact, three for the pocket, one for the rail, two for the jaw
+// arcade-style: short pitched blips with a light echo
 const SFX = {
-  strike: (o, t, v)=>{ sfxTone(o, t, .08, 226, 143, .7*v, 'triangle'); },                                                   // thock
-  click:  (o, t, v)=>{ sfxTone(o, t, .07, 1397, 1250, .45*v); },                                                             // tock
-  drop:   (o, t, v)=>{ sfxTone(o, t, .1, 293.66, 0, .5, 'triangle'); sfxTone(o, t + .09, .1, 392, 0, .5, 'triangle'); sfxTone(o, t + .18, .26, 493.88, 0, .55, 'triangle'); },   // rising three: D, G, B
-  rail:   (o, t, v)=>{ sfxTone(o, t, .2, 202, 101, .7*v); },                                                                  // bump
-  jaw:    (o, t, v)=>{ sfxTone(o, t, .07, 393, 333, .55*v, 'triangle'); sfxTone(o, t + .09, .24, 238, 131, .6*v); },           // knock, then sag
+  click:  (o, t, v)=>{ sfxTone(o, t, .12, 1568, 0, .55*v); sfxTone(o, t, .08, 2349, 0, .3*v); sfxTone(o, t, .025, 3136, 0, .12*v, 'triangle'); },   // tink
+  drop:   (o, t, v)=>{ sfxTone(o, t, .14, 540, 170, .8*v, 'triangle'); sfxTone(o, t + .13, .16, 1046.5, 0, .45); sfxTone(o, t + .21, .3, 1568, 0, .45); },  // bloop, then a rising pling
+  rail:   (o, t, v)=>{ sfxTone(o, t, .22, 260, 105, .8*v); sfxTone(o, t, .18, 390, 150, .3*v, 'triangle'); },                                      // bonk
+  jaw:    (o, t, v)=>{ sfxTone(o, t, .06, 430, 300, .6*v, 'triangle'); sfxTone(o, t + .08, .06, 370, 260, .5*v, 'triangle'); sfxTone(o, t + .16, .28, 220, 90, .55*v); },   // clack-clack-bwomp
 };
 // schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
 function tableSounds(plan){
@@ -1600,7 +1599,7 @@ function tableSounds(plan){
     audioCtx();
     const bus = actx.createGain(); bus.gain.value = 0.55;
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
-    const dly = actx.createDelay(); dly.delayTime.value = 0.08; const fb = actx.createGain(); fb.gain.value = 0.1;
+    const dly = actx.createDelay(); dly.delayTime.value = 0.08; const fb = actx.createGain(); fb.gain.value = 0.16;
     bus.connect(lp); lp.connect(actx.destination); lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(actx.destination);   // a touch of room
     plan.forEach(([t, kind, v])=>SFX[kind](bus, Math.max(0, t), v ?? 1));
     return bus;
@@ -1608,12 +1607,10 @@ function tableSounds(plan){
 }
 function cutSounds(bus){ if(!bus || !actx) return; try{ bus.gain.setTargetAtTime(0, actx.currentTime, 0.01); setTimeout(()=>{ try{ bus.disconnect(); }catch(e){} }, 250); }catch(e){} }
 const SPEED_VOL = {slow:.7, medium:1, firm:1.25};
-// the sounds of a shot, played out: strike, contact, then the pocket, the jaw or the rail (and the cue ball on a rail)
+// the sounds of a shot: two only, the contact and then what the object ball does (pocket, jaw or rail)
 function shotPlan(s, oc, T1, tOb, tCb, cbRail, jawHit){
-  const v = SPEED_VOL[s.speed] || 1, plan = [[0, 'strike', v], [T1, 'click', v]];
-  plan.push([T1 + tOb, oc.made ? 'drop' : jawHit ? 'jaw' : 'rail', v]);
-  if(cbRail && tCb > 0.05) plan.push([T1 + tCb, 'rail', .45*v]);
-  return plan;
+  const v = SPEED_VOL[s.speed] || 1;
+  return [[T1, 'click', v], [T1 + tOb, oc.made ? 'drop' : jawHit ? 'jaw' : 'rail', v]];
 }
 
 // ---------- sessions ----------
