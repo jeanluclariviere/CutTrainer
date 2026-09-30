@@ -40,6 +40,37 @@
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
 .wrap{max-width:1680px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.gradebadge{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:58px;padding:7px 10px 8px;border-radius:12px;background:#10283d;color:#ffd34d;box-shadow:0 1px 3px rgba(0,0,0,.18)}
+.gradebadge b{font:700 26px/1 var(--display);letter-spacing:.02em}
+.bbar{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden}
+.bbar i{display:block;height:100%;width:0;background:#ffd34d;border-radius:2px;transition:width .25s}
+.bbar i.neg{background:#ff8a7a}
+.gradebadge.pop{animation:badgepop .7s ease-out}
+@keyframes badgepop{0%{transform:scale(1)}35%{transform:scale(1.3)}100%{transform:scale(1)}}
+.lvlcard{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;pointer-events:none;color:#fff;background:radial-gradient(circle at center,rgba(10,26,40,.88) 0,rgba(10,26,40,.6) 40%,transparent 75%);text-align:center;padding:0 16px}
+.lvlcard small{font:700 15px var(--display);letter-spacing:.14em;text-transform:uppercase;color:#c9d7e0}
+.lvlcard b{font:700 104px/1 var(--display);color:#ffd34d;text-shadow:0 0 28px rgba(255,211,77,.55)}
+.lvlcard span{font-size:15px;color:#e6eef3}
+.lvlcard.down b{color:#c9d7e0;text-shadow:none}
+.lvlcard.show{animation:lvlin 2.8s ease-out forwards}
+.lvlcard.show b{animation:lvlpop .6s cubic-bezier(.2,1.6,.4,1)}
+@keyframes lvlin{0%{opacity:0}8%{opacity:1}80%{opacity:1}100%{opacity:0}}
+@keyframes lvlpop{0%{transform:scale(.4)}100%{transform:scale(1)}}
+.hright{display:flex;align-items:center;gap:10px;margin-left:auto}
+.cog{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;padding:0}
+.cog:hover{color:var(--ink)}
+.menu{position:fixed;inset:0;z-index:60;background:rgba(10,26,40,.35);display:flex;justify-content:flex-end;align-items:flex-start;padding:70px 16px 16px}
+.menucard{background:var(--bg);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.25);padding:14px 16px 16px;display:flex;flex-direction:column;gap:12px;width:min(100%,360px)}
+.menuhead{display:flex;justify-content:space-between;align-items:center;font:700 20px var(--display)}
+.menuclose{background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer;padding:4px 6px}
+.menucard .opt{justify-content:space-between}
+.aids{display:flex;flex-direction:column;gap:4px}
+.aid{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.aid .seg button{padding:4px 12px}
+.aidname{position:relative;font-weight:600;cursor:help;outline:none;display:flex;align-items:baseline;gap:8px}
+.aidname:focus-visible{text-decoration:underline dotted}
+.aidat{font:500 12px var(--mono);color:var(--muted)}
+.aidname[data-tip]:hover::after,.aidname[data-tip]:focus::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);z-index:10;width:min(270px,70vw);background:var(--ink);color:var(--bg);font:400 13px/1.4 var(--body);padding:8px 10px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.2);white-space:normal}
 .livelink{font:600 14px var(--body);color:var(--accent-ink);background:var(--accent);text-decoration:none;padding:8px 14px;border-radius:999px;white-space:nowrap}
 h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;letter-spacing:.01em;margin:0;text-wrap:balance}
 .sub{color:var(--muted);margin:4px 0 0;max-width:60ch}
@@ -289,8 +320,49 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <h1>Cut Trainer</h1>
     </div>
     <a class="livelink" href="ar.html" id="livelink" hidden>Live AR ›</a>
+    <div class="hright">
+      <div class="gradebadge" id="badge" hidden><b id="badgeg"></b><span class="bbar"><i id="badgefill"></i></span></div>
+      <button class="cog" id="cog" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.8h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9-2.6-.5v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    </div>
   </header>
 
+
+  <div class="menu" id="menu" hidden>
+    <div class="menucard" role="dialog" aria-label="Settings">
+      <div class="menuhead"><span>Settings</span><button class="menuclose" id="menuclose" aria-label="Close">✕</button></div>
+      <div class="opt">View
+        <div class="seg" role="group" aria-label="View">
+          <button id="view-stand" data-set="view" data-val="stand">Standing</button>
+          <button id="view-down" data-set="view" data-val="down">Down on the ball</button>
+        </div>
+      </div>
+      <div class="opt">Table
+        <div class="seg" role="group" aria-label="Table size">
+          <button id="table-7" data-set="table" data-val="7">7 ft</button>
+          <button id="table-8" data-set="table" data-val="8">8 ft</button>
+          <button id="table-9" data-set="table" data-val="9">9 ft</button>
+        </div>
+      </div>
+      <div class="opt">Full-ball shots
+        <div class="seg" role="group" aria-label="Full-ball shots">
+          <button id="full-0" data-set="full" data-val="0">Off</button>
+          <button id="full-1" data-set="full" data-val="1">On</button>
+        </div>
+      </div>
+      <div class="opt">Shot animation
+        <div class="seg" role="group" aria-label="Shot animation">
+          <button id="animate-0" data-set="animate" data-val="0">Off</button>
+          <button id="animate-1" data-set="animate" data-val="1">On</button>
+        </div>
+      </div>
+      <div class="opt">Sound
+        <div class="seg" role="group" aria-label="Sound">
+          <button id="sound-0" data-set="sound" data-val="0">Off</button>
+          <button id="sound-1" data-set="sound" data-val="1">On</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="main">
     <div class="tablecol">
@@ -313,12 +385,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
               <span>Shot shows for</span>
               <div class="fpseg" role="group" aria-label="How long each shot shows">
                 <button id="flash-1500" data-set="flash" data-val="1500">1.5 s</button>
-                <button id="flash-750" data-set="flash" data-val="750">0.75 s</button>
+                <button id="flash-750" data-set="flash" data-val="750">0.75 s<span class="lock" id="fastlock" hidden> 🔒</span></button>
               </div>
             </div>
             <div class="sumbtns" id="sessbtns"><button class="startbtn" data-sess="50">50 shots</button><button class="startbtn" data-sess="100">100 shots</button></div>
             <div class="sumbtns" id="basebtns" hidden><button class="startbtn" id="basestart">Baseline · 100 shots</button></div>
-            <button class="link endkeep" id="rebase" hidden>New baseline</button>
           </div>
         </div>
         <div class="cover sumcover" id="endcover" hidden>
@@ -330,6 +401,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           </div>
         </div>
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
+        <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
       </div>
       <div class="flashtrack"><div class="flashbar" id="flashbar" hidden></div></div>
@@ -356,7 +428,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="tabs" role="tablist" aria-label="Details">
         <button class="tab" role="tab" data-tab="shot" id="tabbtn-shot">Shot</button>
         <button class="tab" role="tab" data-tab="stats" id="tabbtn-stats">Stats</button>
-        <button class="tab" role="tab" data-tab="settings" id="tabbtn-settings">Settings</button>
+        <button class="tab" role="tab" data-tab="aids" id="tabbtn-aids">Aids</button>
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-shot"><div class="result" id="result"></div></div>
       <div class="tabpanel" role="tabpanel" id="tab-stats" hidden>
@@ -424,60 +496,25 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="foot"><span>Best streak: <b id="s-best">0</b></span><button class="link" id="reset">Reset this mode</button></div>
       </div>
-      <div class="tabpanel" role="tabpanel" id="tab-settings" hidden>
-  <section class="settings">
-    <div class="options">
-    
-    <div class="opt">View
-      <div class="seg" role="group" aria-label="View">
-        <button id="view-stand" data-set="view" data-val="stand">Standing</button>
-        <button id="view-down" data-set="view" data-val="down">Down on the ball</button>
+      <div class="tabpanel" role="tabpanel" id="tab-aids" hidden>
+  <section class="aids">
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-aim">Aim line<span class="lock" id="aimlock" hidden> 🔒</span><small class="aidat" id="at-aim"></small></span>
+      <div class="seg" role="group" aria-label="Aim line">
+        <button id="cam-line" data-set="cam" data-val="line">Off</button>
+        <button id="cam-aim" data-set="cam" data-val="aim">On</button>
       </div>
     </div>
-    <div class="opt">Table
-      <div class="seg" role="group" aria-label="Table size">
-        <button id="table-7" data-set="table" data-val="7">7 ft</button>
-        <button id="table-8" data-set="table" data-val="8">8 ft</button>
-        <button id="table-9" data-set="table" data-val="9">9 ft</button>
-      </div>
-    </div>
-    <div class="opt">Distance
-      <div class="seg" role="group" aria-label="Distance">
-        <button id="len-short" data-set="len" data-val="short">Short</button>
-        <button id="len-long" data-set="len" data-val="long">Long</button>
-        <button id="len-both" data-set="len" data-val="both">Both</button>
-      </div>
-    </div>
-    <div class="opt">Stance
-      <div class="seg" role="group" aria-label="Stance">
-        <button id="cam-line" data-set="cam" data-val="line">Ball line</button>
-        <button id="cam-aim" data-set="cam" data-val="aim">Aim line</button>
-      </div>
-    </div>
-    <div class="opt"><span>Ghost ball<span class="lock" id="ghostlock" hidden> 🔒</span></span>
-      <div class="seg" role="group" aria-label="Show ghost ball">
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-ghost">Ghost ball<span class="lock" id="ghostlock" hidden> 🔒</span><small class="aidat" id="at-ghost"></small></span>
+      <div class="seg" role="group" aria-label="Ghost ball">
         <button id="ghost-0" data-set="ghost" data-val="0">Off</button>
         <button id="ghost-1" data-set="ghost" data-val="1">On</button>
       </div>
     </div>
-    <div class="opt">Shot animation
-      <div class="seg" role="group" aria-label="Shot animation">
-        <button id="animate-0" data-set="animate" data-val="0">Off</button>
-        <button id="animate-1" data-set="animate" data-val="1">On</button>
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-walk">Looking around<span class="lock" id="walklock" hidden> 🔒</span><small class="aidat" id="at-walk"></small></span>
+      <div class="seg" role="group" aria-label="Looking around">
+        <button id="walk-0" data-set="walk" data-val="0">Off</button>
+        <button id="walk-1" data-set="walk" data-val="1">On</button>
       </div>
-    </div>
-    <div class="opt">Sound
-      <div class="seg" role="group" aria-label="Sound">
-        <button id="sound-0" data-set="sound" data-val="0">Off</button>
-        <button id="sound-1" data-set="sound" data-val="1">On</button>
-      </div>
-    </div>
-    <div class="opt">Full-ball shots
-      <div class="seg" role="group" aria-label="Full-ball shots">
-        <button id="full-0" data-set="full" data-val="0">Off</button>
-        <button id="full-1" data-set="full" data-val="1">On</button>
-      </div>
-    </div>
     </div>
   </section>
       </div>
@@ -531,7 +568,7 @@ function segDist(p,a,b){const ab=sub(b,a);const t=Math.max(0,Math.min(1,dot(sub(
 function f2(n){return n.toFixed(2);}
 
 // ---------- settings & stats ----------
-const settings = {view:'stand', mode:'ref', flash:'0', throw:'0', full:'1', cam:'line', task:'sess', len:'both', table:'9', pockets:'std'};
+const settings = {walk:'1', view:'stand', mode:'ref', flash:'0', throw:'0', full:'1', cam:'line', task:'sess', len:'both', table:'9', pockets:'std'};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cutreader-settings')) || {}); }catch(e){}
 try{ const v = localStorage.getItem('cutreader-view'); if(v && !localStorage.getItem('cutreader-settings')) settings.view = v; }catch(e){}
 function saveSettings(){ try{ localStorage.setItem('cutreader-settings', JSON.stringify(settings)); }catch(e){} }
@@ -593,8 +630,7 @@ function cueScratches(c){
 function generate(){
   const w = bucketWeights();
   const throwOn = settings.throw==='1';
-  const lenSet = baseRun() ? 'both' : settings.len;   // the baseline always mixes short and long
-  const lenCls = lenSet==='both' ? (Math.random()<.5 ? 'short' : 'long') : lenSet;
+  const lenCls = Math.random() < longShare() ? 'long' : 'short';   // the grade sets the mix of short and long shots
   const k = H/100;
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
   let fallback = null;
@@ -630,45 +666,73 @@ function generate(){
   return fallback;
 }
 
-// ---------- baseline & adaptive dealing ----------
-// The first Freeplay session is a 100-shot baseline (50 standing, then 50 down on the ball), dealt truly at random.
-// Once a baseline exists, every Freeplay and Flash session deals adaptively: more of the kinds of shots you usually
-// call wrong (a kind = fraction + cue-ball distance). How hard it leans on them is a dial per mode: each pocketed shot turns it up, each miss turns it down
-// (further), so it settles where you pocket about 3 in 4. Below zero it leans toward your strong shots instead.
+// ---------- baseline, grades & adaptive dealing ----------
+// The first Freeplay session is a one-time 100-shot baseline (50 standing, then 50 down on the ball), dealt at random
+// under fixed conditions. Its score sets your starting grade, D- to A+. From then on every Freeplay shot moves you
+// toward the next grade (+1 right, -2 wrong: break-even is 2 in 3); ten up levels you up, ten down drops you a grade.
+// Each grade deals harder: more long shots, a stronger lean toward your weak spots, and fewer aids.
 const BASE_LOCKED = ['view','table','len','cam','ghost','full'];   // can't be changed during the baseline
 const BASE_STD = {table:'9', len:'both', cam:'line', ghost:'0', full:'1'};   // the view is set per half: standing, then down
-// Aids come and go with your level (called right over your last 50 Freeplay shots): the better you read,
-// the fewer aids you get. Each locks at one score and only unlocks again a few points lower, so it doesn't flicker.
-const AIDS = [
-  {key:'walk',  name:'Looking around', lockAt:75, unlockAt:70},
-  {key:'ghost', name:'Ghost ball',     lockAt:60, unlockAt:55},
-];
-function skillScore(){
-  const L = stats.log.filter(e=>taskOf(e)==='sess' && !e.gh).slice(-50);   // ghost-ball shots aren't scored, so they don't count
-  return L.length >= 20 ? pct(L.filter(success).length, L.length) : null;
-}
-function aidLocked(key){ return baseRun() || !!(stats.aids && stats.aids[key]); }
-function updateAids(quiet){
-  if(!hasBaseline()) return;
-  const sc = skillScore(); if(sc === null) return;
-  stats.aids = stats.aids || {};
-  const changes = [];
-  AIDS.forEach(a=>{
-    const was = !!stats.aids[a.key], now = was ? sc >= a.unlockAt : sc >= a.lockAt;
-    if(now !== was){ stats.aids[a.key] = now; changes.push(`${now ? '🔒 ' : ''}${a.name} ${now ? 'locked' : 'unlocked'}`); }
-  });
-  if(stats.aids.ghost && settings.ghost==='1'){ settings.ghost = '0'; saveSettings(); if(shot) draw(answered); }
-  if(changes.length){ syncPressed(); if(!quiet) notice(changes.join(' · ')); }
-}
-const K_MIN = -1, K_MAX = 2, K_UP = 0.1, K_DOWN = 0.3, K_START = 1;
+const GRADES = ['D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+'];
+const GRADE_FROM = [0,30,35,40,47,53,60,66,72,78,84,90];   // baseline % for each starting grade
+const AID_LOCK = {aim:3, ghost:6, walk:9};                   // the grade each aid locks at: C-, B-, A-
+const AID_NAME = {aim:'Aim line', ghost:'Ghost ball', walk:'Looking around'};
+const AID_TIP = {
+  aim: 'Look down the line the cue travels instead of from behind the cue ball. The overlap is plain to see, so it is the easiest read.',
+  ghost: 'Shows where the cue ball has to be at contact. Practice only: shots with it on are not scored.',
+  walk: 'Drag the table to walk around the shot and see it from other angles.',
+};
+const FAST_FLASH_AT = 6;                                      // 0.75 s Flash opens at B-
+const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
 const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
 const baselines = () => (stats.sessions||[]).filter(x=>x.base);
 const hasBaseline = () => baselines().length > 0;
 const adaptiveOn = () => hasBaseline() && sessTask(settings.task) && !baseRun();
-function adaptK(){ const a = stats.adapt || {}; return typeof a[settings.task]==='number' ? a[settings.task] : K_START; }
-function turnDial(pocketed){
-  stats.adapt = stats.adapt || {};
-  stats.adapt[settings.task] = Math.max(K_MIN, Math.min(K_MAX, adaptK() + (pocketed ? K_UP : -K_DOWN)));
+const level = () => stats.level ? stats.level.g : null;
+const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
+const longShare = () => !adaptiveOn() || level()===null ? 0.5 : 0.25 + 0.05*level();   // D- 25% long shots … A+ 80%
+const leanK = () => 0.5 + (level()||0)*(1.5/11);                                       // how hard it leans on weak spots
+const aidLocked = key => baseRun() || (level()!==null && level() >= AID_LOCK[key]);
+const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
+function enforceLocks(){
+  if(baseRun()) return;
+  let ch = false;
+  if(aidLocked('ghost') && settings.ghost==='1'){ settings.ghost = '0'; ch = true; }
+  if(aidLocked('aim') && settings.cam==='aim'){ settings.cam = 'line'; ch = true; }
+  if(aidLocked('walk') && settings.walk!=='0'){ settings.walk = '0'; ch = true; }
+  if(fastFlashLocked() && settings.flash==='750'){ settings.flash = '1500'; ch = true; }
+  if(ch) saveSettings();
+}
+function levelPoint(ok){   // returns +1 / -1 when the grade changes
+  const L = stats.level;
+  L.pts += ok ? PT_RIGHT : PT_WRONG;
+  if(L.pts >= PTS_UP && L.g < GRADES.length-1){ L.g++; L.pts = 0; return 1; }
+  if(L.pts <= -PTS_UP && L.g > 0){ L.g--; L.pts = 0; return -1; }
+  L.pts = Math.max(-PTS_UP, Math.min(PTS_UP, L.pts));
+  return 0;
+}
+function renderBadge(pop){
+  const g = level(), el = $('badge');
+  el.hidden = g===null; if(g===null) return;
+  const pts = stats.level.pts;
+  $('badgeg').textContent = GRADES[g];
+  const f = $('badgefill'); f.style.width = (Math.min(1, Math.abs(pts)/PTS_UP)*100) + '%'; f.classList.toggle('neg', pts < 0);
+  el.title = `Grade ${GRADES[g]}` + (g < GRADES.length-1 ? ` · ${Math.max(0,pts)} of ${PTS_UP} to ${GRADES[g+1]}` : '');
+  if(pop){ el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+}
+let lvlTimer = 0;
+function showLevel(d, from){
+  const to = level(), notes = [];
+  for(const k in AID_LOCK){ const at = AID_LOCK[k]; if(from < at && to >= at) notes.push(`🔒 ${AID_NAME[k]}`); if(from >= at && to < at) notes.push(`${AID_NAME[k]} unlocked`); }
+  if(from < FAST_FLASH_AT && to >= FAST_FLASH_AT) notes.push('⚡️ 0.75 s Flash unlocked');
+  if(from >= FAST_FLASH_AT && to < FAST_FLASH_AT) notes.push('🔒 0.75 s Flash');
+  enforceLocks(); syncPressed(); renderBadge(true);
+  $('lvlhead').textContent = d > 0 ? 'Level up' : 'Down a grade';
+  $('lvlgrade').textContent = GRADES[to];
+  $('lvlnote').textContent = notes.join(' · ');
+  const c = $('lvlcard'); c.classList.toggle('down', d < 0); c.hidden = false; c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
+  clearTimeout(lvlTimer); lvlTimer = setTimeout(()=>{ c.hidden = true; }, d > 0 ? 2800 : 2000);
+  playSound(d > 0 ? 'levelup' : 'leveldown');
 }
 // A kind of shot is its fraction plus how far the cue ball is from the object ball (short / medium / long).
 const distBin = d => d < 24 ? 0 : d < 42 ? 1 : 2;
@@ -697,7 +761,7 @@ function weakModel(){
 }
 function dealShot(){
   if(!adaptiveOn()) return generate();
-  const model = weakModel(), k = adaptK();
+  const model = weakModel(), k = leanK();
   const cands = Array.from({length:20}, generate);
   return cands[weightedIndex(cands.map(c=>Math.pow(model[shotCell(c)]||1, k)))];
 }
@@ -1133,7 +1197,6 @@ function showSessIdle(){
     $('flashpick').hidden = t!=='flash';
     const needBase = t==='sess' && !hasBaseline();
     $('sessbtns').hidden = needBase; $('basebtns').hidden = !needBase;
-    $('rebase').hidden = t!=='sess' || needBase;
   }
 }
 let flashArmed = false;
@@ -1160,7 +1223,7 @@ function updateControls(){
 }
 
 let laterT = 0;
-function laterSave(){ clearTimeout(laterT); laterT = setTimeout(()=>{ updateAids(); save(); renderStats(); }, 30); }   // after the answer has painted
+function laterSave(){ clearTimeout(laterT); laterT = setTimeout(()=>{ save(); renderStats(); }, 30); }   // after the answer has painted
 function logEntry(extra){
   const act = stats.active && stats.active.task===settings.task ? stats.active.id : undefined;
   stats.log.push({sid:act, t:settings.task, a:shot.answer.id, s:shot.side, v:settings.view,
@@ -1237,6 +1300,16 @@ function playSound(kind, streak){
       const o = audioOut(0.2), r = semis(659.25, Math.min(12, (streak||6) - 6));
       [0, 4, 7, 12].forEach((n,i)=>tone(o, semis(r, n), i*0.055, i===3 ? 0.42 : 0.2, i===3 ? 1 : 0.85));
     }
+    else if(kind === 'levelup'){
+      // a short fanfare: a rising run, then a held major chord (about 2.5 s)
+      const o = audioOut(0.2), C = 523.25;
+      [[0,0,.15],[.13,4,.15],[.26,7,.15],[.39,12,.34],[.78,7,.15],[.93,12,1.5],[.93,16,1.5],[.93,19,1.5]]
+        .forEach(([t,n,d])=>tone(o, semis(C,n), t, d, n > 12 ? 0.55 : 0.9));
+    }
+    else if(kind === 'leveldown'){
+      const o = audioOut(0.2);
+      [[0,7,.22],[.2,3,.22],[.4,0,.7]].forEach(([t,n,d])=>tone(o, semis(392,n), t, d, 0.8));
+    }
     else if(kind === 'streakEnd'){
       // a soft descending "power down"
       const o = audioOut(0.22);
@@ -1248,7 +1321,7 @@ function thock(good){ playSound(good ? 'made' : 'miss'); }
 
 // ---------- sessions ----------
 function startSession(size, base){
-  stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now()};
+  stats.active = {id: Date.now().toString(36), task: settings.task, size, n:0, right:0, made:0, start: Date.now(), g0: level()};
   if(base){   // the baseline is played under fixed conditions: settings are borrowed, then given back
     stats.active.base = 1;
     stats.active.saved = Object.fromEntries(BASE_LOCKED.map(k=>[k, settings[k]]));
@@ -1293,7 +1366,9 @@ function finishSession(){
   restoreView(a);
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
   stats.active = null; syncPressed();
-  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); updateAids(); showSummary(rec);
+  if(rec.base){ stats.level = {g: gradeFor(pct(rec.right, rec.n)), pts: 0}; rec.grade = stats.level.g; enforceLocks(); syncPressed(); renderBadge(true); playSound('levelup'); }
+  else if(a.task==='sess' && a.g0!=null){ rec.g0 = a.g0; rec.grade = level(); }
+  stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
 }
 function syncStreakPill(){ if(!$('streakpill')) return; const c = curStreak(); showStreak(c >= STREAK_HOT ? c : 0, 0); }
 function renderSession(){
@@ -1305,19 +1380,18 @@ function showSummary(rec){
   const L = stats.log.filter(e=>e.sid === rec.id);
   const score = pct(rec.right, rec.n);
   $('sumhead').textContent = rec.base ? `Baseline · ${rec.size} shots` : rec.early ? `Session ended early · ${rec.n} of ${rec.size} shots · ${MODE_LABEL[rec.task]}` : `Session complete · ${rec.size} shots · ${MODE_LABEL[rec.task]}`;
-  $('sumbig').textContent = score + '%';
-  $('sumsub').textContent = 'called right';
+  $('sumbig').textContent = rec.base ? GRADES[rec.grade] : score + '%';
+  $('sumsub').textContent = rec.base ? `${score}% called right` : 'called right';
   const rows = [];   // [label, value, tone]
   const prev = (stats.sessions || []).filter(x=>x.task===rec.task && x.size===rec.size && x.id!==rec.id && !x.base===!rec.base).slice(-5);
   if(rec.base){
     rows.push(['Standing', `${rec.stand}%`, '']);
     rows.push(['Down on the ball', `${rec.down}%`, '']);
-    const last = prev[prev.length-1];
-    if(last){ const d = score - pct(last.right, last.n); rows.push(['vs. last baseline', `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} pts <small>${pct(last.right,last.n)}%</small>`, d>=3?'up':d<=-3?'down':'']); }
   } else if(prev.length){
     const avg = Math.round(prev.reduce((t,x)=>t+pct(x.right,x.n),0)/prev.length), d = score - avg;
     rows.push(['vs. your average', `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} pts <small>avg ${avg}%</small>`, d>=3?'up':d<=-3?'down':'']);
   } else rows.push(['vs. your average', 'Baseline set', '']);
+  if(!rec.base && rec.g0!=null) rows.unshift(['Grade', rec.grade===rec.g0 ? GRADES[rec.grade] : `${GRADES[rec.g0]} → ${GRADES[rec.grade]}`, rec.grade>rec.g0 ? 'up' : rec.grade<rec.g0 ? 'down' : '']);
   const secs = (rec.end - rec.start) / 1000 / Math.max(1, rec.n);
   const prevPace = prev.filter(x=>x.end && x.start).map(x=>(x.end - x.start)/1000/Math.max(1,x.n));
   const avgPace = prevPace.length ? prevPace.reduce((a,b)=>a+b,0)/prevPace.length : 0;
@@ -1391,7 +1465,10 @@ function answer(id){
   else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
   else thock(counted);
   logEntry({p:id, m:counted?1:0});
-  if(!aided && adaptiveOn() && stats.active && stats.active.task===settings.task) turnDial(counted);
+  if(!aided && settings.task==='sess' && level()!==null && stats.active && stats.active.task==='sess' && !stats.active.base){
+    const from = level(), d = levelPoint(ok);
+    if(d) setTimeout(()=>showLevel(d, from), 350); else renderBadge();
+  }
   document.querySelectorAll('#answers button').forEach(b=>{ b.disabled = true; });
   const reveal = (animMs)=>{
     if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
@@ -1663,11 +1740,8 @@ function renderPatterns(){
   const dash = ['—','none'];
   const wrong = all.thin + all.full;
   if(statTask()==='sess'){
-    const B = baselines(), b = B[B.length-1];
-    if(b){
-      const s0 = pct(b.right, b.n), p0 = B.length > 1 ? pct(B[B.length-2].right, B[B.length-2].n) : null, d = p0===null ? 0 : s0 - p0;
-      rows.push(['Baseline', `${s0}% <small>${p0===null ? `standing ${b.stand}% · down ${b.down}%` : `${d>0?'+':d<0?'−':'±'}${Math.abs(d)} vs last`}</small>`, p0===null ? '' : d>=3 ? 'up' : d<=-3 ? 'down' : '']);
-    } else rows.push(['Baseline', ...dash]);
+    const b = baselines()[0];
+    rows.push(['Baseline', ...(b ? [`${GRADES[b.grade ?? gradeFor(pct(b.right,b.n))]} <small>${pct(b.right,b.n)}% · standing ${b.stand}% · down ${b.down}%</small>`,''] : dash)]);
   }
   rows.push(['Misses lean', ...(wrong < 4 ? (all.n && !wrong ? ['No misses','up'] : dash)
     : all.thin/wrong >= .65 ? [`Too thin <small>${all.thin} of ${wrong}</small>`,'']
@@ -1744,14 +1818,30 @@ function syncPressed(){
   const lockFlash = !hasBaseline();   // Flash opens once there's a baseline
   $('task-flash').disabled = lockFlash; $('flashlock').hidden = !lockFlash;
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
-  document.querySelectorAll('[data-set]').forEach(b=>{ if(BASE_LOCKED.includes(b.dataset.set)) b.disabled = baseRun() || (b.dataset.set==='ghost' && aidLocked('ghost')); });
-  $('ghostlock').hidden = !aidLocked('ghost');
+  document.querySelectorAll('[data-set]').forEach(b=>{ if(BASE_LOCKED.includes(b.dataset.set)) b.disabled = baseRun(); });
+  $('ghost-1').disabled = aidLocked('ghost'); $('ghostlock').hidden = !aidLocked('ghost');
+  $('cam-aim').disabled = aidLocked('aim'); $('aimlock').hidden = !aidLocked('aim');
+  $('walk-1').disabled = aidLocked('walk'); $('walklock').hidden = !aidLocked('walk');
+  $('flash-750').disabled = fastFlashLocked(); $('fastlock').hidden = !fastFlashLocked();
+  $('flash-750').title = fastFlashLocked() ? `Unlocks at ${GRADES[FAST_FLASH_AT]}` : '';
+  $('task-flash').title = hasBaseline() ? '' : 'Unlocks after your baseline';
+  // aids: what each does, and the grade it locks at
+  const g = level();
+  for(const k in AID_LOCK){
+    const G = GRADES[AID_LOCK[k]], locked = aidLocked(k);
+    $('at-'+k).textContent = locked ? `from ${G}` : `until ${G}`;
+    const when = baseRun() ? 'Off during the baseline.'
+      : g===null ? `Available until ${G}; locks from ${G} up.`
+      : locked ? `Locked from ${G} up. Drop below ${G} and it comes back.`
+      : `Yours until ${G}; it locks when you reach ${G}.`;
+    $('tip-'+k).dataset.tip = AID_TIP[k] + ' ' + when;
+  }
   $('modehint').textContent = isPlace()
     ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
     : HINTS[settings.mode];
 }
 function applySetting(key, val){
-  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && val==='1' && aidLocked('ghost'))) return;
+  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && val==='1' && aidLocked('ghost')) || (key==='cam' && val==='aim' && aidLocked('aim')) || (key==='walk' && val==='1' && aidLocked('walk')) || (key==='flash' && val==='750' && fastFlashLocked())) return;
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
   if(key==='ghost'){ if(shot) draw(answered); }
@@ -1777,7 +1867,7 @@ function nextShot(){
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) shoot(); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
-function walkOn(){ return (settings.task==='call' || settings.task==='sess') && !aidLocked('walk'); }   // locked during the baseline, and once your level is high enough
+function walkOn(){ return (settings.task==='call' || settings.task==='sess') && settings.walk!=='0' && !aidLocked('walk'); }   // locked during the baseline, and once your level is high enough
 function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
 svgEl.addEventListener('pointerdown', ev=>{
   if(anim || !walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
@@ -1845,11 +1935,16 @@ function showSub(t){
 }
 document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('click', ()=>showSub(b.dataset.sub)));
 showSub(['overview','fractions','details'].includes(settings.sub) ? settings.sub : 'overview');
-showTab(settings.tab==='misses' ? 'stats' : ['shot','stats','settings'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
-$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(stats.adapt) delete stats.adapt[t]; if(t==='sess') delete stats.aids; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; showSessIdle(); } if(!hasBaseline() && settings.task==='flash') applySetting('task','sess'); syncPressed(); save(); renderStats(); syncStreakPill(); });
+showTab(settings.tab==='misses' ? 'stats' : settings.tab==='settings' ? 'aids' : ['shot','stats','aids'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
+$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(t==='sess') delete stats.level; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; showSessIdle(); } if(!hasBaseline() && settings.task==='flash') applySetting('task','sess'); syncPressed(); save(); renderStats(); syncStreakPill(); });
 document.querySelectorAll('.statmode button').forEach(b=>b.addEventListener('click', ()=>{ settings.statTask = b.dataset.stat; saveSettings(); renderStats(); }));
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
+const menuOpen = () => !$('menu').hidden;
+function openMenu(v){ $('menu').hidden = !v; if(v) $('menuclose').focus({preventScroll:true}); else $('cog').focus({preventScroll:true}); }
+$('cog').addEventListener('click', ()=>openMenu(true));
+$('menuclose').addEventListener('click', ()=>openMenu(false));
+$('menu').addEventListener('click', e=>{ if(e.target === $('menu')) openMenu(false); });
 $('endsave').addEventListener('click', e=>{ e.stopPropagation(); saveSessionEarly(); });
 $('enddiscard').addEventListener('click', e=>{ e.stopPropagation(); discardSession(); });
 $('endkeep').addEventListener('click', e=>{ e.stopPropagation(); closeEndPrompt(); });
@@ -1858,11 +1953,11 @@ $('sessagain').addEventListener('click', e=>{ e.stopPropagation(); startSession(
 $('sessdone').addEventListener('click', e=>{ e.stopPropagation(); $('sesscover').hidden = true; deal(); });
 document.querySelectorAll('#sessidlecover [data-sess]').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); startSession(+b.dataset.sess); }));
 $('basestart').addEventListener('click', e=>{ e.stopPropagation(); startSession(100, true); });
-$('rebase').addEventListener('click', e=>{ e.stopPropagation(); startSession(100, true); });
 $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
+  if(menuOpen()){ if(e.key==='Escape'){ openMenu(false); e.preventDefault(); } return; }
   if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
   if(!$('endcover').hidden){ if(e.key==='Escape'){ closeEndPrompt(); e.preventDefault(); } return; }
   if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ if(settings.task==='sess' && !hasBaseline()) startSession(100, true); else startSession(50); e.preventDefault(); } return; }
@@ -1880,8 +1975,9 @@ settings.mode = 'ref';   // reference cuts only for now
 if(!['line','aim'].includes(settings.cam)) settings.cam='line';
 if(!['short','long','both'].includes(settings.len)) settings.len='both';
 if(!['0','1'].includes(settings.ghost)) settings.ghost='0';
-updateAids(true);
-if(stats.aids && stats.aids.ghost) settings.ghost='0';   // locked at your level
+if(!['0','1'].includes(settings.walk)) settings.walk='1';
+if(hasBaseline() && !stats.level){ const b = baselines()[0]; stats.level = {g: gradeFor(pct(b.right, b.n)), pts: 0}; save(); }   // baselines played before grades existed
+enforceLocks(); renderBadge();
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 settings.throw='0';   // throw option removed
@@ -1905,7 +2001,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, adaptK, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
