@@ -1244,8 +1244,9 @@ function perspSVG(s, reveal, view){
   // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
-  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p:s.gb, kind:'ghost', a: (A && contact) || reveal ? 1 : gA});
-  if(contact && s.pick && s.pick.far) items.push({p:s.pick.g2, kind:'callghost'});   // where your call made contact; the reveal draws it once the balls stop
+  // once the balls meet, the ghost ball shows where your call actually made contact (on a miss that's not the ideal spot)
+  const hit = (A && contact) || (reveal && !A), yours = hit && s.pick && s.pick.far;
+  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p: yours ? s.pick.g2 : s.gb, kind:'ghost', a: hit ? 1 : gA});
   if(!reveal && s.place) items.push({p:s.place, kind:'user'});
   items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],R]);});
   items.sort((a,b)=>b.c[2]-a.c[2]);
