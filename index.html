@@ -215,6 +215,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 /* shot breakdown: one fixed-size box, scrolls inside if a long explanation ever overflows */
 .result{min-height:0}
 .result svg{width:100%;max-width:440px;height:auto;margin:0 auto;display:block}
+.resultpair{display:grid;grid-template-columns:6.6fr 3fr;gap:10px;align-items:start}
+.resultpair svg{max-width:none;border-radius:12px}
 
 .replay[hidden]{display:none}
 .replay .replayicon{width:18px;height:18px;flex:none;display:block}
@@ -691,12 +693,7 @@ function spotToward(toEye){
 // The cue ball has six red dots, one on each face of a cube (like the TV-style training cue balls), fixed on the ball.
 const CB_DOTS = (()=>{ const t = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]], q = [.35, .6, .72];   // tilted so none sits dead on top
   return t.map(v=>rotAxis(rotAxis(v, [1,0,0], q[0]), [0,1,0], q[1])); })();
-function cbSpin(v, sp){   // turn a dot by the cue ball's spin so far: the approach (backspin wearing off), then after contact (roll building)
-  if(!sp) return v;
-  if(sp.aA) v = rotAxis(v, sp.kA, sp.aA);
-  if(sp.aC) v = rotAxis(v, sp.kC, sp.aC);
-  return v;
-}
+function cbSpin(v, sp){ return sp && sp.M ? matVec(sp.M, v) : v; }   // turn a dot by everything the cue ball has turned so far
 function rotAxis(v, k, a){   // rotate v about unit axis k by angle a (Rodrigues)
   const kl = Math.hypot(k[0],k[1],k[2]); if(kl < 1e-9) return v; k = [k[0]/kl, k[1]/kl, k[2]/kl];
   const c = Math.cos(a), sn = Math.sin(a), kd = k[0]*v[0]+k[1]*v[1]+k[2]*v[2];
@@ -705,11 +702,10 @@ function rotAxis(v, k, a){   // rotate v about unit axis k by angle a (Rodrigues
 }
 function cueScratches(c){
   // where the cue ball really goes after a pocket-speed stun: along the tangent line, as far as its speed carries it
-  const tan = sub(c.v, mul(c.n, dot(c.v, c.n))), tl = len(tan);
-  const reach = tl > 0.05 ? rollOut(Math.max(0.01, contactSpeed(c)*Math.sin(c.theta*RAD))).stop : 0;
-  const end = tl > 0.05 ? rayToCushion(c.gb, mul(tan, 1/tl), reach + 1) : c.gb;
-  if(len(sub(end, c.gb)) < 0.5) return false;
-  return POCKETS.some(P => segDist(P.t, c.gb, end) < pocketR(P) + 2.5);
+  // the cue ball's real (curving) path after contact must stay clear of every pocket
+  const sim = simCue(c, c.gb, false), post = sim.pts.filter(q=>q.t >= sim.T1);
+  for(let i=1;i<post.length;i++) if(POCKETS.some(P => segDist(P.t, post[i-1].p, post[i].p) < pocketR(P) + 1.2)) return true;
+  return false;
 }
 function generate(){
   const w = bucketWeights();
@@ -1221,7 +1217,12 @@ function perspSVG(s, reveal, view){
   // trails: where the balls have travelled (during the animation, and the cue ball's path afterwards)
   const trail = s.anim ? s.anim.trail : (reveal && s.final ? s.final.trail : null);
   if(trail){
-    for(let k=0;k<trail.cb.length-1;k++){
+    // one continuous line (so the dashes run evenly round the curve), unless part of it is behind the eye
+    const cs = trail.cb.map(q=>cam.toCam([q[0], q[1], .03]));
+    if(cs.every(c=>c[2] > NEAR)){
+      const d = cs.map((c,i)=>{ const [x,y] = cam.proj(c); return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); }).join('');
+      o += `<path d="${d}" fill="none" stroke="#f4efe0" stroke-opacity=".6" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 4"/>`;
+    } else for(let k=0;k<trail.cb.length-1;k++){
       const a = trail.cb[k], b = trail.cb[k+1];
       if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" stroke="#f4efe0" stroke-opacity=".6" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2 4"/>`;
     }
@@ -1871,7 +1872,54 @@ function rollOut(v0){
   const ts = (2/7)*v0/MU_G, ds = v0*ts - MU_G*ts*ts/2, v1 = (5/7)*v0, tr = v1/A_ROLL, dr = v1*v1/(2*A_ROLL);
   const x = t => t <= ts ? v0*t - MU_G*t*t/2 : ds + v1*Math.min(t-ts, tr) - A_ROLL*Math.min(t-ts, tr)**2/2;
   const tFor = d => d <= ds ? (v0 - Math.sqrt(Math.max(0, v0*v0 - 2*MU_G*d)))/MU_G : ts + (v1 - Math.sqrt(Math.max(0, v1*v1 - 2*A_ROLL*(d-ds))))/A_ROLL;
-  return {x, tFor, stop: ds + dr, ts, v1};
+  const v = t => t <= ts ? v0 - MU_G*t : Math.max(0, v1 - A_ROLL*(t-ts));
+  return {x, tFor, v, stop: ds + dr, ts, v1};
+}
+// ---------- the cue ball, simulated: hit at centre, it slides, friction builds roll; after contact it keeps that roll,
+// so its path bends forward off the tangent line before it rolls straight (the natural-roll path) ----------
+const I3 = [[1,0,0],[0,1,0],[0,0,1]];
+function matRot(M, k, a){   // rotation by a about unit axis k, applied after M
+  const c = Math.cos(a), sn = Math.sin(a), C = 1 - c, [x, y, z] = k;
+  const Rm = [[c+x*x*C, x*y*C-z*sn, x*z*C+y*sn],[y*x*C+z*sn, c+y*y*C, y*z*C-x*sn],[z*x*C-y*sn, z*y*C+x*sn, c+z*z*C]];
+  return Rm.map(row=>[0,1,2].map(j=>row[0]*M[0][j] + row[1]*M[1][j] + row[2]*M[2][j]));
+}
+const matVec = (M, v) => M.map(row=>row[0]*v[0] + row[1]*v[1] + row[2]*v[2]);
+function tipSpeed(Vc, d1){   // how hard it's hit so it arrives at the object ball at Vc
+  let lo = Vc, hi = Vc + 600;
+  for(let i=0;i<40;i++){ const mid = (lo+hi)/2, m = rollOut(mid); if(m.stop < d1 || m.v(m.tFor(d1)) < Vc) lo = mid; else hi = mid; }
+  return hi;
+}
+function simCue(s, g2, withSpin){
+  const cb0 = s.cb, n2 = norm(sub(s.ob, g2)), d1 = len(sub(g2, cb0)), dA = d1 > 1e-6 ? mul(sub(g2, cb0), 1/d1) : [0,1];
+  const Vc = contactSpeed(s), v0 = tipSpeed(Vc, d1), dt = withSpin ? 1/240 : 1/100;
+  let p = [...cb0], v = mul(dA, v0), rv = [0,0], t = 0, contact = d1 < 1e-6, T1 = 0, M = I3, rail = false;
+  const pts = [{t:0, p:[...p], M}];
+  for(let k=0; k<6000; k++){
+    // friction: while the ball slides (its speed and its spin disagree), it slows and its spin catches up; then it rolls
+    const u = sub(v, rv), ul = len(u);
+    if(ul > 0.05){
+      const uh = mul(u, 1/ul);
+      v = sub(v, mul(uh, MU_G*dt)); rv = add(rv, mul(uh, 2.5*MU_G*dt));
+      if(dot(sub(v, rv), uh) <= 0) rv = [...v];                    // slip gone: rolling
+    } else { const vl = len(v); v = vl <= A_ROLL*dt ? [0,0] : mul(v, (vl - A_ROLL*dt)/vl); rv = [...v]; }
+    let step = mul(v, dt), f = 1;
+    if(!contact){
+      const along = dot(sub(p, cb0), dA), da = dot(step, dA);
+      if(along + da >= d1){ f = Math.max(0, Math.min(1, (d1 - along)/Math.max(1e-9, da))); step = mul(step, f); }
+    }
+    p = add(p, step); t += dt*f;
+    if(withSpin){ const w = [-rv[1]/R, rv[0]/R, 0], wl = Math.hypot(w[0], w[1]); if(wl > 1e-9) M = matRot(M, [w[0]/wl, w[1]/wl, 0], wl*dt*f); }
+    if(!contact && f < 1){                                          // the hit: the object ball takes the speed along the line of centres
+      contact = true; T1 = t; p = [...g2]; v = sub(v, mul(n2, dot(v, n2)));
+      pts.push({t, p:[...p], M, hit:1}); continue;
+    }
+    if(contact){
+      if(p[0] < R || p[0] > W-R || p[1] < R || p[1] > H-R){ p = [Math.max(R, Math.min(W-R, p[0])), Math.max(R, Math.min(H-R, p[1]))]; rail = true; pts.push({t, p:[...p], M}); break; }
+      if(len(v) < 0.2){ pts.push({t, p:[...p], M}); break; }
+    }
+    pts.push({t, p:[...p], M});
+  }
+  return {pts, T1, rail, end: pts[pts.length-1]};
 }
 // the object-ball speed that gets it to a pocket d inches away arriving at about POCKET_ARRIVE in/s ("pocket speed")
 function pocketSpeedFor(d){
@@ -1884,17 +1932,12 @@ function animateShot(oc, done, obCol){
   const s = shot, cb0 = s.cb, ob0 = s.ob, g2 = oc.g2;
   const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
   const toPocket = dot(sub(s.P.t, ob0), oc.u2);
-  // pocket speed: the cue ball is hit just hard enough that the right call sends the object ball to the pocket, arriving slowly;
-  // it's struck with backspin that wears off exactly at contact (a stun), sliding friction slowing it on the way
-  const cosTrue = Math.cos(s.theta*RAD), Vc = contactSpeed(s);             // cue-ball speed at contact
-  const d1 = len(sub(g2, cb0)), V0 = Math.sqrt(Vc*Vc + 2*MU_G*d1);            // speed off the tip
-  const T1 = d1 > 0.01 ? (V0 - Vc)/MU_G : 0;
-  const xA = t => V0*t - MU_G*t*t/2;
-  // after contact the speed splits by the cut: object ball Vc·cos(cut), cue ball Vc·sin(cut)
-  const cosC = Math.max(0.02, Math.min(1, dot(v2, n2))), sinC = Math.sqrt(1 - cosC*cosC);
-  const mOb = rollOut(Vc*cosC), vCb = Vc*sinC, mCb = rollOut(Math.max(0.01, vCb));
-  const mIdeal = rollOut(Vc*cosTrue);   // the right call's object ball, for drawing the correct path at its pace
-  // where the object ball ends: in the pocket, on the jaw, at a cushion, or wherever it stops rolling
+  // the cue ball, simulated from the tip to where it stops: slide, roll, the hit, and its curving path after
+  const sim = simCue(s, g2, true), pts = sim.pts, T1 = sim.T1, tEnd = sim.end.t;
+  const Vc = contactSpeed(s), cosTrue = Math.cos(s.theta*RAD);
+  // after contact the object ball leaves along the line of centres at Vc·cos(cut), with no spin: it slides, then rolls
+  const cosC = Math.max(0.02, Math.min(1, dot(v2, n2)));
+  const mOb = rollOut(Vc*cosC), mIdeal = rollOut(Vc*cosTrue);
   const lat = Math.abs(oc.lat ?? 0);
   const sink = oc.made;
   const jawHit = !oc.made && toPocket > 4 && lat < s.tol + 2.4 && mOb.stop >= toPocket - 2.8;
@@ -1905,41 +1948,36 @@ function animateShot(oc, done, obCol){
   const obRail = !sink && !jawHit && mOb.stop >= d2;
   d2 = Math.min(d2, sink ? d2 : mOb.stop);
   const obEnd = add(ob0, mul(oc.u2, d2));
-  // the cue ball after a stun: along the tangent line until it stops or meets a cushion (nothing rebounds)
-  const tan = sub(v2, mul(n2, dot(v2, n2))), tl = len(tan);
-  const dirT = tl > 0.05 ? mul(tan, 1/tl) : [0,1];
-  const cbCush = tl > 0.05 ? len(sub(rayToCushion(g2, dirT), g2)) : 0;
-  const d3 = tl > 0.05 && vCb > 0.5 ? Math.min(cbCush, mCb.stop) : 0;
-  const cbRail = d3 > 0 && mCb.stop >= cbCush;
-  const cbEnd = add(g2, mul(dirT, d3));
   const obTime = d => mOb.tFor(Math.min(d, mOb.stop));
   // into the pocket: once its centre is over the hole it falls under gravity, still drifting forward a little
   let xIn = null;
   if(sink){ const q = sub(ob0, s.P.c), b = dot(q, oc.u2), c = dot(q, q) - (pocketR(s.P) - 0.3)**2, disc = b*b - c; if(disc > 0) xIn = -b - Math.sqrt(disc); }
   if(xIn !== null && xIn < 0) xIn = 0;
-  const tIn = xIn !== null ? obTime(xIn) : null, G = 386, FALL = Math.sqrt(2*3.2*R/G);   // time to drop about three ball-radii
-  const T2 = sink && tIn !== null ? tIn + FALL : obTime(d2), T3 = d3 > 0 ? mCb.tFor(d3) : 0;
-  // cue ball spin: backspin that wears off by contact, then after contact the cloth builds forward roll
-  const dirA = d1 > 0.01 ? mul(sub(g2, cb0), 1/d1) : [0,1], kA = [-dirA[1], dirA[0], 0], kC = [-dirT[1], dirT[0], 0];
-  const ALPHA = 2.5*MU_G/R;                                         // rad/s²: how fast sliding friction changes the spin (5/2·μg/R)
-  const spinA = t => -(ALPHA*T1*t - ALPHA*t*t/2);                  // backspin that wears off to nothing at contact: a stun
-  const spinC = t => { if(d3 <= 0) return 0; t = Math.min(t, T3);      // stops turning when the cue ball stops
-    return t <= mCb.ts ? ALPHA*t*t/2 : ALPHA*mCb.ts*mCb.ts/2 + (mCb.x(t) - mCb.x(mCb.ts))/R; };
-  const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
+  const tIn = xIn !== null ? obTime(xIn) : null, G = 386, FALL = Math.sqrt(2*3.2*R/G);
+  const T2 = sink && tIn !== null ? tIn + FALL : obTime(d2);
+  const total = Math.max(T1 + T2, tEnd) * 1000 + 280;   // short hold so you see where the balls stopped
   const plan = [[T1, 'click', 1]];
-  if(sink) plan.push([T1 + (tIn !== null ? tIn + FALL*0.7 : obTime(Math.max(0, toPocket - 1.2))), 'drop', 1]);   // as it lands in the pocket
+  if(sink) plan.push([T1 + (tIn !== null ? tIn + FALL*0.7 : obTime(Math.max(0, toPocket - 1.2))), 'drop', 1]);
   else if(jawHit) plan.push([T1 + T2, 'jaw', 1]);
   else if(obRail) plan.push([T1 + T2, 'rail', 1]);
   const bus = tableSounds(plan, s.duck);
+  // the cue ball's trail after contact: a thinned copy of its path
+  const postPts = pts.filter((q, i)=>q.t > T1 && (i % 6 === 0 || i === pts.length-1));
+  const cueAt = t => {   // position and spin at time t, from the simulation
+    if(t >= tEnd) return sim.end;
+    let lo = 0, hi = pts.length - 1;
+    while(hi - lo > 1){ const m = (lo+hi) >> 1; if(pts[m].t <= t) lo = m; else hi = m; }
+    const a = pts[lo], b = pts[hi], k = b.t > a.t ? (t - a.t)/(b.t - a.t) : 0;
+    return {p: add(a.p, mul(sub(b.p, a.p), k)), M: a.M};
+  };
   const t0 = performance.now();
   const frame = now => {
     if(!anim) return;
     const t = (now - t0) / 1000;
-    let cb, ob = ob0, obScale = 1, obZ = R, obShadow = 1;
-    if(t < T1){ cb = add(cb0, mul(sub(g2, cb0), d1 > 0 ? Math.min(d1, xA(t))/d1 : 1)); }
-    else {
+    let ob = ob0, obScale = 1, obZ = R, obShadow = 1;
+    const c = cueAt(t), cb = c.p;
+    if(t >= T1){
       let x2 = Math.min(d2, mOb.x(t-T1));
-      const x3 = d3 > 0 ? Math.min(d3, mCb.x(t-T1)) : 0;
       if(sink && tIn !== null){
         x2 = Math.min(x2, xIn + 1.4);                                   // the pocket's back stops its forward drift
         const tf = (t - T1) - tIn; if(tf > 0) obZ = R - G*tf*tf/2;       // gravity
@@ -1947,15 +1985,13 @@ function animateShot(oc, done, obCol){
         if(obZ < -3*R) obScale = 0;
       } else if(sink){ const past = x2 - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
       ob = add(ob0, mul(oc.u2, x2));
-      cb = add(g2, mul(dirT, x3));
     }
-    const spin = {kA, kC, aA: spinA(Math.min(t, T1)), aC: t > T1 ? spinC(t - T1) : 0};
-    s.anim = {cb, spin, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, run: t < T1 ? 0 : mIdeal.x(t-T1),   // run: how far the correct path has drawn: as far as a correctly hit object ball would have rolled by now
-      trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : [ob0, ob], obCol}};
+    s.anim = {cb, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, run: t < T1 ? 0 : mIdeal.x(t-T1),
+      trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, ...postPts.filter(q=>q.t <= t).map(q=>q.p), cb], ob: t < T1 ? null : [ob0, ob], obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
-  s.final = {cb: cbEnd, spin: {kA, kC, aA: spinA(T1), aC: spinC(T3)}, ob: sink ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, cbEnd]}};
+  s.final = {cb: sim.end.p, spin: {M: sim.end.M}, ob: sink ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, ...postPts.map(q=>q.p)]}};
   anim = {done, t0, total, bus, raf: requestAnimationFrame(frame)};
 }
 function finishAnim(){
@@ -1968,7 +2004,21 @@ function finishAnim(){
 }
 
 function showResult(){
-  $('result').innerHTML = overlapSVG(shot);   // the diagram speaks for itself
+  $('result').innerHTML = `<div class="resultpair">${overlapSVG(shot)}${tipSVG(shot)}</div>`;   // the diagrams speak for themselves
+}
+// where the cue tip struck the cue ball, seen from behind it (centre ball for now)
+function tipSVG(s){
+  const tip = s.tip || [0, 0], lab = !tip[0] && !tip[1] ? 'Centre' : '';
+  return `<svg viewBox="-1.5 -2.45 3 4.9" aria-label="Cue ball struck at ${lab.toLowerCase() || 'an offset'}">
+    <rect x="-1.5" y="-2.45" width="3" height="4.9" rx=".35" fill="#1f5f96"/>
+    <text x="0" y="-1.72" font-size=".56" text-anchor="middle" fill="#ffffff" font-family="Barlow Condensed, sans-serif" font-weight="700">${lab}</text>
+    <defs><radialGradient id="tipg" cx="40%" cy="36%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#efe9d8"/><stop offset="1" stop-color="#cfc6ae"/></radialGradient></defs>
+    <circle cx="0" cy=".15" r="1" fill="url(#tipg)"/>
+    <line x1="-1" y1=".15" x2="1" y2=".15" stroke="#10283d" stroke-opacity=".25" stroke-width=".03"/>
+    <line x1="0" y1="-.85" x2="0" y2="1.15" stroke="#10283d" stroke-opacity=".25" stroke-width=".03"/>
+    <circle cx="${tip[0]}" cy="${(.15 - tip[1]).toFixed(2)}" r=".2" fill="#1b6fd1" fill-opacity=".85" stroke="#fff" stroke-width=".05"/>
+    <text x="0" y="2.1" font-size=".26" text-anchor="middle" fill="#ffffff" fill-opacity=".7" font-family="IBM Plex Sans, sans-serif" letter-spacing=".04">CUE TIP</text>
+  </svg>`;
 }
 
 // ---------- ghost-ball placement ----------
