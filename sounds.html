@@ -88,7 +88,7 @@ const ONE = [['strike','Strike'],['click','Contact'],['drop','Pocket'],['rail','
 function play(set, seq){ ac(); const o = bus(SETS[set].echo); seq.forEach(([t,k])=>SETS[set].sfx[k](o, t)); }
 document.getElementById('grid').innerHTML = Object.entries(SETS).map(([k,v])=>`<div class="card"><h2>${v.name}</h2><small>${v.note}</small>
   <div class="row">${ONE.map(([s,l])=>`<button data-set="${k}" data-one="${s}">${l}</button>`).join('')}</div>
-  <div class="row"><button class="seq" data-set="${k}" data-seq="make">▶ A make</button><button class="seq" data-set="${k}" data-seq="miss">▶ A miss</button><button class="seq" data-set="${k}" data-seq="jaw">▶ A jaw</button></div></div>`).join('');
+  <div class="row"><button class="seq" data-set="${k}" data-seq="make">▶ Make</button><button class="seq" data-set="${k}" data-seq="miss">▶ Miss</button><button class="seq" data-set="${k}" data-seq="jaw">▶ Jaw rattle</button></div></div>`).join('');
 const SEQ = {make:[[0,'strike'],[.35,'click'],[.9,'drop']], miss:[[0,'strike'],[.35,'click'],[.95,'rail']], jaw:[[0,'strike'],[.35,'click'],[.9,'jaw']]};
 document.getElementById('grid').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
