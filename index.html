@@ -640,7 +640,7 @@ const SPEED_LABEL = {slow:'Slow', medium:'Medium', firm:'Firm'};
 const THROW_MAX = {slow:5, medium:3.5, firm:2};      // degrees, at the peak
 const ROLL_V = {slow:45, medium:75, firm:120};       // animation speed, inches per second
 function throwAt(speed, phi){ if(!speed || phi <= 0) return 0; const x = phi/32; return THROW_MAX[speed]*x*Math.exp(1-x); }
-function throwFor(s, phi){ return s && s.phys && s.speed ? throwAt(s.speed, phi) : 0; }   // throw only counts once it's part of the call (B+)
+function throwFor(s, phi){ return s && s.phys && s.throwOn && s.speed ? throwAt(s.speed, phi) : 0; }   // throw only counts once it's part of the call
 // the contact cut needed so that, after throw, the object ball leaves at the geometric cut tp
 function contactFor(speed, tp){ let c = tp; for(let i=0;i<6;i++) c = tp + throwAt(speed, c); return c; }
 const MU_G = 108;                                     // sliding friction μ·g, in/s² (μ ≈ 0.28: a medium cloth, not a fast one)
@@ -670,7 +670,7 @@ function weightedIndex(w){
 }
 function chooseAim(i){
   const r = REFS[i];
-  if(physOn()){ const [lo, hi] = BOUNDS[i]; return rnd(Math.max(lo > 0 ? lo + 1 : 0, r.deg - PHYS_SPREAD), Math.min(hi - 1, r.deg + PHYS_SPREAD)); }   // close to a fraction: speed & throw decide the adjustment
+  if(throwNow()){ const [lo, hi] = BOUNDS[i]; return rnd(Math.max(lo > 0 ? lo + 1 : 0, r.deg - PHYS_SPREAD), Math.min(hi - 1, r.deg + PHYS_SPREAD)); }   // close to a fraction: speed & throw decide the adjustment
   if(anyOn()){ const [lo, hi] = BOUNDS[i]; return rnd(lo > 0 ? lo + 1 : 0, hi - 1); }   // any angle, but never within 1° of a boundary: every answer is clear
   return r.id==='full' ? rnd(0,1) : r.deg + rnd(-1,1);
 }
@@ -714,7 +714,7 @@ function cueScratches(c){
 }
 function generate(){
   const w = bucketWeights();
-  const throwOn = false, phys = physOn(), speed = SHOT_SPEED;   // every shot is firm for now: the cue ball's path is drawn as a stun shot (the tangent line), which fits a firm hit
+  const throwOn = throwNow(), phys = physOn(), speed = SHOT_SPEED;
   const lenCls = tut.on ? 'short' : Math.random() < longShare() ? 'long' : 'short';   // the grade sets the mix of short and long shots
   const k = H/100;
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
@@ -730,7 +730,7 @@ function generate(){
     else { const bis = norm([Math.sign(P.c[0]-W/2), Math.sign(P.c[1]-H/2)]); if(dot(u,bis) < Math.cos(44*RAD)) continue; }
     // with speed & throw, the dealt angle is the cut as it looks (the ghost-ball geometry); the hit it needs is thinner
     // with throw, the spread is around the hit the shot needs (so thick and thin both come up); the angle it looks is thicker by the throw
-    const cut = phi, tp = phys ? Math.max(0, cut - throwAt(speed, cut)) : phi;
+    const cut = phi, tp = phys && throwOn ? Math.max(0, cut - throwAt(speed, cut)) : phi;
     const sign = Math.random()<.5?-1:1;
     const v = rot(u, sign*tp*RAD);                      // cue direction
     const n = rot(v, -sign*cut*RAD);                    // line of centres at contact
@@ -782,7 +782,8 @@ const AIDS = {
   stance: {name:'Aim-line stance', fade:{},          goneAt:7, tip:'You look from directly behind the cue, on the line it travels, so the overlap is plain to see. From the ball line you stand behind the cue ball instead, as in a real read.'},
 };
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
-const PHYS_AT = 9;                                           // B+: speed & throw (medium only), called with thick / center / thin
+const PHYS_AT = 9;                                           // B+: cuts between fractions, called with thick / center / thin
+const THROW_AT = 99;                                         // throw joins the call later (A-, with its own explainer); off until then
 const SHOT_SPEED = 'medium';   // pocket speed: throw as for a medium-soft hit                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
 const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
 const LEAN_AT = 7;                                           // the weak-spot lean starts once you read unaided (B-)
@@ -815,6 +816,7 @@ function aidAlpha(key){
 }
 const stanceAim = () => aidAlpha('stance') > 0;
 const physOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= PHYS_AT;
+const throwNow = () => physOn() && level() >= THROW_AT;
 const anyOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
 const AID_SET = {ghost:['ghost','0'], line:['line','0'], stance:['cam','line']};
@@ -830,14 +832,14 @@ function enforceLocks(){
 // what reaching each grade brings (first time only for aids going away)
 const LADDER_UP = {1:'Guide line fades after 1.5 s', 2:'Guide line fades after 0.75 s', 3:'Guide line gone',
   4:'👻 Ghost ball fades after 1.5 s', 5:'👻 Ghost ball fades after 0.75 s', 6:'Ghost ball gone',
-  7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Throw',
+  7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'↔️ Between fractions',
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
 const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide line fades after 1.5 s', 'Guide line fades after 0.75 s', 'Guide line gone',
   'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone', 'Ball line: read it from behind the cue ball',
-  'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+  'Any angle', 'Between fractions: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 120;   // one per commit to main
+const BUILD = 121;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -861,7 +863,7 @@ function renderProgress(){
     return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
   }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
 }
-const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more throw', 11:'🔒 0.75 s Flash'};
+const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more thick & thin', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = stats.level;
   L.pts += ok ? PT_RIGHT : PT_WRONG;
@@ -1899,7 +1901,7 @@ function answer(id, mod){
   showResult(msg, cls, counted, oc.lat, over, exactLine, tipText);
   const quickHTML = `<div class="ql"><b class="${counted?'ok':'no'}">${counted ? 'Pocketed' : 'Missed'}</b>`
     + (!ok ? `<span class="out">${counted ? `Also drops, a bit ${over?'thin':'full'}` : oc.short ? `Right line, but it dies short` : `${over?'Too thin':'Too full'}, by ${Math.abs(oc.lat).toFixed(1)}″`}</span>` : '')
-    + (phys ? `<span>${lbl(shot.answer)} ${shot.mod}${alt ? ` / ${lbl(ALL.find(r=>r.id===alt.id))} ${alt.mod}` : ''} · throw ${shot.throwDeg.toFixed(1)}°</span></div>` : `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`)
+    + (phys ? `<span>${lbl(shot.answer)} ${shot.mod}${alt ? ` / ${lbl(ALL.find(r=>r.id===alt.id))} ${alt.mod}` : ''} · ${shot.theta.toFixed(1)}°${shot.throwDeg > 0.05 ? ` · throw ${shot.throwDeg.toFixed(1)}°` : ''}</span></div>` : `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`)
     + (tip ? `<div class="ql"><span class="tipq">Hit it a touch ${adjust}</span><span>A pure ${lbl(picked)} misses ${Math.abs(oc.lat).toFixed(1)}″</span></div>` : '');
   // the verdict lands on the call, not after the animation: sound, result, button colours, streak
   $('quick').innerHTML = quickHTML;
