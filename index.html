@@ -651,7 +651,19 @@ const SPEED_LABEL = {slow:'Slow', medium:'Medium', firm:'Firm'};
 const THROW_MAX = {slow:5, medium:3.5, firm:2};      // degrees, at the peak
 const ROLL_V = {slow:45, medium:75, firm:120};       // animation speed, inches per second
 function throwAt(speed, phi){ if(!speed || phi <= 0) return 0; const x = phi/32; return THROW_MAX[speed]*x*Math.exp(1-x); }
-function throwFor(s, phi){ return s && s.phys && s.throwOn && s.speed ? throwAt(s.speed, phi) : 0; }   // throw only counts once it's part of the call
+// Throw (Alciatore's model): friction between the balls while they slide against each other drags the object ball toward the
+// cue ball's direction. More when it's slow (the balls grip more) and when the cue ball is sliding (stun); topspin or backspin
+// means the surfaces are already slipping, and there's far less. vIn: cue-ball speed at contact (in/s); spin: its spin as a
+// share of rolling (0 stun, 1 rolling). Returns degrees.
+function throwPhys(vIn, phi, spin){
+  if(phi <= 0) return 0;
+  const v = vIn*0.0254, c = Math.cos(phi*RAD), sn = Math.sin(phi*RAD);
+  const vx = v*sn, vz = v*c*(spin || 0), vrel = Math.hypot(vx, vz);
+  if(vrel < 1e-6) return 0;
+  const mu = 9.951e-3 + 0.108*Math.exp(-1.088*vrel);
+  return Math.atan(Math.min(mu*v*c/vrel, 1/7)*vx/(v*c))/RAD;
+}
+function throwFor(s, phi){ return s && s.throwOn ? throwPhys(contactSpeed(s), phi, s.spinR ?? 0) : 0; }   // throw is on from A-
 // the contact cut needed so that, after throw, the object ball leaves at the geometric cut tp
 function contactFor(speed, tp){ let c = tp; for(let i=0;i<6;i++) c = tp + throwAt(speed, c); return c; }
 const MU_G = 108;                                     // sliding friction μ·g, in/s² (μ ≈ 0.28: a medium cloth, not a fast one)
@@ -683,7 +695,7 @@ function weightedIndex(w){
 function chooseAim(i){
   if(forceDeg != null) return forceDeg;   // the tutorial asks for an exact cut
   const r = REFS[i];
-  if(throwNow()){ const [lo, hi] = BOUNDS[i]; return rnd(Math.max(lo > 0 ? lo + 1 : 0, r.deg - PHYS_SPREAD), Math.min(hi - 1, r.deg + PHYS_SPREAD)); }   // close to a fraction: speed & throw decide the adjustment
+  if(physOn()){ const [lo, hi] = BOUNDS[i]; return rnd(Math.max(lo > 0 ? lo + 1 : 0, r.deg - PHYS_SPREAD), Math.min(hi - 1, r.deg + PHYS_SPREAD)); }   // close to a fraction: speed & throw decide the adjustment
   if(anyOn()){ const [lo, hi] = BOUNDS[i]; return rnd(lo > 0 ? lo + 1 : 0, hi - 1); }   // any angle, but never within 1° of a boundary: every answer is clear
   return r.id==='full' ? rnd(0,1) : r.deg + rnd(-1,1);
 }
@@ -727,7 +739,7 @@ function cueScratches(c){
 }
 function generate(){
   const w = bucketWeights();
-  const throwOn = throwNow(), phys = physOn(), speed = SHOT_SPEED;
+  const throwOn = throwNow(), phys = physOn(), speed = SHOT_SPEED, wantFlip = throwOn && !tut.on && Math.random() < 1/3;
   const lenCls = tut.on ? 'short' : Math.random() < longShare() ? 'long' : 'short';   // the grade sets the mix of short and long shots
   const k = H/100;
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
@@ -746,7 +758,7 @@ function generate(){
     else { const bis = norm([Math.sign(P.c[0]-W/2), Math.sign(P.c[1]-H/2)]); if(dot(u,bis) < Math.cos(44*RAD)) continue; }
     // with speed & throw, the dealt angle is the cut as it looks (the ghost-ball geometry); the hit it needs is thinner
     // with throw, the spread is around the hit the shot needs (so thick and thin both come up); the angle it looks is thicker by the throw
-    const cut = phi, tp = phys && throwOn ? Math.max(0, cut - throwAt(speed, cut)) : phi;
+    const cut = phi, tp = throwOn ? Math.max(0, cut - throwPhys(pocketSpeedFor(Math.max(1, dist))/Math.max(.2, Math.cos(cut*RAD)), cut, 0)) : phi;
     const sign = Math.random()<.5?-1:1;
     const v = rot(u, sign*tp*RAD);                      // cue direction
     const n = rot(v, -sign*cut*RAD);                    // line of centres at contact
@@ -760,7 +772,9 @@ function generate(){
     const right = [-v[1], v[0]];
     const cand = {any: anyOn(), phys, speed, len:lenCls, theta:cut, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
       L: dist, tol: tolC, T, uC, cheat, side: dot(u,right)>0?'R':'L',
-      color: pick(OB_COLORS), answer: nearestRef(tp), pick:null, spot: spotToward(sub(cb, ob))};
+      color: pick(OB_COLORS), answer: nearestRef(cut), pick:null, spot: spotToward(sub(cb, ob)),
+      stroke: throwOn ? 'stun' : 'roll', spinR: throwOn ? 0 : 1, throwDeg: cut - tp, gbLook: throwOn ? sub(ob, mul(u, 2*R)) : null};   // gbLook: the ghost ball as the shot looks (the pocket line), before throw   // the call is the hit it needs; with throw that can be a thinner fraction than it looks
+    if(throwOn && (nearestRef(tp).id !== cand.answer.id) !== wantFlip) continue;   // about one throw shot in three is one where throw changes the fraction
     if(phys){
       // center if the plain fraction pockets at this speed; otherwise which way the hit has to move
       cand.mod = outcome(cand, cand.answer.deg).made ? 'center' : cut > cand.answer.deg ? 'thin' : 'thick';
@@ -801,7 +815,7 @@ const AIDS = {
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
 const PHYS_AT = 99;                                          // thick / center / thin as part of the call: retired (too fine a judgement); B+ gives it as feedback instead
 const BETWEEN_AT = 9;                                        // B+: cuts between fractions; you call the nearest, the result says which way to nudge
-const THROW_AT = 99;                                         // throw joins the call later (A-, with its own explainer); off until then
+const THROW_AT = 10;                                         // A-: every shot is soft stun, and the object ball throws
 const SHOT_SPEED = 'medium';   // pocket speed: throw as for a medium-soft hit                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
 const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
 const LEAN_AT = 7;                                           // the weak-spot lean starts once you read unaided (B-)
@@ -834,7 +848,7 @@ function aidAlpha(key){
 }
 const stanceAim = () => aidAlpha('stance') > 0;
 const physOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= PHYS_AT;
-const throwNow = () => physOn() && level() >= THROW_AT;
+const throwNow = () => tut.on ? tut.lesson === 'throw' : adaptiveOn() && level()!==null && level() >= THROW_AT;
 const anyOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
 const AID_SET = {ghost:['ghost','0'], line:['line','0'], stance:['cam','line']};
@@ -851,13 +865,13 @@ function enforceLocks(){
 const LADDER_UP = {1:'Guide line fades after 1.5 s', 2:'Guide line fades after 0.75 s', 3:'Guide line gone',
   4:'👻 Ghost ball fades after 1.5 s', 5:'👻 Ghost ball fades after 0.75 s', 6:'Ghost ball gone',
   7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'↔️ Between fractions',
-  11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
+  10:'🌀 Throw', 11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
 const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide line fades after 1.5 s', 'Guide line fades after 0.75 s', 'Guide line gone',
   'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone', 'Ball line: read it from behind the cue ball',
-  'Any angle', 'Between fractions: call the nearest', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+  'Any angle', 'Between fractions: call the nearest', 'Throw: soft stun shots', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 128;   // one per commit to main
+const BUILD = 129;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -882,7 +896,7 @@ function renderProgress(){
     return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
   }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
 }
-const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 11:'🔒 0.75 s Flash'};
+const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 10:'No more throw', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = stats.level;
   L.pts += ok ? PT_RIGHT : PT_WRONG;
@@ -1292,7 +1306,7 @@ function perspDyn(cam, s, reveal){
 
   // the aim-line aid: a line on the cloth from the cue ball along the shot line to the ghost ball (may be fading away)
   const lA = reveal || s.anim ? 0 : aidAlpha('line');
-  if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [s.gb[0], s.gb[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.9*lA).toFixed(3)}" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`; }
+  if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [(s.gbLook || s.gb)[0], (s.gbLook || s.gb)[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.9*lA).toFixed(3)}" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`; }
   // balls, far to near
   const A = s.anim, F = reveal && !A ? s.final : null;
   const cbP = A ? A.cb : F ? F.cb : s.cb;   // null once the cue ball has dropped into a pocket
@@ -1309,7 +1323,7 @@ function perspDyn(cam, s, reveal){
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
   // once the balls meet, the ghost ball shows where your call actually made contact (on a miss that's not the ideal spot)
   const hit = (A && contact) || (reveal && !A), yours = hit && s.pick && s.pick.far;
-  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p: yours ? s.pick.g2 : s.gb, kind:'ghost', a: hit ? Math.max(refA, yours ? 0 : gA) : gA});
+  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p: yours ? s.pick.g2 : hit ? s.gb : (s.gbLook || s.gb), kind:'ghost', a: hit ? Math.max(refA, yours ? 0 : gA) : gA});
   if(!reveal && s.place) items.push({p:s.place, kind:'user'});
   items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],it.z ?? R]);});
   items.sort((a,b)=>b.c[2]-a.c[2]);
@@ -2055,10 +2069,27 @@ function simBall(p, v, rv, t, M, dt, withSpin, pts){
 }
 function simCue(s, g2, withSpin){
   const cb0 = s.cb, n2 = norm(sub(s.ob, g2)), d1 = len(sub(g2, cb0)), dA = d1 > 1e-6 ? mul(sub(g2, cb0), 1/d1) : [0,1];
-  const Vc = contactSpeed(s), v0 = tipSpeed(Vc, d1), dt = withSpin ? 1/240 : 1/100;
-  // to the object ball: rolling in a straight line, slowing only by rolling resistance
+  const Vc = contactSpeed(s), dt = withSpin ? 1/240 : 1/100;
   const pts = [{t:0, p:[...cb0], M:I3}];
   let M = I3, t = 0;
+  if(s.stroke === 'stun'){
+    // stun: hit below centre with just enough backspin that it has worn off at contact; it slides the whole way, then leaves
+    // along the tangent line with no spin
+    const T1 = (-Vc + Math.sqrt(Vc*Vc + 2*MU_G*d1))/MU_G, v0 = Vc + MU_G*T1, w0 = -2.5*MU_G*T1, steps = Math.max(1, Math.ceil(T1/dt));
+    s.tip = [0, Math.max(-.6, .4*w0/Math.max(1, v0))];
+    for(let k=1; k<=steps; k++){
+      const tk = T1*k/steps, x = v0*tk - MU_G*tk*tk/2, w = w0 + 2.5*MU_G*tk;
+      if(withSpin && Math.abs(w) > 1e-6) M = matRot(M, [-dA[1], dA[0], 0], w*(tk - t)/R);
+      t = tk; pts.push({t, p: add(cb0, mul(dA, Math.min(d1, x))), M});
+    }
+    pts[pts.length-1].p = [...g2]; pts[pts.length-1].hit = 1;
+    const vIn = mul(dA, Vc), v = sub(vIn, mul(n2, dot(vIn, n2)));
+    const r = simBall([...g2], v, [0,0], T1, M, dt, withSpin, pts);
+    return {pts, T1, bounces: r.bounces, pocket: r.pocket, vDrop: r.v, end: r.end};
+  }
+  s.tip = CUE_TIP;
+  const v0 = tipSpeed(Vc, d1);
+  // to the object ball: rolling in a straight line, slowing only by rolling resistance
   const T1 = (v0 - Vc)/A_ROLL, steps = Math.max(1, Math.ceil(T1/dt));
   for(let k=1; k<=steps; k++){
     const tk = T1*k/steps, x = v0*tk - A_ROLL*tk*tk/2, vk = v0 - A_ROLL*tk;
@@ -2163,7 +2194,7 @@ function showResult(){
 }
 // where the cue tip struck the cue ball, seen from behind it
 function tipSVG(s){
-  const tip = s.tip || CUE_TIP, lab = !tip[0] && !tip[1] ? 'Centre' : !tip[0] && Math.abs(tip[1] - .4) < .01 ? 'Rolling' : '';
+  const tip = s.tip || CUE_TIP, lab = !tip[0] && !tip[1] ? 'Centre' : !tip[0] && Math.abs(tip[1] - .4) < .01 ? 'Rolling' : !tip[0] && tip[1] < 0 ? 'Stun' : '';
   return `<svg viewBox="-1.5 -2.45 3 4.9" aria-label="Cue tip: ${lab || 'offset'}">
     <rect x="-1.5" y="-2.45" width="3" height="4.9" rx=".35" fill="#1f5f96"/>
     <text x="0" y="-1.72" font-size=".56" text-anchor="middle" fill="#ffffff" font-family="Barlow Condensed, sans-serif" font-weight="700">${lab}</text>
@@ -2583,9 +2614,23 @@ const BSTEPS = [
   {finish:true, aids:{},
    text:'You still just call the <b>nearest fraction</b>: ½ here is right. When the plain fraction would miss, the result tells you which way to nudge it, <b>a touch thinner</b> or <b>a touch fuller</b>.'},
 ];
+// A-: throw
+const TSTEPS_THROW = [
+  {deg:30, mustMiss:'look', aids:{stance:1, ghost:1, line:1}, next:true,
+   text:'You’re at <b>A-</b>. From here every shot is played <b>soft, with stun</b>: the cue ball is struck a little below centre, so it arrives sliding, with no spin.'},
+  {aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
+   text:'As the balls touch, friction drags the object ball a little along the cue ball’s path. That’s <b>throw</b>: the object ball goes <b>fuller</b> than the ghost ball says.'},
+  {aids:{stance:1, ghost:1}, demo:'look', next:true,
+   text:'Hit it exactly as it looks, and throw carries it fuller. Watch it miss.'},
+  {aids:{stance:1, ghost:1}, demo:'right', next:true,
+   text:'Take a touch less ball to allow for the throw, and it drops. After contact the stunned cue ball goes straight out along the tangent line.'},
+  {finish:true, aids:{},
+   text:'Throw is biggest on <b>soft stun</b> shots and around a <b>half-ball</b> hit, and there’s none on a full hit. Sometimes it’s enough to change the call: a cut that looks <b>¾</b> can need <b>½</b>.'},
+];
 const LESSONS = {
   intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
   nudge: {name:'Between fractions', at:BETWEEN_AT, steps:BSTEPS},
+  throw: {name:'Throw', at:THROW_AT, steps:TSTEPS_THROW},
 };
 const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
 const tstep = () => tsteps()[tut.i];
@@ -2615,7 +2660,7 @@ function tutShotDeg(deg, mustMiss){   // a shot at an exact cut; mustMiss: a pla
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   forceDeg = deg;
   let s1 = null;
-  for(let k=0; k<400; k++){ const c = generate(); s1 = s1 || c; if(mustMiss != null && outcome(c, mustMiss).made) continue; s1 = c; if(c.L >= 16 && len(sub(c.ob, c.cb)) >= 14) break; }
+  for(let k=0; k<400; k++){ const c = generate(); s1 = s1 || c; if(mustMiss != null && outcome(c, mustMiss === 'look' ? c.pathDeg : mustMiss).made) continue; s1 = c; if(c.L >= 16 && len(sub(c.ob, c.cb)) >= 14) break; }
   forceDeg = null;
   shot = s1; shot.t0 = performance.now();
   shot.color = pick([OB_COLORS[1], OB_COLORS[2], OB_COLORS[3], OB_COLORS[5]]);   // never yellow: the lit-up overlap is yellow
@@ -2646,7 +2691,7 @@ function runStep(){
   freshCall();
   if(st.demo != null) setTimeout(()=>{   // the coach plays the hit for you
     if(!tut.on || tstep() !== st || answered) return;
-    const oc = outcome(shot, st.demo === 'right' ? shot.theta : st.demo);
+    const oc = outcome(shot, st.demo === 'right' ? shot.theta : st.demo === 'look' ? shot.pathDeg : st.demo);
     answered = true; shot.pick = {...oc, id: '', far: st.demo !== 'right'};
     if(settings.animate !== '0') animateShot(oc, ()=>{ draw(true); }, st.demo === 'right' ? '#ffd34d' : MISS); else draw(true);
   }, 700);
@@ -2713,7 +2758,7 @@ function tutLayer(cam, s, reveal){
     if(l==='pocket') want.push([[s.P.c[0], s.P.c[1], 1.6], 'pocket']);
     if(l==='ob') want.push([[s.ob[0], s.ob[1], R], 'object ball']);
     if(l==='cb') want.push([[s.cb[0], s.cb[1], R], 'cue ball']);
-    if(l==='ghost') want.push([[s.gb[0], s.gb[1], R], 'ghost ball']);
+    if(l==='ghost') want.push([[(s.gbLook || s.gb)[0], (s.gbLook || s.gb)[1], R], 'ghost ball']);
     if(l==='line') want.push([[(s.cb[0]+s.gb[0])/2, (s.cb[1]+s.gb[1])/2, .03], 'guide line']);
   }
   want.forEach(([P3, t])=>{ const p = scr(P3); if(p) targets.push({x:p[0], y:p[1], r:Math.max(p[2], 6), t}); });
@@ -2738,7 +2783,7 @@ function tutLayer(cam, s, reveal){
   }
   if((st.labels || []).includes('drag')) o += `<text x="${VW/2}" y="${VH-28}" text-anchor="middle" font-size="15" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#fff" ${halo}>⟵ drag to walk around ⟶</text>`;
   if(st.overlap && tut.zb > 0.99){
-    const g = scr([s.gb[0], s.gb[1], R]), b = scr([s.ob[0], s.ob[1], R]);
+    const g = scr([(s.gbLook || s.gb)[0], (s.gbLook || s.gb)[1], R]), b = scr([s.ob[0], s.ob[1], R]);
     if(g && b) o += `<clipPath id="tovl"><circle cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="${b[2].toFixed(1)}"/></clipPath>
       <circle cx="${g[0].toFixed(1)}" cy="${g[1].toFixed(1)}" r="${g[2].toFixed(1)}" fill="#ffd34d" fill-opacity=".6" clip-path="url(#tovl)"/>
       <text x="${b[0].toFixed(1)}" y="${(Math.min(g[1], b[1]) - Math.max(g[2], b[2]) - 14).toFixed(1)}" text-anchor="middle" font-size="16" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#fff" ${halo}>covered = the fraction</text>`;
