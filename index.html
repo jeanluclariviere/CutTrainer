@@ -1061,11 +1061,14 @@ function walkCam(s, view){
 }
 function makeCam(s, view){
   const c0 = VIEWS[view];
-  if(tut.on && tut.zoomNow){   // tutorial close-up: same eye, narrow view on the object ball and ghost ball
+  if(tut.on && tut.zb > 0){   // tutorial close-up, blended with the game view while the camera moves
     // eye low on the cue ball's path, a little short of the ghost ball, so the overlap reads side by side
     const E = [s.gb[0] - s.v[0]*16, s.gb[1] - s.v[1]*16, R*2.2], T = [(s.ob[0]+s.gb[0])/2, (s.ob[1]+s.gb[1])/2, R];
     const d = Math.hypot(T[0]-E[0], T[1]-E[1], T[2]-E[2]);
-    return camFrom(E, norm3([T[0]-E[0], T[1]-E[1], T[2]-E[2]]), 2*Math.atan(5*R/d)/RAD);
+    const zf = norm3([T[0]-E[0], T[1]-E[1], T[2]-E[2]]), zh = 2*Math.atan(5*R/d)/RAD;
+    if(tut.zb >= 1) return camFrom(E, zf, zh);
+    const g = makeCamBase(s, view), k = tut.zb, mix = (a, b) => a.map((x, i)=>x + (b[i]-x)*k);
+    return camFrom(mix(g.E, E), norm3(mix(g.f, zf)), g.hfov + (zh - g.hfov)*k);
   }
   return makeCamBase(s, view);
 }
@@ -1236,7 +1239,7 @@ function perspSVG(s, reveal, view){
   if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [s.gb[0], s.gb[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.9*lA).toFixed(3)}" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="0.1 3.2"/>`; }
   // balls, far to near
   const A = s.anim, F = reveal && !A ? s.final : null;
-  const items = tut.on && tut.zoomNow ? [] : [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];   // the tutorial close-up looks from in front of the cue ball
+  const items = tut.on && tut.zb > 0.5 ? [] : [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];   // the tutorial close-up looks from in front of the cue ball
   if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A ? A.obScale : 1});
   // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
@@ -1304,7 +1307,7 @@ function perspSVG(s, reveal, view){
   const ringPts = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
   const ringVisible = ringPts.some(([x,y])=>x>=0 && x<=VW && y>=0 && y<=VH);
   o += tutLayer(cam, s, reveal);
-  if(!ringVisible && !(walk && walk.blend > 0) && !(tut.on && tut.zoomNow)){
+  if(!ringVisible && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0)){
     const pc = cam.toCam([s.P.c[0], s.P.c[1], 1.6]);
     let dx = pc[0], dy = -pc[1];
     if(pc[2] <= NEAR){ dy = Math.abs(dy)+1; }
@@ -1564,6 +1567,50 @@ function playSound(kind, streak){
   }catch(e){}
 }
 function thock(good){ playSound(good ? 'made' : 'miss'); }
+// ---------- table sounds: cue strike, ball contact, the drop, the rail (synthesized, no files) ----------
+let noiseBuf = null;
+function noise(){
+  if(!noiseBuf){ noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate); const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = Math.random()*2 - 1; }
+  return noiseBuf;
+}
+function sfxNoise(out, at, dur, type, freq, q, gain){   // a filtered burst of noise
+  const t = actx.currentTime + at, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  src.buffer = noise(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(out); src.start(t, Math.random()*0.5); src.stop(t + dur + 0.02);
+}
+function sfxTone(out, at, dur, f0, f1, gain, type){   // a short pitched knock that decays
+  const t = actx.currentTime + at, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); if(f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
+}
+const SFX = {
+  strike: (o, t, v)=>{ sfxNoise(o, t, .035, 'bandpass', 2400, 1.2, .55*v); sfxTone(o, t, .06, 190, 110, .45*v); },                         // leather tip on the cue ball
+  click:  (o, t, v)=>{ sfxTone(o, t, .045, 3900, 3500, .5*v); sfxTone(o, t, .03, 5600, 0, .22*v); sfxNoise(o, t, .015, 'highpass', 3000, .7, .5*v); },   // ball on ball
+  drop:   (o, t, v)=>{ sfxNoise(o, t, .05, 'bandpass', 900, 1, .35*v); sfxTone(o, t + .02, .3, 120, 70, .8*v); sfxTone(o, t + .11, .12, 160, 120, .35*v); },   // into the pocket
+  rail:   (o, t, v)=>{ sfxNoise(o, t, .09, 'lowpass', 650, .8, .6*v); sfxTone(o, t, .13, 95, 65, .6*v); },                                     // cushion thump
+  jaw:    (o, t, v)=>{ sfxNoise(o, t, .04, 'bandpass', 1300, 1.5, .5*v); sfxTone(o, t, .09, 150, 110, .5*v); sfxNoise(o, t + .06, .08, 'lowpass', 600, .8, .35*v); },   // rattles on the point
+};
+// schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
+function tableSounds(plan){
+  if(settings.sound === '0') return null;
+  try{
+    audioCtx();
+    const bus = actx.createGain(); bus.gain.value = 0.9; bus.connect(actx.destination);
+    plan.forEach(([t, kind, v])=>SFX[kind](bus, Math.max(0, t), v ?? 1));
+    return bus;
+  }catch(e){ return null; }
+}
+function cutSounds(bus){ if(!bus || !actx) return; try{ bus.gain.setTargetAtTime(0, actx.currentTime, 0.01); setTimeout(()=>{ try{ bus.disconnect(); }catch(e){} }, 250); }catch(e){} }
+const SPEED_VOL = {slow:.7, medium:1, firm:1.25};
+// the sounds of a shot, played out: strike, contact, then the pocket, the jaw or the rail (and the cue ball on a rail)
+function shotPlan(s, oc, T1, tOb, tCb, cbRail, jawHit){
+  const v = SPEED_VOL[s.speed] || 1, plan = [[0, 'strike', v], [T1, 'click', v]];
+  plan.push([T1 + tOb, oc.made ? 'drop' : jawHit ? 'jaw' : 'rail', v]);
+  if(cbRail && tCb > 0.05) plan.push([T1 + tCb, 'rail', .45*v]);
+  return plan;
+}
 
 // ---------- sessions ----------
 function startSession(size, base){
@@ -1732,9 +1779,9 @@ function answer(id, mod){
   const prevStreak = aided ? 0 : curStreak();
   const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
   // sound first: nothing else runs before it
-  if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);
+  if(!aided && ok && newStreak >= STREAK_HOT) playSound('streak', newStreak);   // chimes are for streaks; the shot itself sounds like a shot
   else if(!aided && !ok && prevStreak >= STREAK_HOT) playSound('streakEnd');
-  else thock(counted);
+  if(settings.animate === '0') tableSounds(shotPlan(shot, ok ? outcome(shot, shot.theta) : oc, .12, .3, 0, false, false));
   logEntry({p:id, m:counted?1:0, ...(phys ? {pm:mod} : {})});
   if(stats.active && stats.active.pending) delete stats.active.pending;
   if(!aided && settings.task==='sess' && level()!==null && stats.active && stats.active.task==='sess' && !stats.active.base){
@@ -1817,6 +1864,8 @@ function animateShot(oc, done, obCol){
   const V = s.speed ? ROLL_V[s.speed] : 75;       // one constant speed (inches per second) for every ball, start to finish
   const T1 = d1/V, T2 = d2/V, T3 = d3/V;
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
+  const cbRail = tl > 0.05 && len(sub(rayToCushion(g2, mul(tan, 1/tl)), cbEnd)) < 0.5;   // the cue ball's path reached a cushion
+  const bus = tableSounds(shotPlan(s, oc, T1, sink ? toPocket/V : T2, T3, cbRail, jawHit));
   const easeOut = u => u;   // linear: no speeding up or slowing down
   const t0 = performance.now();
   const frame = now => {
@@ -1836,12 +1885,13 @@ function animateShot(oc, done, obCol){
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
   s.final = {cb: cbEnd, ob: sink ? null : obEnd, stop: jawHit ? obEnd : null, trail: {cb: [cb0, g2, cbEnd]}};
-  anim = {done, t0, raf: requestAnimationFrame(frame)};
+  anim = {done, t0, total, bus, raf: requestAnimationFrame(frame)};
 }
 function finishAnim(){
   if(!anim) return;
   const a = anim; anim = null;
   cancelAnimationFrame(a.raf);
+  if(performance.now() - a.t0 < a.total - 300) cutSounds(a.bus);   // skipped: sounds that haven't happened yet don't play
   if(shot) shot.anim = null;
   a.done(performance.now() - a.t0);
 }
@@ -2239,7 +2289,7 @@ const menuOpen = () => !$('menu').hidden;
 function openMenu(v){ $('menu').hidden = !v; if(v) $('menuclose').focus({preventScroll:true}); else $('cog').focus({preventScroll:true}); }
 
 // ---------- tutorial: played on the real table, step by step ----------
-const tut = {on:false, i:0, zoomNow:false};
+const tut = {on:false, i:0, zb:0, zt:0, zRaf:0};   // zb: how far the camera is into the close-up (0..1), eased toward zt
 const TSTEPS = [
   {shot:'12', aids:{stance:1}, labels:['cb','ob','pocket'], next:true,
    text:'Every shot has a <b>cue ball</b>, an <b>object ball</b> and a <b>pocket</b>, ringed in gold. Your job: say how full to hit the object ball.'},
@@ -2248,9 +2298,11 @@ const TSTEPS = [
   {aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
    text:'Up close: the ghost ball covers part of the object ball. <b>That covered part is the fraction.</b> Here it covers half, so this is a <b>½-ball</b> hit.'},
   {aids:{stance:1, ghost:1, line:1}, ask:'12',
-   text:'Your turn: tap <b>½</b>.'},
-  {shot:'14', aids:{stance:1, ghost:1}, zoom:true, overlap:true, ask:'14',
-   text:'Here <b>¾ of the object ball is still showing</b>. Only a quarter is covered, so it’s a <b>¼-ball</b> hit. Tap <b>¼</b>.'},
+   text:'Back to where you stand. Your turn: tap <b>½</b>.'},
+  {shot:'14', aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
+   text:'A new shot, up close. Here <b>¾ of the object ball is still showing</b>. Only a quarter is covered, so it’s a <b>¼-ball</b> hit.'},
+  {aids:{stance:1, ghost:1, line:1}, ask:'14',
+   text:'From where you stand: tap <b>¼</b>.'},
   {shot:'34', aids:{stance:1, ghost:'fade'}, ask:'any',
    text:'The ghost ball fades after a moment now: picture it yourself, then call it.'},
   {aids:{}, labels:['drag'], next:true,
@@ -2284,11 +2336,22 @@ function freshCall(){   // same shot, ready to be called again
   $('result').innerHTML = ''; $('quick').innerHTML = '';
   tableBox.classList.remove('tappable');
 }
+function zoomTo(target){
+  tut.zt = target; cancelAnimationFrame(tut.zRaf);
+  const from = tut.zb, t0 = performance.now(), dur = 700;
+  if(from === target) return;
+  const step = now=>{
+    const u = Math.min(1, (now - t0)/dur), e = u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;   // ease in and out
+    tut.zb = from + (target - from)*e; draw(answered);
+    if(u < 1) tut.zRaf = requestAnimationFrame(step);
+  };
+  tut.zRaf = requestAnimationFrame(step);
+}
 function runStep(){
   const st = tstep();
   if(st.shot) tutShot(st.shot);
   freshCall();
-  tut.zoomNow = !!st.zoom;
+  zoomTo(st.zoom ? 1 : 0);
   $('coachstep').textContent = `Tutorial · ${tut.i+1} of ${TSTEPS.length}`;
   $('coachtext').innerHTML = st.text;
   const nx = $('coachnext');
@@ -2305,7 +2368,7 @@ function startTut(){
   $('coach').scrollIntoView({block:'nearest'});
 }
 function endTut(thenBaseline){
-  tut.on = false; tut.zoomNow = false;
+  tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf);
   if(!settings.tut){ settings.tut = 1; saveSettings(); }
   $('coach').hidden = true;
   renderSession(); deal();
@@ -2322,15 +2385,15 @@ function tutAnswer(id){
   if(!st.ask || answered) return;
   const right = id === shot.answer.id, b = $('ans-'+id);
   if(st.ask !== 'any' && !right){
-    thock(false); b.className = 'wrong'; setTimeout(()=>{ if(!answered) b.className = ''; }, 700);
+    tableSounds([[0, 'rail', .5]]); b.className = 'wrong'; setTimeout(()=>{ if(!answered) b.className = ''; }, 700);
     $('coachtext').innerHTML = st.text + '<br><span class="coachnote">Not quite: how much of the object ball does the ghost ball cover?</span>';
     return;
   }
-  answered = true; thock(right);
+  answered = true;
+  if(settings.animate === '0') tableSounds(shotPlan(shot, right ? outcome(shot, shot.theta) : outcome(shot, ALL.find(r=>r.id===id).deg), .12, .3, 0, false, false));
   document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===shot.answer.id ? 'right' : x.dataset.id===id ? 'wrong' : ''; });
   const picked = ALL.find(r=>r.id===id), oc = outcome(shot, picked.deg);
   shot.pick = {...oc, id, far: !right};
-  tut.zoomNow = false;
   const lab = shot.answer.id==='full' ? 'full' : shot.answer.label;
   $('coachtext').innerHTML = right ? `Right: a <b>${lab}</b>-ball hit. Watch it go.` : `It was a <b>${lab}</b>-ball hit: the ghost ball covered ${lab==='full' ? 'all' : lab} of it.`;
   $('coachnext').hidden = false; $('coachnext').textContent = 'Next';
@@ -2374,7 +2437,7 @@ function tutLayer(cam, s, reveal){
       <text x="${best.cx.toFixed(1)}" y="${(best.cy + FS*0.36).toFixed(1)}" text-anchor="middle" font-size="${FS}" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#fff" ${halo}>${t.t}</text>`;
   }
   if((st.labels || []).includes('drag')) o += `<text x="${VW/2}" y="${VH-28}" text-anchor="middle" font-size="15" font-weight="700" font-family="IBM Plex Sans, sans-serif" fill="#fff" ${halo}>⟵ drag to walk around ⟶</text>`;
-  if(st.overlap){
+  if(st.overlap && tut.zb > 0.99){
     const g = scr([s.gb[0], s.gb[1], R]), b = scr([s.ob[0], s.ob[1], R]);
     if(g && b) o += `<clipPath id="tovl"><circle cx="${b[0].toFixed(1)}" cy="${b[1].toFixed(1)}" r="${b[2].toFixed(1)}"/></clipPath>
       <circle cx="${g[0].toFixed(1)}" cy="${g[1].toFixed(1)}" r="${g[2].toFixed(1)}" fill="#ffd34d" fill-opacity=".6" clip-path="url(#tovl)"/>
@@ -2463,7 +2526,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test' || DEV) window.__ct = {renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 if(DEV && !hasBaseline()) openProg(true);   // #dev: no baseline, straight to the grade picker
