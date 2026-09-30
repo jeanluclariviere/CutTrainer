@@ -1837,11 +1837,17 @@ function animateShot(oc, done, obCol){
   // one constant speed (inches per second) for every ball, scaled to the shot's length: short shots play slower so
   // you can see (and hear) the contact and the pocket as two things; long firm shots still move at full pace
   const V = Math.max(55, Math.min(s.speed ? ROLL_V[s.speed] : 75, d1/0.18));   // never slower than a believable stun shot
-  const T1 = d1/V, T2 = d2/V, T3 = d3/V;
+  // after contact the speed splits by the cut: object ball V·cos(cut), cue ball V·sin(cut); both then slow as they roll
+  const cosC = Math.max(0.05, Math.min(1, dot(v2, n2))), sinC = Math.sqrt(1 - cosC*cosC);
+  const vOb = V*cosC, vCb = Math.max(4, V*sinC);
+  const decel = (v, d) => Math.min(22, 0.8*v*v/(2*Math.max(d, 0.1)));   // rolling slows it, but it always gets where it's going
+  const aOb = decel(vOb, d2), aCb = decel(vCb, d3);
+  const tAt = (v, a, x) => a < 1e-6 ? x/v : (v - Math.sqrt(Math.max(0, v*v - 2*a*x)))/a;   // time to cover x
+  const xAt = (v, a, t, d) => Math.min(d, v*t - a*t*t/2);                                    // distance covered by time t
+  const T1 = d1/V, T2 = tAt(vOb, aOb, d2), T3 = d3 > 0.01 ? tAt(vCb, aCb, d3) : 0;
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
   const cbRail = tl > 0.05 && len(sub(rayToCushion(g2, mul(tan, 1/tl)), cbEnd)) < 0.5;   // the cue ball's path reached a cushion
-  const bus = tableSounds(shotPlan(s, oc, T1, sink ? Math.max(0, toPocket - 1.2)/V : T2, T3, cbRail, jawHit), s.duck);
-  const easeOut = u => u;   // linear: no speeding up or slowing down
+  const bus = tableSounds(shotPlan(s, oc, T1, sink ? tAt(vOb, aOb, Math.max(0, toPocket - 1.2)) : T2, T3, cbRail, jawHit), s.duck);
   const t0 = performance.now();
   const frame = now => {
     if(!anim) return;
@@ -1849,12 +1855,12 @@ function animateShot(oc, done, obCol){
     let cb, ob = ob0, obScale = 1;
     if(t < T1){ cb = add(cb0, mul(sub(g2, cb0), t/T1)); }
     else {
-      const u2 = Math.min(1, (t-T1)/T2), u3 = Math.min(1, (t-T1)/T3);
-      ob = jaw ? obAt(d2*u2) : add(ob0, mul(sub(obEnd, ob0), easeOut(u2)));
-      cb = add(g2, mul(sub(cbEnd, g2), easeOut(u3)));
+      const x2 = xAt(vOb, aOb, t-T1, d2), x3 = d3 > 0.01 ? xAt(vCb, aCb, t-T1, d3) : 0;
+      ob = jaw ? obAt(x2) : add(ob0, mul(sub(obEnd, ob0), d2 > 0 ? x2/d2 : 1));
+      cb = d3 > 0.01 ? add(g2, mul(sub(cbEnd, g2), x3/d3)) : g2;
       if(sink){ const past = len(sub(ob, ob0)) - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
     }
-    s.anim = {cb, ob: obScale > 0.02 ? ob : null, obScale, run: t < T1 ? 0 : V*(t-T1),   // run: how far the object ball has travelled since contact
+    s.anim = {cb, ob: obScale > 0.02 ? ob : null, obScale, run: t < T1 ? 0 : vOb*(t-T1),   // run: how far the correct path has drawn since contact (at the object ball's starting speed)
       trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : (jaw && len(sub(ob, ob0)) > dJ ? [ob0, jaw, ob] : [ob0, ob]), obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
