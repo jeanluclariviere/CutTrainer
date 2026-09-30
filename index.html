@@ -1585,13 +1585,13 @@ function sfxTone(out, at, dur, f0, f1, gain, type){   // a short pitched knock t
   g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
-// retro 8-bit: square-wave chiptune blips
+// few notes, warm tones: one for the strike, one for contact, three for the pocket, one for the rail, two for the jaw
 const SFX = {
-  strike: (o, t, v)=>{ sfxTone(o, t, .06, 200, 90, .35*v, 'square'); },
-  click:  (o, t, v)=>{ sfxTone(o, t, .05, 1200, 1800, .28*v, 'square'); },
-  drop:   (o, t, v)=>{ sfxTone(o, t, .08, 660, 0, .28, 'square'); sfxTone(o, t + .08, .08, 880, 0, .28, 'square'); sfxTone(o, t + .16, .18, 1320, 0, .28, 'square'); },
-  rail:   (o, t, v)=>{ sfxTone(o, t, .16, 220, 70, .32*v, 'square'); },
-  jaw:    (o, t, v)=>{ sfxTone(o, t, .05, 300, 0, .28*v, 'square'); sfxTone(o, t + .07, .05, 260, 0, .28*v, 'square'); sfxTone(o, t + .14, .25, 180, 60, .3*v, 'square'); },
+  strike: (o, t, v)=>{ sfxTone(o, t, .08, 190, 120, .7*v, 'triangle'); },                                                   // thock
+  click:  (o, t, v)=>{ sfxTone(o, t, .07, 1175, 1050, .45*v); },                                                             // tock
+  drop:   (o, t, v)=>{ sfxTone(o, t, .1, 392, 0, .5, 'triangle'); sfxTone(o, t + .09, .1, 523.25, 0, .5, 'triangle'); sfxTone(o, t + .18, .26, 659.25, 0, .55, 'triangle'); },   // rising three
+  rail:   (o, t, v)=>{ sfxTone(o, t, .2, 170, 85, .7*v); },                                                                  // bump
+  jaw:    (o, t, v)=>{ sfxTone(o, t, .07, 330, 280, .55*v, 'triangle'); sfxTone(o, t + .09, .24, 200, 110, .6*v); },           // knock, then sag
 };
 // schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
 function tableSounds(plan){
@@ -1600,8 +1600,8 @@ function tableSounds(plan){
     audioCtx();
     const bus = actx.createGain(); bus.gain.value = 0.55;
     const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
-    const dly = actx.createDelay(); dly.delayTime.value = 0.08; const fb = actx.createGain(); fb.gain.value = 0;
-    bus.connect(lp); lp.connect(actx.destination);   // chiptune: dry, no echo
+    const dly = actx.createDelay(); dly.delayTime.value = 0.08; const fb = actx.createGain(); fb.gain.value = 0.1;
+    bus.connect(lp); lp.connect(actx.destination); lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(actx.destination);   // a touch of room
     plan.forEach(([t, kind, v])=>SFX[kind](bus, Math.max(0, t), v ?? 1));
     return bus;
   }catch(e){ return null; }
