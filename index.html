@@ -510,19 +510,25 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="tabpanel" role="tabpanel" id="tab-aids" hidden>
   <section class="aids">
-    <div class="aid"><span class="aidname" tabindex="0" id="tip-aim">Aim line<span class="lock" id="aimlock" hidden> 🔒</span><small class="aidat" id="at-aim"></small></span>
-      <div class="seg" role="group" aria-label="Aim line">
-        <button id="cam-line" data-set="cam" data-val="line">Off</button>
-        <button id="cam-aim" data-set="cam" data-val="aim">On</button>
-      </div>
-    </div>
-    <div class="aid"><span class="aidname" tabindex="0" id="tip-ghost">Ghost ball<span class="lock" id="ghostlock" hidden> 🔒</span><small class="aidat" id="at-ghost"></small></span>
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-ghost">Ghost ball<small class="aidat" id="at-ghost"></small></span>
       <div class="seg" role="group" aria-label="Ghost ball">
         <button id="ghost-0" data-set="ghost" data-val="0">Off</button>
         <button id="ghost-1" data-set="ghost" data-val="1">On</button>
       </div>
     </div>
-    <div class="aid"><span class="aidname" tabindex="0" id="tip-walk">Looking around<span class="lock" id="walklock" hidden> 🔒</span><small class="aidat" id="at-walk"></small></span>
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-line">Aim line<small class="aidat" id="at-line"></small></span>
+      <div class="seg" role="group" aria-label="Aim line">
+        <button id="line-0" data-set="line" data-val="0">Off</button>
+        <button id="line-1" data-set="line" data-val="1">On</button>
+      </div>
+    </div>
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-stance">Stance<small class="aidat" id="at-stance"></small></span>
+      <div class="seg" role="group" aria-label="Stance">
+        <button id="cam-line" data-set="cam" data-val="line">Ball line</button>
+        <button id="cam-aim" data-set="cam" data-val="aim">Aim line</button>
+      </div>
+    </div>
+    <div class="aid"><span class="aidname" tabindex="0" id="tip-walk">Looking around<small class="aidat" id="at-walk"></small></span>
       <div class="seg" role="group" aria-label="Looking around">
         <button id="walk-0" data-set="walk" data-val="0">Off</button>
         <button id="walk-1" data-set="walk" data-val="1">On</button>
@@ -590,7 +596,7 @@ function segDist(p,a,b){const ab=sub(b,a);const t=Math.max(0,Math.min(1,dot(sub(
 function f2(n){return n.toFixed(2);}
 
 // ---------- settings & stats ----------
-const settings = {walk:'1', view:'stand', mode:'ref', flash:'0', throw:'0', full:'1', cam:'line', task:'sess', len:'both', table:'9', pockets:'std'};
+const settings = {line:'0', walk:'1', view:'stand', mode:'ref', flash:'0', throw:'0', full:'1', cam:'line', task:'sess', len:'both', table:'9', pockets:'std'};
 try{ Object.assign(settings, JSON.parse(localStorage.getItem('cutreader-settings')) || {}); }catch(e){}
 try{ const v = localStorage.getItem('cutreader-view'); if(v && !localStorage.getItem('cutreader-settings')) settings.view = v; }catch(e){}
 function saveSettings(){ try{ localStorage.setItem('cutreader-settings', JSON.stringify(settings)); }catch(e){} }
@@ -677,7 +683,7 @@ function cueScratches(c){
 }
 function generate(){
   const w = bucketWeights();
-  const throwOn = false, phys = physOn(), speed = phys ? pick(SPEEDS) : null;
+  const throwOn = false, phys = physOn(), speed = phys ? (level() >= ALL_SPEEDS_AT ? pick(SPEEDS) : 'medium') : null;
   const lenCls = Math.random() < longShare() ? 'long' : 'short';   // the grade sets the mix of short and long shots
   const k = H/100;
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
@@ -727,50 +733,72 @@ function generate(){
 }
 
 // ---------- baseline, grades & adaptive dealing ----------
-// The first Freeplay session is a one-time 100-shot baseline (50 standing, then 50 down on the ball), dealt at random
-// under fixed conditions. Its score sets your starting grade, D- to A+. From then on every Freeplay shot moves you
-// toward the next grade (+1 right, -2 wrong: break-even is 2 in 3); ten up levels you up, ten down drops you a grade.
-// Each grade deals harder: more long shots, a stronger lean toward your weak spots, and fewer aids.
-const BASE_LOCKED = ['view','table','len','cam','ghost','full'];   // can't be changed during the baseline
-const BASE_STD = {table:'9', len:'both', cam:'line', ghost:'0', full:'1'};   // the view is set per half: standing, then down
-const GRADES = ['D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+'];
-const GRADE_FROM = [0,30,35,40,47,53,60,66,72,78,84,90];   // baseline % for each starting grade
-const AID_LOCK = {aim:3, ghost:6};                            // the grade each aid locks at: C-, B- (looking around never locks)
-const AID_NAME = {aim:'Aim line', ghost:'Ghost ball', walk:'Looking around'};
-const AID_TIP = {
-  aim: 'Look down the line the cue travels instead of from behind the cue ball. The overlap is plain to see, so it is the easiest read.',
-  ghost: 'Shows where the cue ball has to be at contact. Practice only: shots with it on are not scored.',
-  walk: 'Drag the table to walk around the shot and see it from other angles.',
+// The first Freeplay session is a one-time 100-shot baseline (50 standing, then 50 down on the ball), dealt at random,
+// unaided, from the ball line. Its score places you, F to A. From then on every Freeplay shot moves you toward the
+// next grade (+1 right, -2 wrong: break-even is 2 in 3); ten up levels you up, ten down drops you a grade.
+// The ladder: aids fade away and go (and stay yours as options), then any angle, then speed & throw.
+const BASE_LOCKED = ['view','table','len','cam','ghost','line','full'];   // can't be changed during the baseline
+const BASE_STD = {table:'9', len:'both', cam:'line', ghost:'0', line:'0', full:'1'};   // the view is set per half: standing, then down
+const GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S'];
+const GRADE_FROM = [0,30,35,40,45,50,55,60,66,72,78,84];   // baseline % for each starting grade (F … A; A+ and S are earned)
+// Each aid: forced on, then fading away (after a delay, in ms), then gone for good and yours to switch on as practice.
+const AIDS = {
+  ghost:  {name:'Ghost ball', fade:{1:3000, 2:1500}, goneAt:3, tip:'Shows where the cue ball has to be at contact.'},
+  line:   {name:'Aim line',   fade:{4:3000, 5:1500}, goneAt:6, tip:'A line drawn from the cue ball along the shot line, to the ghost ball.'},
+  stance: {name:'Aim-line stance', fade:{},          goneAt:7, tip:'You look from directly behind the cue, on the line it travels, so the overlap is plain to see. From the ball line you stand behind the cue ball instead, as in a real read.'},
 };
-const FAST_FLASH_AT = 6;
-const ANY_AT = 7;                                            // from B: cuts at any angle (the right call always pockets)
-const PHYS_AT = 8;                                           // from B+: speed & throw, called with thick / center / thin                                      // 0.75 s Flash opens at B-
+const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
+const PHYS_AT = 9;                                           // B+: speed & throw (medium only), called with thick / center / thin
+const ALL_SPEEDS_AT = 10;                                    // A-: slow, medium and firm
+const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
+const LEAN_AT = 7;                                           // the weak-spot lean starts once you read unaided (B-)
 const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
 const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
 const baselines = () => (stats.sessions||[]).filter(x=>x.base);
 const hasBaseline = () => baselines().length > 0;
 const adaptiveOn = () => hasBaseline() && sessTask(settings.task) && !baseRun();
 const level = () => stats.level ? stats.level.g : null;
+const bestLevel = () => stats.level ? Math.max(stats.level.best ?? 0, stats.level.g) : null;
 const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
-const longShare = () => !adaptiveOn() || level()===null ? 0.5 : 0.25 + 0.05*level();   // D- 25% long shots … A+ 80%
-const leanK = () => 0.5 + (level()||0)*(1.5/11);                                       // how hard it leans on weak spots
-const aidLocked = key => baseRun() || (key in AID_LOCK && level()!==null && level() >= AID_LOCK[key]);
+const longShare = () => 0.5;   // short and long evenly: long shots aren't harder here (no cueing), so distance only comes in as a weak spot
+const leanK = () => { const g = level(); return g===null || g < LEAN_AT ? 0 : 0.8 + (g - LEAN_AT)*(1.2/(GRADES.length-1-LEAN_AT)); };
+// 'on' (forced), 'fade' (forced, fades away), 'optional' (earned: yours to switch on, as practice), 'off' (baseline)
+function aidMode(key){
+  if(baseRun()) return 'off';
+  const a = AIDS[key], g = level(), best = bestLevel();
+  if(g===null || best >= a.goneAt) return 'optional';
+  return a.fade[g] ? 'fade' : 'on';
+}
+const aidSetting = {ghost: ()=>settings.ghost==='1', line: ()=>settings.line==='1', stance: ()=>settings.cam==='aim'};
+// switched on by choice after it's been earned: that shot is practice and doesn't count
+const practiceAid = () => Object.keys(AIDS).some(k=>aidMode(k)==='optional' && aidSetting[k]());
+// how visible an aid is right now, 0..1 (fading aids fade out 500 ms after their delay)
+function aidAlpha(key){
+  const m = aidMode(key);
+  if(m==='off') return 0;
+  if(m==='optional') return aidSetting[key]() ? 1 : 0;
+  if(m==='on') return 1;
+  const d = AIDS[key].fade[level()], t = shot && shot.t0 ? performance.now() - shot.t0 : 0;
+  return t < d ? 1 : Math.max(0, 1 - (t - d)/500);
+}
+const stanceAim = () => aidAlpha('stance') > 0;
 const physOn = () => adaptiveOn() && level()!==null && level() >= PHYS_AT;
 const anyOn = () => adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
 function enforceLocks(){
   if(baseRun()) return;
-  let ch = false;
-  if(aidLocked('ghost') && settings.ghost==='1'){ settings.ghost = '0'; ch = true; }
-  if(aidLocked('aim') && settings.cam==='aim'){ settings.cam = 'line'; ch = true; }
-  if(aidLocked('walk') && settings.walk!=='0'){ settings.walk = '0'; ch = true; }
-  if(fastFlashLocked() && settings.flash==='750'){ settings.flash = '1500'; ch = true; }
-  if(ch) saveSettings();
+  if(fastFlashLocked() && settings.flash==='750'){ settings.flash = '1500'; saveSettings(); }
 }
+// what reaching each grade brings (first time only for aids going away)
+const LADDER_UP = {1:'👻 Ghost ball fades after 3 s', 2:'👻 Ghost ball fades after 1.5 s', 3:'Ghost ball gone: now an optional aid',
+  4:'Aim line fades after 3 s', 5:'Aim line fades after 1.5 s', 6:'Aim line gone: now an optional aid',
+  7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Speed & throw', 10:'All three speeds',
+  11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
+const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more speed & throw', 10:'Medium speed only', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = stats.level;
   L.pts += ok ? PT_RIGHT : PT_WRONG;
-  if(L.pts >= PTS_UP && L.g < GRADES.length-1){ L.g++; L.pts = 0; return 1; }
+  if(L.pts >= PTS_UP && L.g < GRADES.length-1){ L.g++; L.pts = 0; L.best = Math.max(L.best ?? 0, L.g); return 1; }
   if(L.pts <= -PTS_UP && L.g > 0){ L.g--; L.pts = 0; return -1; }
   L.pts = Math.max(-PTS_UP, Math.min(PTS_UP, L.pts));
   return 0;
@@ -787,13 +815,8 @@ function renderBadge(pop){
 let lvlTimer = 0;
 function showLevel(d, from){
   const to = level(), notes = [];
-  for(const k in AID_LOCK){ const at = AID_LOCK[k]; if(from < at && to >= at) notes.push(`🔒 ${AID_NAME[k]}`); if(from >= at && to < at) notes.push(`${AID_NAME[k]} unlocked`); }
-  if(from < FAST_FLASH_AT && to >= FAST_FLASH_AT) notes.push('⚡️ 0.75 s Flash unlocked');
-  if(from >= FAST_FLASH_AT && to < FAST_FLASH_AT) notes.push('🔒 0.75 s Flash');
-  if(from < ANY_AT && to >= ANY_AT) notes.push('📐 Any angle');
-  if(from >= ANY_AT && to < ANY_AT) notes.push('Cuts back on the fractions');
-  if(from < PHYS_AT && to >= PHYS_AT) notes.push('💨 Speed & throw');
-  if(from >= PHYS_AT && to < PHYS_AT) notes.push('No more speed & throw');
+  if(d > 0){ const n = LADDER_UP[to]; if(n && !(to <= 7 && stats.level.bestBefore >= to)) notes.push(n); }   // aid steps only the first time
+  else if(LADDER_DOWN[from]) notes.push(LADDER_DOWN[from]);
   enforceLocks(); syncPressed(); renderBadge(true);
   $('lvlhead').textContent = d > 0 ? 'Level up' : 'Down a grade';
   $('lvlgrade').textContent = GRADES[to];
@@ -808,8 +831,9 @@ const shotCell = s => s.answer.id + distBin(len(sub(s.ob, s.cb)));
 const entryCell = e => typeof e.dc==='number' ? e.a + distBin(e.dc) : null;
 // how much more often than usual you call each kind of shot wrong (1 = your average), from your recent shots
 function weakModel(){
-  let L = stats.log.filter(e=>!e.gh && taskOf(e)===settings.task && entryCell(e));
-  if(L.length < 40) L = stats.log.filter(e=>!e.gh && sessTask(taskOf(e)) && entryCell(e));
+  // unaided reads only: practice shots and shots read with a forced aid don't show your real weak spots
+  let L = stats.log.filter(e=>!e.gh && !e.fa && taskOf(e)===settings.task && entryCell(e));
+  if(L.length < 40) L = stats.log.filter(e=>!e.gh && !e.fa && sessTask(taskOf(e)) && entryCell(e));
   const view = L.filter(e=>e.v===settings.view);
   if(view.length >= 40) L = view;
   L = L.slice(-400);
@@ -828,7 +852,7 @@ function weakModel(){
   return ratio;
 }
 function dealShot(){
-  if(!adaptiveOn()) return generate();
+  if(!adaptiveOn() || leanK()===0) return generate();
   const model = weakModel(), k = leanK();
   const cands = Array.from({length:20}, generate);
   return cands[weightedIndex(cands.map(c=>Math.pow(model[shotCell(c)]||1, k)))];
@@ -961,7 +985,7 @@ function makeCam(s, view){
   const c = VIEWS[view];
   const d = norm(sub(s.ob, s.cb));
   let eye, look;
-  if(settings.cam==='aim' && settings.task!=='place'){ eye = sub(s.cb, mul(s.v, c.back)); look = s.v; }      // on the correct shot line
+  if(stanceAim() && settings.task!=='place'){ eye = sub(s.cb, mul(s.v, c.back)); look = s.v; }      // on the correct shot line
   else { eye = sub(s.cb, mul(d, c.back)); look = d; }
   const E = [eye[0], eye[1], c.h];
   // Tilt just enough to keep both the cue ball and the target pocket in frame (like lifting your eyes).
@@ -1119,13 +1143,17 @@ function perspSVG(s, reveal, view){
       if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" stroke="${trail.obCol}" stroke-opacity=".9" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 4.5"/>`;
     }
   }
+  // the aim-line aid: a line on the cloth from the cue ball along the shot line to the ghost ball (may be fading away)
+  const lA = reveal || s.anim ? 0 : aidAlpha('line');
+  if(lA > 0){ const a3 = [s.cb[0], s.cb[1], .03], b3 = [s.gb[0], s.gb[1], .03]; o += `<path d="${segD(cam, a3, b3)}" stroke="#fff" stroke-opacity="${(.85*lA).toFixed(3)}" stroke-width="1.4" stroke-linecap="round"/>`; }
   // balls, far to near
   const A = s.anim, F = reveal && !A ? s.final : null;
   const items = [{p: A ? A.cb : F ? F.cb : s.cb, kind:'cb'}];
   if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A ? A.obScale : 1});
   // no start-position ghosts: the trails already show where each ball came from
   const contact = A && A.trail.ob;   // the balls have met and are diverging
-  if(A ? (contact || settings.ghost==='1') : (reveal || settings.ghost==='1')) items.push({p:s.gb, kind:'ghost'});   // ghost-ball aid shows it before you answer
+  const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
+  if(A ? (contact || gA > 0) : (reveal || gA > 0)) items.push({p:s.gb, kind:'ghost', a: (A && contact) || reveal ? 1 : gA});
   if(contact && s.pick && s.pick.far) items.push({p:s.pick.g2, kind:'callghost'});   // where your call made contact; the reveal draws it once the balls stop
   if(!reveal && s.place) items.push({p:s.place, kind:'user'});
   items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],R]);});
@@ -1138,7 +1166,7 @@ function perspSVG(s, reveal, view){
     if(it.kind==='refob'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${s.color[0]}" fill-opacity=".32" stroke="${s.color[0]}" stroke-opacity=".85" stroke-width="1"/>`; continue; }
     if(it.kind==='user'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".3" stroke="#fff" stroke-width="1.2"/>`; continue; }
     if(it.kind==='callghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="${s.pick.made ? NEAR_MISS_OK : MISS}" stroke-width="1.125" stroke-dasharray="4 3"/>`; continue; }
-    if(it.kind==='ghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".22" stroke="#fff" stroke-width="1.125" stroke-dasharray="4 3"/>`; continue; }
+    if(it.kind==='ghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity="${(.22*(it.a ?? 1)).toFixed(3)}" stroke="#fff" stroke-opacity="${(it.a ?? 1).toFixed(3)}" stroke-width="1.125" stroke-dasharray="4 3"/>`; continue; }
     o += `<path d="${polyD(cam, circ3([it.p[0]+.2,it.p[1]+.2], R*.95*(it.scale ?? 1), .02, 20))}" fill="#000" fill-opacity=".35"/>`;
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${it.kind==='cb'?'url(#cbg)':s.color[0]}"/>`;
     if(it.kind==='ob'){
@@ -1266,6 +1294,7 @@ function deal(){
   if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
   syncRefs();
   shot = dealShot();
+  shot.t0 = performance.now(); scheduleFades();
   answered = false;
   draw(false);
   document.querySelectorAll('#answers button, #mods button').forEach(b=>{b.disabled=false;b.className='';});
@@ -1279,6 +1308,17 @@ function deal(){
   updateControls();
   if(settings.task==='flash' && stats.active && stats.active.task==='flash') startFlash(); else endFlash();   // the flash timer only runs inside a session
   showSessIdle();
+}
+// fading aids: redraw while they fade out (only before you answer)
+let fadeRaf = 0;
+function scheduleFades(){
+  cancelAnimationFrame(fadeRaf);
+  const keys = Object.keys(AIDS).filter(k=>aidMode(k)==='fade'); if(!keys.length) return;
+  const s0 = shot, end = Math.max(...keys.map(k=>AIDS[k].fade[level()])) + 520;
+  const tick = ()=>{ if(shot !== s0 || answered) return; const t = performance.now() - s0.t0;
+    if(keys.some(k=>{ const d = AIDS[k].fade[level()]; return t >= d && t <= d + 520; })) draw(false);
+    if(t < end) fadeRaf = requestAnimationFrame(tick); };
+  fadeRaf = requestAnimationFrame(tick);
 }
 function showSessIdle(){
   const t = settings.task, idle = sessTask(t) && !(stats.active && stats.active.task===t);
@@ -1319,8 +1359,8 @@ function laterSave(){ clearTimeout(laterT); laterT = setTimeout(()=>{ save(); re
 function logEntry(extra){
   const act = stats.active && stats.active.task===settings.task ? stats.active.id : undefined;
   stats.log.push({sid:act, t:settings.task, a:shot.answer.id, s:shot.side, v:settings.view,
-    c: settings.view==='top' ? '-' : (isPlace() ? 'line' : settings.cam),
-    md:shot.any ? 'any' : 'ref', ...(shot.phys ? {am: shot.mod, sp: shot.speed, tw: +shot.throwDeg.toFixed(1), ...(shot.alt ? {aa: shot.alt.id, aam: shot.alt.mod} : {})} : {}), th:settings.throw, ln:shot.len, rp:shot.replays||0, wk: shot.walked ? 1 : 0, dc:Math.round(len(sub(shot.ob,shot.cb))), dp:Math.round(shot.L), ag:+shot.theta.toFixed(1), pt:shot.P.side?'s':'c', gh: settings.ghost==='1' ? 1 : 0, tb:settings.table, pk:settings.pockets, ...extra});
+    c: settings.view==='top' ? '-' : (isPlace() ? 'line' : stanceAim() ? 'aim' : 'line'),
+    md:shot.any ? 'any' : 'ref', ...(shot.phys ? {am: shot.mod, sp: shot.speed, tw: +shot.throwDeg.toFixed(1), ...(shot.alt ? {aa: shot.alt.id, aam: shot.alt.mod} : {})} : {}), th:settings.throw, ln:shot.len, rp:shot.replays||0, wk: shot.walked ? 1 : 0, dc:Math.round(len(sub(shot.ob,shot.cb))), dp:Math.round(shot.L), ag:+shot.theta.toFixed(1), pt:shot.P.side?'s':'c', gh: practiceAid() ? 1 : 0, fa: ['ghost','line','stance'].filter(k=>['on','fade'].includes(aidMode(k))).join('') || undefined, tb:settings.table, pk:settings.pockets, ...extra});
   if(stats.log.length > 3000) stats.log = stats.log.slice(-3000);
   laterSave();
 }
@@ -1458,7 +1498,7 @@ function finishSession(){
   restoreView(a);
   stats.sessions = (stats.sessions || []).concat(rec).slice(-200);
   stats.active = null; syncPressed();
-  if(rec.base){ stats.level = {g: gradeFor(pct(rec.right, rec.n)), pts: 0}; rec.grade = stats.level.g; enforceLocks(); syncPressed(); renderBadge(true); playSound('levelup'); }
+  if(rec.base){ const g0 = gradeFor(pct(rec.right, rec.n)); stats.level = {g: g0, best: g0, pts: 0, v: 2}; rec.grade = stats.level.g; enforceLocks(); syncPressed(); renderBadge(true); playSound('levelup'); }
   else if(a.task==='sess' && a.g0!=null){ rec.g0 = a.g0; rec.grade = level(); }
   stats.active = null; save(); renderSession(); renderStats(); syncStreakPill(); showSummary(rec);
 }
@@ -1573,7 +1613,7 @@ function answer(id, mod){
   const tip = !phys && ok && !oc.made && shot.any;       // right bucket, but the pure reference needs adjusting
   const counted = oc.made || ok;                             // a right call never counts against your pocket rate
   shot.pick = {...oc, id, far: Math.abs(contact - shot.theta) > 0.3 && (!ok || tip)};
-  const aided = settings.ghost === '1';
+  const aided = practiceAid();
   const prevStreak = aided ? 0 : curStreak();
   const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
   // sound first: nothing else runs before it
@@ -1582,7 +1622,7 @@ function answer(id, mod){
   else thock(counted);
   logEntry({p:id, m:counted?1:0, ...(phys ? {pm:mod} : {})});
   if(!aided && settings.task==='sess' && level()!==null && stats.active && stats.active.task==='sess' && !stats.active.base){
-    const from = level(), d = levelPoint(ok);
+    const from = level(); stats.level.bestBefore = bestLevel(); const d = levelPoint(ok);
     if(d) setTimeout(()=>showLevel(d, from), 350); else renderBadge();
   }
   document.querySelectorAll('#answers button, #mods button').forEach(b=>{ b.disabled = true; });
@@ -1590,7 +1630,7 @@ function answer(id, mod){
     if(stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (animMs||0);
     if(jumpingAhead){ sessionTick(ok, counted); return; }   // going straight to the next shot: just count it, draw nothing
     draw(true);
-    $('quick').innerHTML = quickHTML + `<div class="ql tap">${settings.ghost==='1' ? 'Ghost ball on: practice shot, not scored. ' : ''}<span class="touchonly">Tap the table for the next shot</span></div>`;
+    $('quick').innerHTML = quickHTML + `<div class="ql tap">${aided ? 'Aid on: practice shot, not scored. ' : ''}<span class="touchonly">Tap the table for the next shot</span></div>`;
     finishRound();
     sessionTick(ok, counted);
   };
@@ -1943,34 +1983,37 @@ function syncPressed(){
   $('task-flash').disabled = lockFlash; $('flashlock').hidden = !lockFlash;
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
   document.querySelectorAll('[data-set]').forEach(b=>{ if(BASE_LOCKED.includes(b.dataset.set)) b.disabled = baseRun(); });
-  $('ghost-1').disabled = aidLocked('ghost'); $('ghostlock').hidden = !aidLocked('ghost');
-  $('cam-aim').disabled = aidLocked('aim'); $('aimlock').hidden = !aidLocked('aim');
-  $('walk-1').disabled = aidLocked('walk'); $('walklock').hidden = !aidLocked('walk');
   $('flash-750').disabled = fastFlashLocked(); $('fastlock').hidden = !fastFlashLocked();
   $('flash-750').title = fastFlashLocked() ? `Unlocks at ${GRADES[FAST_FLASH_AT]}` : '';
   $('task-flash').title = hasBaseline() ? '' : 'Unlocks after your baseline';
-  // aids: what each does, and the grade it locks at
-  const g = level();
-  for(const k in AID_LOCK){
-    const G = GRADES[AID_LOCK[k]], locked = aidLocked(k);
-    $('at-'+k).textContent = locked ? `from ${G}` : `until ${G}`;
-    const when = baseRun() ? 'Off during the baseline.'
-      : g===null ? `Available until ${G}; locks from ${G} up.`
-      : locked ? `Locked from ${G} up. Drop below ${G} and it comes back.`
-      : `Yours until ${G}; it locks when you reach ${G}.`;
-    $('tip-'+k).dataset.tip = AID_TIP[k] + ' ' + when;
+  // aids: forced / fading ones show as on and can't be changed; earned ones are yours to switch
+  const SCHED = {
+    ghost: 'F: always on. D-: fades after 3 s. D: after 1.5 s. From D+ it is yours to switch on; shots with it on are practice.',
+    line: 'Up to D+: always on. C-: fades after 3 s. C: after 1.5 s. From C+ it is yours to switch on; shots with it on are practice.',
+    stance: 'Up to C+: you stand on the aim line. From B- you read from the ball line; the aim-line stance is yours to switch on, as practice.',
+  };
+  const btn = {ghost:['ghost-0','ghost-1'], line:['line-0','line-1'], stance:['cam-line','cam-aim']};
+  for(const k in AIDS){
+    const m = aidMode(k), [off, on] = btn[k].map($);
+    if(m==='on' || m==='fade'){ off.disabled = on.disabled = true; off.setAttribute('aria-pressed', false); on.setAttribute('aria-pressed', true); }
+    else if(m==='off'){ off.disabled = on.disabled = true; off.setAttribute('aria-pressed', true); on.setAttribute('aria-pressed', false); }
+    else { off.disabled = on.disabled = false; }
+    const G = GRADES[AIDS[k].goneAt];
+    $('at-'+k).textContent = m==='on' ? `on until ${G}` : m==='fade' ? `fading · gone at ${G}` : m==='off' ? 'off' : '';
+    $('tip-'+k).dataset.tip = AIDS[k].tip + ' ' + (m==='off' ? 'Off during the baseline.' : SCHED[k]);
   }
+  $('walk-1').disabled = baseRun();
   $('at-walk').textContent = '';
-  $('tip-walk').dataset.tip = AID_TIP.walk + (baseRun() ? ' Off during the baseline.' : ' Always yours.');
+  $('tip-walk').dataset.tip = 'Drag the table to walk around the shot and see it from other angles.' + (baseRun() ? ' Off during the baseline.' : ' Always yours.');
   $('modehint').textContent = isPlace()
     ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
     : HINTS[settings.mode];
 }
 function applySetting(key, val){
-  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && val==='1' && aidLocked('ghost')) || (key==='cam' && val==='aim' && aidLocked('aim')) || (key==='walk' && val==='1' && aidLocked('walk')) || (key==='flash' && val==='750' && fastFlashLocked())) return;
+  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && aidMode('ghost')!=='optional') || (key==='line' && aidMode('line')!=='optional') || (key==='cam' && aidMode('stance')!=='optional') || (key==='walk' && baseRun()) || (key==='flash' && val==='750' && fastFlashLocked())) return;
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
-  if(key==='ghost'){ if(shot) draw(answered); }
+  if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='view' || key==='cam'){ if(shot && !answered) deal(); else if(shot) draw(answered); }
   else if(key==='table' || key==='pockets'){ setTable(settings.table, settings.pockets); deal(); }
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();
@@ -2001,7 +2044,7 @@ function nextShot(){
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) shoot(); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
-function walkOn(){ return (settings.task==='call' || settings.task==='sess') && settings.walk!=='0' && !aidLocked('walk'); }   // locked during the baseline, and once your level is high enough
+function walkOn(){ return (settings.task==='call' || settings.task==='sess') && settings.walk!=='0' && !baseRun(); }   // always yours, except during the baseline
 function walkRedraw(){ if(walkRaf) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }
 svgEl.addEventListener('pointerdown', ev=>{
   if(anim || !walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
@@ -2110,9 +2153,15 @@ settings.mode = 'ref';   // reference cuts only for now
 if(!['line','aim'].includes(settings.cam)) settings.cam='line';
 if(!['short','long','both'].includes(settings.len)) settings.len='both';
 if(!['0','1'].includes(settings.ghost)) settings.ghost='0';
+if(!['0','1'].includes(settings.line)) settings.line='0';
 if(!['0','1'].includes(settings.walk)) settings.walk='1';
 if(!settings.sv5){ settings.walk = '1'; settings.sv5 = 1; }   // looking around used to lock at A-: give it back
-if(hasBaseline() && !stats.level){ const b = baselines()[0]; stats.level = {g: gradeFor(pct(b.right, b.n)), pts: 0}; save(); }   // baselines played before grades existed
+if(hasBaseline() && !stats.level){ const b = baselines()[0], g0 = gradeFor(pct(b.right, b.n)); stats.level = {g: g0, best: g0, pts: 0, v: 2}; save(); }   // baselines played before grades existed
+if(stats.level && !stats.level.v){   // grades gained F at the bottom and S at the top: shift everything up one
+  stats.level.g += 1; stats.level.best = stats.level.g; stats.level.v = 2;
+  (stats.sessions||[]).forEach(x=>{ if(x.grade!=null) x.grade += 1; if(x.g0!=null) x.g0 += 1; });
+  save();
+}
 enforceLocks(); renderBadge();
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
@@ -2137,7 +2186,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test') window.__ct = {generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
