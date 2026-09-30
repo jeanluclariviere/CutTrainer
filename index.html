@@ -830,7 +830,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 103;   // one per commit to main
+const BUILD = 104;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1807,7 +1807,7 @@ function answer(id, mod){
   const newStreak = aided ? 0 : (ok ? prevStreak + 1 : 0);
   // sound first: nothing else runs before it
   shot.duck = 1;
-  if(!aided && ok && newStreak >= STREAK_HOT){ playSound('streak', newStreak); shot.duck = 0; }   // chimes are for streaks; the table sounds step back under them
+  if(!aided && ok && newStreak >= STREAK_HOT){ playSound('streak', newStreak); shot.duck = .25; }   // on a streak the table sounds play quietly under the chime
   else if(!aided && !ok && prevStreak >= STREAK_HOT){ playSound('streakEnd'); shot.duck = 0; }
   if(settings.animate === '0') tableSounds(shotPlan(shot, ok ? outcome(shot, shot.theta) : oc, .12, .3, 0, false, false), shot.duck);
   logEntry({p:id, m:counted?1:0, ...(phys ? {pm:mod} : {})});
