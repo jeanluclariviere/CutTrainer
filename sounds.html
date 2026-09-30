@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cut Trainer sounds</title>
+<style>
+  :root{--bg:#eef2f5;--ink:#10283d;--muted:#5b6b78;--card:#fff;--line:#d5dde3;--accent:#1f6fb2}
+  @media (prefers-color-scheme: dark){:root{--bg:#0f1720;--ink:#e6eef3;--muted:#9fb3c1;--card:#17222d;--line:#2a3845;--accent:#5aa9e6}}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:20px 16px 40px}
+  h1{font-size:24px;margin:0 0 4px}
+  p{margin:0 0 16px;color:var(--muted)}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .card h2{margin:0 0 2px;font-size:18px}
+  .card small{display:block;color:var(--muted);margin-bottom:10px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  button{font:600 14px system-ui,sans-serif;border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:9px 12px;cursor:pointer}
+  button:active{transform:scale(.97)}
+  button.seq{background:var(--accent);border-color:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+<h1>Pick the table sounds</h1>
+<p>Tap to listen. Tell me a letter for the whole set, or mix them per sound (e.g. "strike C, pocket A, rail B").</p>
+<div class="grid" id="grid"></div>
+<script>
+let ctx = null, noiseBuf = null;
+function ac(){ if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); } if(ctx.state==='suspended') ctx.resume(); return ctx; }
+function noise(){ if(!noiseBuf){ noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1; } return noiseBuf; }
+function bus(echo){
+  const g = ctx.createGain(); g.gain.value = .55;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
+  g.connect(lp); lp.connect(ctx.destination);
+  if(echo){ const d = ctx.createDelay(); d.delayTime.value = .08; const fb = ctx.createGain(); fb.gain.value = echo; lp.connect(d); d.connect(fb); fb.connect(d); d.connect(ctx.destination); }
+  return g;
+}
+function tn(o, at, dur, f0, f1, gain, type){
+  const t = ctx.currentTime + at, osc = ctx.createOscillator(), g = ctx.createGain();
+  osc.type = type || 'sine'; osc.frequency.setValueAtTime(f0, t); if(f1) osc.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  osc.connect(g).connect(o); osc.start(t); osc.stop(t + dur + .02);
+}
+function nz(o, at, dur, type, freq, q, gain){
+  const t = ctx.currentTime + at, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  s.buffer = noise(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(f).connect(g).connect(o); s.start(t, Math.random()*.5); s.stop(t + dur + .02);
+}
+const SETS = {
+  A: {name:'A · Arcade', note:'Pitched blips with a light echo', echo:.16, sfx:{
+    strike:(o,t)=>{ tn(o,t,.075,330,140,.9,'triangle'); nz(o,t,.02,'bandpass',3000,1,.3); },
+    click:(o,t)=>{ tn(o,t,.12,1568,0,.55); tn(o,t,.08,2349,0,.3); tn(o,t,.025,3136,0,.12,'triangle'); },
+    drop:(o,t)=>{ tn(o,t,.14,540,170,.8,'triangle'); tn(o,t+.13,.16,1046.5,0,.45); tn(o,t+.21,.3,1568,0,.45); },
+    rail:(o,t)=>{ tn(o,t,.22,260,105,.8); tn(o,t,.18,390,150,.3,'triangle'); },
+    jaw:(o,t)=>{ tn(o,t,.06,430,300,.6,'triangle'); tn(o,t+.08,.06,370,260,.5,'triangle'); tn(o,t+.16,.28,220,90,.55); },
+  }},
+  B: {name:'B · Soft pop', note:'Round, gentle bubbles, easy on the ears', echo:.12, sfx:{
+    strike:(o,t)=>{ tn(o,t,.09,420,210,.8); },
+    click:(o,t)=>{ tn(o,t,.1,880,1100,.6); tn(o,t+.01,.08,1320,0,.25); },
+    drop:(o,t)=>{ tn(o,t,.16,700,240,.7); tn(o,t+.16,.12,660,990,.5); tn(o,t+.26,.25,1320,0,.4); },
+    rail:(o,t)=>{ tn(o,t,.2,300,150,.7); },
+    jaw:(o,t)=>{ tn(o,t,.07,500,380,.5); tn(o,t+.09,.07,440,330,.45); tn(o,t+.18,.25,260,130,.5); },
+  }},
+  C: {name:'C · Retro 8-bit', note:'Square-wave chiptune, like an old console', echo:0, sfx:{
+    strike:(o,t)=>{ tn(o,t,.06,200,90,.35,'square'); },
+    click:(o,t)=>{ tn(o,t,.05,1200,1800,.28,'square'); },
+    drop:(o,t)=>{ tn(o,t,.08,660,0,.28,'square'); tn(o,t+.08,.08,880,0,.28,'square'); tn(o,t+.16,.18,1320,0,.28,'square'); },
+    rail:(o,t)=>{ tn(o,t,.16,220,70,.32,'square'); },
+    jaw:(o,t)=>{ tn(o,t,.05,300,0,.28,'square'); tn(o,t+.07,.05,260,0,.28,'square'); tn(o,t+.14,.25,180,60,.3,'square'); },
+  }},
+  D: {name:'D · Wood & felt', note:'Muted, woody knocks; the least musical', echo:.08, sfx:{
+    strike:(o,t)=>{ nz(o,t,.04,'bandpass',1800,2,.6); tn(o,t,.05,240,160,.5,'triangle'); },
+    click:(o,t)=>{ tn(o,t,.06,1900,1700,.5,'triangle'); nz(o,t,.02,'highpass',2500,.7,.35); },
+    drop:(o,t)=>{ tn(o,t,.12,300,140,.7,'triangle'); nz(o,t+.03,.15,'lowpass',500,.8,.35); tn(o,t+.14,.18,180,90,.5); },
+    rail:(o,t)=>{ nz(o,t,.08,'lowpass',500,.9,.6); tn(o,t,.1,140,90,.6); },
+    jaw:(o,t)=>{ nz(o,t,.04,'bandpass',900,2,.5); tn(o,t,.06,260,200,.45,'triangle'); nz(o,t+.07,.05,'bandpass',800,2,.4); tn(o,t+.12,.16,150,90,.4); },
+  }},
+  E: {name:'E · Punchy', note:'Arcade, but with more thump and a bigger payoff', echo:.2, sfx:{
+    strike:(o,t)=>{ tn(o,t,.09,180,60,1,'sine'); nz(o,t,.03,'bandpass',2500,1,.45); },
+    click:(o,t)=>{ tn(o,t,.14,2093,0,.5); tn(o,t,.1,3136,0,.25); nz(o,t,.015,'highpass',4000,.7,.35); },
+    drop:(o,t)=>{ tn(o,t,.18,500,120,.9,'triangle'); tn(o,t+.15,.12,784,0,.4); tn(o,t+.22,.12,1046.5,0,.4); tn(o,t+.29,.35,1568,0,.45); },
+    rail:(o,t)=>{ tn(o,t,.25,200,70,.9); nz(o,t,.06,'lowpass',400,.8,.5); },
+    jaw:(o,t)=>{ tn(o,t,.07,520,340,.6,'triangle'); tn(o,t+.09,.07,460,300,.55,'triangle'); tn(o,t+.18,.35,200,60,.7); },
+  }},
+};
+const ONE = [['strike','Strike'],['click','Contact'],['drop','Pocket'],['rail','Rail'],['jaw','Jaw']];
+function play(set, seq){ ac(); const o = bus(SETS[set].echo); seq.forEach(([t,k])=>SETS[set].sfx[k](o, t)); }
+document.getElementById('grid').innerHTML = Object.entries(SETS).map(([k,v])=>`<div class="card"><h2>${v.name}</h2><small>${v.note}</small>
+  <div class="row">${ONE.map(([s,l])=>`<button data-set="${k}" data-one="${s}">${l}</button>`).join('')}</div>
+  <div class="row"><button class="seq" data-set="${k}" data-seq="make">▶ A make</button><button class="seq" data-set="${k}" data-seq="miss">▶ A miss</button><button class="seq" data-set="${k}" data-seq="jaw">▶ A jaw</button></div></div>`).join('');
+const SEQ = {make:[[0,'strike'],[.35,'click'],[.9,'drop']], miss:[[0,'strike'],[.35,'click'],[.95,'rail']], jaw:[[0,'strike'],[.35,'click'],[.9,'jaw']]};
+document.getElementById('grid').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.dataset.one) play(b.dataset.set, [[0, b.dataset.one]]);
+  else play(b.dataset.set, SEQ[b.dataset.seq]);
+});
+</script>
+</body>
+</html>
