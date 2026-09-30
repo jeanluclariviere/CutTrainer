@@ -658,6 +658,18 @@ function cuePathEnd(gb, v, n){
   const tan = sub(v, mul(n, dot(v, n))), tl = len(tan);
   return tl > 0.05 ? rayToCushion(gb, mul(tan, 1/tl), 26*tl) : gb;
 }
+// Where the number sits on the object ball: fixed on the ball (it doesn't turn to face you), roughly toward
+// where you first stand so it starts out readable, tilted up a little.
+function spotToward(toEye){
+  const h = rot(norm(toEye), rnd(-40, 40)*RAD), el = rnd(20, 55)*RAD;
+  return [h[0]*Math.cos(el), h[1]*Math.cos(el), Math.sin(el)];
+}
+function rotAxis(v, k, a){   // rotate v about unit axis k by angle a (Rodrigues)
+  const kl = Math.hypot(k[0],k[1],k[2]); if(kl < 1e-9) return v; k = [k[0]/kl, k[1]/kl, k[2]/kl];
+  const c = Math.cos(a), sn = Math.sin(a), kd = k[0]*v[0]+k[1]*v[1]+k[2]*v[2];
+  const kx = [k[1]*v[2]-k[2]*v[1], k[2]*v[0]-k[0]*v[2], k[0]*v[1]-k[1]*v[0]];
+  return [0,1,2].map(i=>v[i]*c + kx[i]*sn + k[i]*kd*(1-c));
+}
 function cueScratches(c){
   const end = cuePathEnd(c.gb, c.v, c.n);
   if(len(sub(end, c.gb)) < 0.5) return false;
@@ -694,7 +706,7 @@ function generate(){
     const right = [-v[1], v[0]];
     const cand = {any: anyOn(), phys, speed, len:lenCls, theta:cut, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
       L: dist, tol: pocketTol(P,u), side: dot(u,right)>0?'R':'L',
-      color: pick(OB_COLORS), answer: nearestRef(tp), pick:null};
+      color: pick(OB_COLORS), answer: nearestRef(tp), pick:null, spot: spotToward(sub(cb, ob))};
     if(phys){
       // center if the plain fraction pockets at this speed; otherwise which way the hit has to move
       cand.mod = outcome(cand, cand.answer.deg).made ? 'center' : cut > cand.answer.deg ? 'thin' : 'thick';
@@ -723,7 +735,7 @@ const BASE_LOCKED = ['view','table','len','cam','ghost','full'];   // can't be c
 const BASE_STD = {table:'9', len:'both', cam:'line', ghost:'0', full:'1'};   // the view is set per half: standing, then down
 const GRADES = ['D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+'];
 const GRADE_FROM = [0,30,35,40,47,53,60,66,72,78,84,90];   // baseline % for each starting grade
-const AID_LOCK = {aim:3, ghost:6, walk:9};                   // the grade each aid locks at: C-, B-, A-
+const AID_LOCK = {aim:3, ghost:6};                            // the grade each aid locks at: C-, B- (looking around never locks)
 const AID_NAME = {aim:'Aim line', ghost:'Ghost ball', walk:'Looking around'};
 const AID_TIP = {
   aim: 'Look down the line the cue travels instead of from behind the cue ball. The overlap is plain to see, so it is the easiest read.',
@@ -742,7 +754,7 @@ const level = () => stats.level ? stats.level.g : null;
 const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
 const longShare = () => !adaptiveOn() || level()===null ? 0.5 : 0.25 + 0.05*level();   // D- 25% long shots … A+ 80%
 const leanK = () => 0.5 + (level()||0)*(1.5/11);                                       // how hard it leans on weak spots
-const aidLocked = key => baseRun() || (level()!==null && level() >= AID_LOCK[key]);
+const aidLocked = key => baseRun() || (key in AID_LOCK && level()!==null && level() >= AID_LOCK[key]);
 const physOn = () => adaptiveOn() && level()!==null && level() >= PHYS_AT;
 const anyOn = () => adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
@@ -1129,7 +1141,22 @@ function perspSVG(s, reveal, view){
     if(it.kind==='ghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".22" stroke="#fff" stroke-width="1.125" stroke-dasharray="4 3"/>`; continue; }
     o += `<path d="${polyD(cam, circ3([it.p[0]+.2,it.p[1]+.2], R*.95*(it.scale ?? 1), .02, 20))}" fill="#000" fill-opacity=".35"/>`;
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${it.kind==='cb'?'url(#cbg)':s.color[0]}"/>`;
-    if(it.kind==='ob') o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r*.44).toFixed(1)}" fill="#fff"/><text x="${x.toFixed(1)}" y="${(y+r*.03).toFixed(1)}" font-size="${(r*.56).toFixed(1)}" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#111">${s.color[1]}</text>`;
+    if(it.kind==='ob'){
+      // the number spot is painted on the ball: it rolls with it, and turns away as you walk around
+      const moved = sub(it.p, s.ob), dl = len(moved);
+      let sp = s.spot || [0,0,1];
+      if(dl > 0.01) sp = rotAxis(sp, [-moved[1], moved[0], 0], dl/R);
+      const C = [it.p[0], it.p[1], R], toE = norm3([cam.E[0]-C[0], cam.E[1]-C[1], cam.E[2]-C[2]]);
+      const facing = sp[0]*toE[0] + sp[1]*toE[1] + sp[2]*toE[2];
+      if(facing > 0.04){
+        const Sc = cam.toCam([C[0]+sp[0]*R, C[1]+sp[1]*R, C[2]+sp[2]*R]);
+        if(Sc[2] > NEAR){
+          const [sx, sy] = cam.proj(Sc), rs = r*.44, a = Math.atan2(sy - y, sx - x)/RAD;
+          const tf = `translate(${sx.toFixed(1)} ${sy.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${facing.toFixed(3)} 1) rotate(${(-a).toFixed(1)})`;
+          o += `<clipPath id="obclip"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/></clipPath><g clip-path="url(#obclip)"><g transform="${tf}"><circle r="${rs.toFixed(1)}" fill="#fff"/><text y="${(r*.03).toFixed(1)}" font-size="${(r*.56).toFixed(1)}" font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="#111">${s.color[1]}</text></g></g>`;
+        }
+      }
+    }
     o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="url(#shine)"/>`;
   }
   // Rails between the eye and the balls hide the bottom of anything behind them: redraw the near side on top.
@@ -1933,6 +1960,8 @@ function syncPressed(){
       : `Yours until ${G}; it locks when you reach ${G}.`;
     $('tip-'+k).dataset.tip = AID_TIP[k] + ' ' + when;
   }
+  $('at-walk').textContent = '';
+  $('tip-walk').dataset.tip = AID_TIP.walk + (baseRun() ? ' Off during the baseline.' : ' Always yours.');
   $('modehint').textContent = isPlace()
     ? (settings.view!=='top' && settings.cam==='aim' ? 'Ghost ball mode always uses the ball line, since the aim line would give it away.' : 'Set the ghost ball where the cue ball must be at contact.')
     : HINTS[settings.mode];
@@ -2082,6 +2111,7 @@ if(!['line','aim'].includes(settings.cam)) settings.cam='line';
 if(!['short','long','both'].includes(settings.len)) settings.len='both';
 if(!['0','1'].includes(settings.ghost)) settings.ghost='0';
 if(!['0','1'].includes(settings.walk)) settings.walk='1';
+if(!settings.sv5){ settings.walk = '1'; settings.sv5 = 1; }   // looking around used to lock at A-: give it back
 if(hasBaseline() && !stats.level){ const b = baselines()[0]; stats.level = {g: gradeFor(pct(b.right, b.n)), pts: 0}; save(); }   // baselines played before grades existed
 enforceLocks(); renderBadge();
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
