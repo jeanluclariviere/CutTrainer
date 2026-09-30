@@ -56,6 +56,21 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .lvlcard.show b{animation:lvlpop .6s cubic-bezier(.2,1.6,.4,1)}
 @keyframes lvlin{0%{opacity:0}8%{opacity:1}80%{opacity:1}100%{opacity:0}}
 @keyframes lvlpop{0%{transform:scale(.4)}100%{transform:scale(1)}}
+.gradebadge{cursor:pointer}
+.progcard{max-height:calc(100dvh - 90px);overflow-y:auto}
+.ladder{list-style:none;margin:0;padding:0;position:relative}
+.ladder::before{content:"";position:absolute;left:21px;top:14px;bottom:14px;width:2px;background:var(--line)}
+.ladder li{position:relative;display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:center;padding:6px 0}
+.ladder .node{position:relative;z-index:1;width:44px;height:30px;border-radius:8px;display:grid;place-items:center;font:700 16px var(--display);background:var(--bg);border:1.5px solid var(--line);color:var(--muted)}
+.ladder .what{font-size:14px;color:var(--muted);line-height:1.3}
+.ladder li.done .node{background:#10283d;border-color:#10283d;color:#ffd34d}
+.ladder li.done .what{color:var(--ink)}
+.ladder li.here .node{background:#ffd34d;border-color:#ffd34d;color:#10283d;box-shadow:0 0 0 4px color-mix(in srgb,#ffd34d 35%,transparent)}
+.ladder li.here .what{color:var(--ink);font-weight:600}
+.ladder .here-bar{display:block;margin-top:5px;height:4px;border-radius:2px;background:var(--chip);overflow:hidden;max-width:180px}
+.ladder .here-bar i{display:block;height:100%;background:var(--accent)}
+.ladder .here-bar i.neg{background:var(--bad)}
+.ladder small{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
 .hright{display:flex;align-items:center;gap:10px;margin-left:auto}
 .cog{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;padding:0}
 .cog:hover{color:var(--ink)}
@@ -331,7 +346,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     </div>
     <a class="livelink" href="ar.html" id="livelink" hidden>Live AR ›</a>
     <div class="hright">
-      <div class="gradebadge" id="badge" hidden><b id="badgeg"></b><span class="bbar"><i id="badgefill"></i></span></div>
+      <div class="gradebadge" id="badge" hidden role="button" tabindex="0" aria-label="Your grade: open progress"><b id="badgeg"></b><span class="bbar"><i id="badgefill"></i></span></div>
       <button class="cog" id="cog" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.8h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9-2.6-.5v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     </div>
   </header>
@@ -371,6 +386,13 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="sound-1" data-set="sound" data-val="1">On</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="menu" id="prog" hidden>
+    <div class="menucard progcard" role="dialog" aria-label="Progress">
+      <div class="menuhead"><span>Progress</span><button class="menuclose" id="progclose" aria-label="Close">✕</button></div>
+      <ol class="ladder" id="ladder"></ol>
     </div>
   </div>
 
@@ -794,6 +816,19 @@ const LADDER_UP = {1:'👻 Ghost ball fades after 3 s', 2:'👻 Ghost ball fades
   4:'Aim line fades after 3 s', 5:'Aim line fades after 1.5 s', 6:'Aim line gone: now an optional aid',
   7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Speed & throw', 10:'All three speeds',
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
+const LADDER_TEXT = ['Ghost ball, aim line and aim-line stance all on', 'Ghost ball fades after 3 s', 'Ghost ball fades after 1.5 s', 'Ghost ball gone: now an optional aid',
+  'Aim line fades after 3 s', 'Aim line fades after 1.5 s', 'Aim line gone: now an optional aid', 'Ball line: read it from behind the cue ball',
+  'Any angle', 'Speed & throw, medium speed', 'All three speeds', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+function renderProgress(){
+  const g = level(), best = bestLevel(), pts = stats.level ? stats.level.pts : 0;
+  $('ladder').innerHTML = GRADES.map((G, i)=>{
+    const cls = i===g ? 'here' : i <= best ? 'done' : '';
+    const bar = i===g ? (i < GRADES.length-1
+      ? `<span class="here-bar"><i class="${pts<0?'neg':''}" style="width:${Math.min(100, Math.abs(pts)/PTS_UP*100)}%"></i></span><small>${pts >= 0 ? `${pts} of ${PTS_UP} to ${GRADES[i+1]}` : `${-pts} of ${PTS_UP} toward dropping to ${GRADES[i-1] || G}`}</small>`
+      : '<small>You made it.</small>') : '';
+    return `<li class="${cls}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
+  }).reverse().join('');
+}
 const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more speed & throw', 10:'Medium speed only', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = stats.level;
@@ -2120,6 +2155,11 @@ $('sessend').addEventListener('click', endSession);
 const menuOpen = () => !$('menu').hidden;
 function openMenu(v){ $('menu').hidden = !v; if(v) $('menuclose').focus({preventScroll:true}); else $('cog').focus({preventScroll:true}); }
 $('cog').addEventListener('click', ()=>openMenu(true));
+function openProg(v){ if(v) renderProgress(); $('prog').hidden = !v; if(v){ $('progclose').focus({preventScroll:true}); const h = $('ladder').querySelector('.here'); if(h) h.scrollIntoView({block:'center'}); } else $('badge').focus({preventScroll:true}); }
+$('badge').addEventListener('click', ()=>openProg(true));
+$('badge').addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); openProg(true); } });
+$('progclose').addEventListener('click', ()=>openProg(false));
+$('prog').addEventListener('click', e=>{ if(e.target === $('prog')) openProg(false); });
 $('menuclose').addEventListener('click', ()=>openMenu(false));
 $('menu').addEventListener('click', e=>{ if(e.target === $('menu')) openMenu(false); });
 $('endsave').addEventListener('click', e=>{ e.stopPropagation(); saveSessionEarly(); });
@@ -2135,6 +2175,7 @@ $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   if(menuOpen()){ if(e.key==='Escape'){ openMenu(false); e.preventDefault(); } return; }
+  if(!$('prog').hidden){ if(e.key==='Escape'){ openProg(false); e.preventDefault(); } return; }
   if(anim){ if(e.key==='Enter'){ nextShot(); e.preventDefault(); } return; }   // keys never touch the animation; Enter is only ever "next shot" 
   if(!$('endcover').hidden){ if(e.key==='Escape'){ closeEndPrompt(); e.preventDefault(); } return; }
   if(!$('sessidlecover').hidden){ if(e.key==='Enter'){ if(settings.task==='sess' && !hasBaseline()) startSession(100, true); else startSession(50); e.preventDefault(); } return; }
