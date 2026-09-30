@@ -233,6 +233,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .mods button:disabled{cursor:default}
 .answers button.sel,.mods button.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
 .mods button.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
+.answers button.also,.mods button.also{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
 .mods button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
 .mods button{display:flex;flex-direction:column;align-items:center;gap:4px}
 .speedchip{position:absolute;top:12px;right:12px;z-index:4;font:700 15px var(--display);letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-radius:999px;background:rgba(10,26,40,.8);color:#fff;pointer-events:none}
@@ -1763,18 +1764,18 @@ function answer(id, mod){
   const tipText = tip ? `Tip: a pure ${lbl(picked)} misses by ${Math.abs(oc.lat).toFixed(1)}″. Hit it a touch ${adjust}.` : '';
   showResult(msg, cls, counted, oc.lat, over, exactLine, tipText);
   const quickHTML = `<div class="ql"><b class="${counted?'ok':'no'}">${counted ? 'Pocketed' : 'Missed'}</b>`
-    + (!ok ? `<span class="out">${over?'Too thin':'Too full'}${counted ? '' : ', by '+Math.abs(oc.lat).toFixed(1)+'″'}</span>` : '')
+    + (!ok ? `<span class="out">${counted ? `Also drops, a bit ${over?'thin':'full'}` : `${over?'Too thin':'Too full'}, by ${Math.abs(oc.lat).toFixed(1)}″`}</span>` : '')
     + (phys ? `<span>${lbl(shot.answer)} ${shot.mod}${alt ? ` / ${lbl(ALL.find(r=>r.id===alt.id))} ${alt.mod}` : ''} · throw ${shot.throwDeg.toFixed(1)}°</span></div>` : `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`)
     + (tip ? `<div class="ql"><span class="tipq">Hit it a touch ${adjust}</span><span>A pure ${lbl(picked)} misses ${Math.abs(oc.lat).toFixed(1)}″</span></div>` : '');
   // the verdict lands on the call, not after the animation: sound, result, button colours, streak
   $('quick').innerHTML = quickHTML;
   document.querySelectorAll('#answers button').forEach(b=>{
     if(b.dataset.id===showF) b.className='right';
-    else if(b.dataset.id===id) b.className='wrong';
+    else if(b.dataset.id===id) b.className = oc.made ? 'also' : 'wrong';   // blue: it still drops, just not the ideal call
     else b.className='';
   });
   if(phys) document.querySelectorAll('#mods button').forEach(b=>{
-    b.className = b.dataset.mod===showM ? 'right' : b.dataset.mod===mod ? 'wrong' : '';
+    b.className = b.dataset.mod===showM ? 'right' : b.dataset.mod===mod ? (oc.made ? 'also' : 'wrong') : '';
   });
   if(!aided) showStreak(newStreak, !ok && prevStreak >= STREAK_HOT ? prevStreak : 0);
   if(settings.animate !== '0'){ animateShot(ok ? outcome(shot, shot.theta) : oc, reveal, ok ? '#ffd34d' : MISS); updateControls(); }   // Next shot works straight away
