@@ -2342,7 +2342,7 @@ function tutLayer(cam, s, reveal){
   if(!tut.on || reveal || s.anim) return '';
   const st = tstep(); let o = '';
   const scr = P3 => { const c = cam.toCam(P3); return c[2] > NEAR ? [...cam.proj(c), cam.focal*R/c[2]] : null; };
-  const halo = 'stroke="#fff" stroke-width="3" paint-order="stroke" stroke-linejoin="round"';
+  const halo = 'stroke="#000" stroke-width="3.5" paint-order="stroke" stroke-linejoin="round"';
   // labels: placed one by one around their target, never overlapping each other, a ball, or the edge of the view
   const FS = 13, targets = [], placed = [];
   const want = [];
