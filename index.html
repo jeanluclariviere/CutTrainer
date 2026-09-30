@@ -834,7 +834,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 118;   // one per commit to main
+const BUILD = 119;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -2293,7 +2293,7 @@ function renderPatterns(){
   const all = groupStats(log), rows = [];   // [label, value, tone]
   const dash = ['—','none'];
   const wrong = all.thin + all.full;
-  if(statTask()==='sess'){
+  if(statTask()==='sess' && baselines().length){   // only players placed by the old baseline have one
     const b = baselines()[0];
     rows.push(['Baseline', ...(b && b.dev ? ['Skipped <small>testing</small>',''] : b ? [`${GRADES[b.grade ?? gradeFor(pct(b.right,b.n))]} <small>${pct(b.right,b.n)}% · standing ${b.stand}% · down ${b.down}%</small>`,''] : dash)]);
   }
@@ -2705,6 +2705,7 @@ if(!['0','1'].includes(settings.line)) settings.line='0';
 if(!['0','1'].includes(settings.walk)) settings.walk='1';
 if(!settings.sv5){ settings.walk = '1'; settings.sv5 = 1; }   // looking around used to lock at A-: give it back
 if(hasBaseline() && !stats.level){ const b = baselines()[0], g0 = gradeFor(pct(b.right, b.n)); stats.level = {g: g0, best: g0, pts: 0, v: 2}; save(); }   // baselines played before grades existed
+if(!stats.level){ stats.level = {g: 0, best: 0, pts: 0, v: 2}; save(); }   // no baseline any more: everyone starts at F
 if(stats.level && !stats.level.v){   // grades gained F at the bottom and S at the top: shift everything up one
   stats.level.g += 1; stats.level.best = stats.level.g; stats.level.v = 2;
   (stats.sessions||[]).forEach(x=>{ if(x.grade!=null) x.grade += 1; if(x.g0!=null) x.g0 += 1; });
@@ -2737,8 +2738,7 @@ sizeTable();
 if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
-if(DEV && !hasBaseline()) openProg(true);   // #dev: no baseline, straight to the grade picker
-else if(!hasBaseline() && !settings.tut) startTut();   // first visit: the tutorial comes first
+if(!settings.tut && !(stats.log || []).length && !baselines().length) startTut();   // first visit (no shots yet): the tutorial comes first
 // Ask the browser to keep this site's storage (scores, settings) instead of evicting it under storage pressure.
 try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
 })();
