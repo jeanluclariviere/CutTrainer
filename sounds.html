@@ -77,11 +77,11 @@ const SETS = {
     jaw:(o,t)=>{ nz(o,t,.04,'bandpass',900,2,.5); tn(o,t,.06,260,200,.45,'triangle'); nz(o,t+.07,.05,'bandpass',800,2,.4); tn(o,t+.12,.16,150,90,.4); },
   }},
   F: {name:'F · Few notes (in the trainer now)', note:'Warm tones: 1 strike, 1 contact, 3 pocket, 1 rail, 2 jaw', echo:.1, sfx:{
-    strike:(o,t)=>{ tn(o,t,.08,190,120,.7,'triangle'); },
-    click:(o,t)=>{ tn(o,t,.07,1175,1050,.45); },
-    drop:(o,t)=>{ tn(o,t,.1,392,0,.5,'triangle'); tn(o,t+.09,.1,523.25,0,.5,'triangle'); tn(o,t+.18,.26,659.25,0,.55,'triangle'); },
-    rail:(o,t)=>{ tn(o,t,.2,170,85,.7); },
-    jaw:(o,t)=>{ tn(o,t,.07,330,280,.55,'triangle'); tn(o,t+.09,.24,200,110,.6); },
+    strike:(o,t)=>{ tn(o,t,.08,226,143,.7,'triangle'); },
+    click:(o,t)=>{ tn(o,t,.07,1397,1250,.45); },
+    drop:(o,t)=>{ tn(o,t,.1,293.66,0,.5,'triangle'); tn(o,t+.09,.1,392,0,.5,'triangle'); tn(o,t+.18,.26,493.88,0,.55,'triangle'); },
+    rail:(o,t)=>{ tn(o,t,.2,202,101,.7); },
+    jaw:(o,t)=>{ tn(o,t,.07,393,333,.55,'triangle'); tn(o,t+.09,.24,238,131,.6); },
   }},
   E: {name:'E · Punchy', note:'Arcade, but with more thump and a bigger payoff', echo:.2, sfx:{
     strike:(o,t)=>{ tn(o,t,.09,180,60,1,'sine'); nz(o,t,.03,'bandpass',2500,1,.45); },

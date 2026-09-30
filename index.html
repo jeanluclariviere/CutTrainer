@@ -1587,11 +1587,11 @@ function sfxTone(out, at, dur, f0, f1, gain, type){   // a short pitched knock t
 }
 // few notes, warm tones: one for the strike, one for contact, three for the pocket, one for the rail, two for the jaw
 const SFX = {
-  strike: (o, t, v)=>{ sfxTone(o, t, .08, 190, 120, .7*v, 'triangle'); },                                                   // thock
-  click:  (o, t, v)=>{ sfxTone(o, t, .07, 1175, 1050, .45*v); },                                                             // tock
-  drop:   (o, t, v)=>{ sfxTone(o, t, .1, 392, 0, .5, 'triangle'); sfxTone(o, t + .09, .1, 523.25, 0, .5, 'triangle'); sfxTone(o, t + .18, .26, 659.25, 0, .55, 'triangle'); },   // rising three
-  rail:   (o, t, v)=>{ sfxTone(o, t, .2, 170, 85, .7*v); },                                                                  // bump
-  jaw:    (o, t, v)=>{ sfxTone(o, t, .07, 330, 280, .55*v, 'triangle'); sfxTone(o, t + .09, .24, 200, 110, .6*v); },           // knock, then sag
+  strike: (o, t, v)=>{ sfxTone(o, t, .08, 226, 143, .7*v, 'triangle'); },                                                   // thock
+  click:  (o, t, v)=>{ sfxTone(o, t, .07, 1397, 1250, .45*v); },                                                             // tock
+  drop:   (o, t, v)=>{ sfxTone(o, t, .1, 293.66, 0, .5, 'triangle'); sfxTone(o, t + .09, .1, 392, 0, .5, 'triangle'); sfxTone(o, t + .18, .26, 493.88, 0, .55, 'triangle'); },   // rising three: D, G, B
+  rail:   (o, t, v)=>{ sfxTone(o, t, .2, 202, 101, .7*v); },                                                                  // bump
+  jaw:    (o, t, v)=>{ sfxTone(o, t, .07, 393, 333, .55*v, 'triangle'); sfxTone(o, t + .09, .24, 238, 131, .6*v); },           // knock, then sag
 };
 // schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
 function tableSounds(plan){
