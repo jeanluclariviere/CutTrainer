@@ -685,8 +685,9 @@ function spotToward(toEye){
   const h = rot(norm(toEye), rnd(-40, 40)*RAD), el = rnd(20, 55)*RAD;
   return [h[0]*Math.cos(el), h[1]*Math.cos(el), Math.sin(el)];
 }
-// The cue ball is a red-dot training ball: dots spread evenly over it (golden spiral), fixed on the ball.
-const CB_DOTS = Array.from({length:22}, (_, i)=>{ const y = 1 - 2*(i + .5)/22, r = Math.sqrt(1 - y*y), a = i*2.39996323; return [r*Math.cos(a), r*Math.sin(a), y]; });
+// The cue ball has six red dots, one on each face of a cube (like the TV-style training cue balls), fixed on the ball.
+const CB_DOTS = (()=>{ const t = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]], q = [.35, .6, .72];   // tilted so none sits dead on top
+  return t.map(v=>rotAxis(rotAxis(v, [1,0,0], q[0]), [0,1,0], q[1])); })();
 function cbSpin(v, sp){   // turn a dot by the cue ball's spin so far: the approach (backspin wearing off), then after contact (roll building)
   if(!sp) return v;
   if(sp.aA) v = rotAxis(v, sp.kA, sp.aA);
@@ -1247,7 +1248,7 @@ function perspSVG(s, reveal, view){
         const d = cbSpin(d0, sp), facing = d[0]*toE[0] + d[1]*toE[1] + d[2]*toE[2];
         if(facing <= 0.05) continue;
         const Sc = cam.toCam([C[0]+d[0]*R, C[1]+d[1]*R, C[2]+d[2]*R]); if(Sc[2] <= NEAR) continue;
-        const [sx, sy] = cam.proj(Sc), rd = r*.13, a = Math.atan2(sy - y, sx - x)/RAD;
+        const [sx, sy] = cam.proj(Sc), rd = r*.2, a = Math.atan2(sy - y, sx - x)/RAD;
         dots += `<g transform="translate(${sx.toFixed(1)} ${sy.toFixed(1)}) rotate(${a.toFixed(1)}) scale(${facing.toFixed(3)} 1)"><circle r="${rd.toFixed(2)}" fill="#c8102e"/></g>`;
       }
       if(dots) o += `<clipPath id="cbclip"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"/></clipPath><g clip-path="url(#cbclip)">${dots}</g>`;
