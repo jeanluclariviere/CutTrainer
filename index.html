@@ -637,6 +637,9 @@ function throwAt(speed, phi){ if(!speed || phi <= 0) return 0; const x = phi/32;
 function throwFor(s, phi){ return s && s.phys && s.speed ? throwAt(s.speed, phi) : 0; }   // throw only counts once it's part of the call (B+)
 // the contact cut needed so that, after throw, the object ball leaves at the geometric cut tp
 function contactFor(speed, tp){ let c = tp; for(let i=0;i<6;i++) c = tp + throwAt(speed, c); return c; }
+const MU_G = 77;                                      // sliding friction μ·g, in/s² (μ ≈ 0.2)
+const A_ROLL = 6;                                     // rolling resistance, in/s²
+const POCKET_ARRIVE = 14;                             // pocket speed: how fast the object ball is still going as it drops, in/s
 const MOD_DEG = 3;
 const PHYS_SPREAD = 4;                              // speed & throw shots look within this many degrees of a fraction                                   // how far a "thick" or "thin" call moves the hit, in degrees of cut
 const MODS = [{id:'thick', label:'Thick', key:'←'}, {id:'center', label:'Center', key:'↓'}, {id:'thin', label:'Thin', key:'→'}];
@@ -773,7 +776,7 @@ const AIDS = {
 };
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
 const PHYS_AT = 9;                                           // B+: speed & throw (medium only), called with thick / center / thin
-const SHOT_SPEED = 'firm';                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
+const SHOT_SPEED = 'medium';   // pocket speed: throw as for a medium-soft hit                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
 const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
 const LEAN_AT = 7;                                           // the weak-spot lean starts once you read unaided (B-)
 const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
@@ -924,8 +927,12 @@ function outcome(s, phiC){
   const u2 = rot(v2, -s.sign*(phiC - throwFor(s, phiC))*RAD);
   const err = Math.atan2(s.u[0]*u2[1]-s.u[1]*u2[0], dot(s.u,u2));
   const lat = s.L*Math.sin(err);
-  return {v2, g2, u2, lat, made: Math.abs(lat) <= s.tol};
+  // pocket speed: a hit thinner than the right one sends the object ball off slower, and it can die short of the pocket
+  const reach = rollOut(contactSpeed(s)*Math.cos(phiC*RAD)).stop, short = reach < s.L - 0.5;
+  return {v2, g2, u2, lat, made: Math.abs(lat) <= s.tol && !short, short: Math.abs(lat) <= s.tol && short};
 }
+// the cue ball's speed at contact for a pocket-speed shot: the right hit gets the object ball to the pocket, arriving slowly
+function contactSpeed(s){ return pocketSpeedFor(Math.max(1, s.L))/Math.max(0.2, Math.cos(s.theta*RAD)); }
 function makeWindow(s){
   let lo = s.theta, hi = s.theta;
   while(lo > 0 && outcome(s, lo-0.05).made) lo -= 0.05;
@@ -1404,7 +1411,7 @@ function deal(){
   document.querySelectorAll('#answers button, #mods button').forEach(b=>{b.disabled=false;b.className='';});
   pend = {f:null, m:null};
   $('mods').hidden = !shot.phys;
-  const sc = $('speedchip'); sc.hidden = !shot.speed; if(shot.speed){ sc.textContent = SPEED_LABEL[shot.speed]; sc.className = 'speedchip ' + shot.speed; }
+  const sc = $('speedchip'); sc.hidden = true;   // no speed shown for now: every shot is pocket speed if(shot.speed){ sc.textContent = SPEED_LABEL[shot.speed]; sc.className = 'speedchip ' + shot.speed; }
   $('result').innerHTML = '';
   $('quick').innerHTML = `<div class="ql hint">${isPlace() ? PLACE_HINT : PLACEHOLDER}</div>`;
   tableBox.classList.remove('tappable');
@@ -1807,7 +1814,7 @@ function answer(id, mod){
   const tipText = tip ? `Tip: a pure ${lbl(picked)} misses by ${Math.abs(oc.lat).toFixed(1)}″. Hit it a touch ${adjust}.` : '';
   showResult(msg, cls, counted, oc.lat, over, exactLine, tipText);
   const quickHTML = `<div class="ql"><b class="${counted?'ok':'no'}">${counted ? 'Pocketed' : 'Missed'}</b>`
-    + (!ok ? `<span class="out">${counted ? `Also drops, a bit ${over?'thin':'full'}` : `${over?'Too thin':'Too full'}, by ${Math.abs(oc.lat).toFixed(1)}″`}</span>` : '')
+    + (!ok ? `<span class="out">${counted ? `Also drops, a bit ${over?'thin':'full'}` : oc.short ? `Right line, but it dies short` : `${over?'Too thin':'Too full'}, by ${Math.abs(oc.lat).toFixed(1)}″`}</span>` : '')
     + (phys ? `<span>${lbl(shot.answer)} ${shot.mod}${alt ? ` / ${lbl(ALL.find(r=>r.id===alt.id))} ${alt.mod}` : ''} · throw ${shot.throwDeg.toFixed(1)}°</span></div>` : `<span>${shot.theta.toFixed(1)}° · ${f.toFixed(2)} ball</span></div>`)
     + (tip ? `<div class="ql"><span class="tipq">Hit it a touch ${adjust}</span><span>A pure ${lbl(picked)} misses ${Math.abs(oc.lat).toFixed(1)}″</span></div>` : '');
   // the verdict lands on the call, not after the animation: sound, result, button colours, streak
@@ -1837,63 +1844,81 @@ function rayToCushion(p, dir, maxLen){
   t = Math.max(0, Math.min(t, maxLen ?? Infinity));
   return add(p, mul(dir, t));
 }
+// Ball motion on the cloth: a ball with no spin first slides (sliding friction MU_G slows it and builds forward roll),
+// and after (2/7)·v/μg it's rolling at 5/7 of its speed, then rolling resistance (A_ROLL) slows it to a stop.
+function rollOut(v0){
+  const ts = (2/7)*v0/MU_G, ds = v0*ts - MU_G*ts*ts/2, v1 = (5/7)*v0, tr = v1/A_ROLL, dr = v1*v1/(2*A_ROLL);
+  const x = t => t <= ts ? v0*t - MU_G*t*t/2 : ds + v1*Math.min(t-ts, tr) - A_ROLL*Math.min(t-ts, tr)**2/2;
+  const tFor = d => d <= ds ? (v0 - Math.sqrt(Math.max(0, v0*v0 - 2*MU_G*d)))/MU_G : ts + (v1 - Math.sqrt(Math.max(0, v1*v1 - 2*A_ROLL*(d-ds))))/A_ROLL;
+  return {x, tFor, stop: ds + dr, ts, v1};
+}
+// the object-ball speed that gets it to a pocket d inches away arriving at about POCKET_ARRIVE in/s ("pocket speed")
+function pocketSpeedFor(d){
+  const va = POCKET_ARRIVE, k = 24/(98*MU_G);
+  const vRoll = Math.sqrt((va*va + 2*A_ROLL*d)/(25/49 + 2*A_ROLL*k));   // still sliding for the first part, rolling to the pocket
+  if(vRoll*vRoll*k <= d) return vRoll;
+  return Math.sqrt(va*va + 2*MU_G*d);                                    // so close it arrives still sliding
+}
 function animateShot(oc, done, obCol){
   const s = shot, cb0 = s.cb, ob0 = s.ob, g2 = oc.g2;
   const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
   const toPocket = dot(sub(s.P.t, ob0), oc.u2);
-  const sink = oc.made;
-  // a near miss stops dead on the jaw, short of the pocket; nothing rebounds
+  // pocket speed: the cue ball is hit just hard enough that the right call sends the object ball to the pocket, arriving slowly;
+  // it's struck with backspin that wears off exactly at contact (a stun), sliding friction slowing it on the way
+  const cosTrue = Math.cos(s.theta*RAD), Vc = contactSpeed(s);             // cue-ball speed at contact
+  const d1 = len(sub(g2, cb0)), V0 = Math.sqrt(Vc*Vc + 2*MU_G*d1);            // speed off the tip
+  const T1 = d1 > 0.01 ? (V0 - Vc)/MU_G : 0;
+  const xA = t => V0*t - MU_G*t*t/2;
+  // after contact the speed splits by the cut: object ball Vc·cos(cut), cue ball Vc·sin(cut)
+  const cosC = Math.max(0.02, Math.min(1, dot(v2, n2))), sinC = Math.sqrt(1 - cosC*cosC);
+  const mOb = rollOut(Vc*cosC), vCb = Vc*sinC, mCb = rollOut(Math.max(0.01, vCb));
+  // where the object ball ends: in the pocket, on the jaw, at a cushion, or wherever it stops rolling
   const lat = Math.abs(oc.lat ?? 0);
-  const jawHit = !sink && toPocket > 4 && lat < s.tol + 2.4;
-  const jaw = null;
-  let obEnd;
-  if(sink) obEnd = add(ob0, mul(oc.u2, toPocket + 2.6));
-  else if(jawHit) obEnd = rayToCushion(ob0, oc.u2, toPocket - (s.P.side ? 1.6 : 2.8));
-  else obEnd = rayToCushion(ob0, oc.u2);
-  const dJ = jaw ? len(sub(jaw, ob0)) : 0;
-  const obAt = dist => !jaw || dist <= dJ ? add(ob0, mul(oc.u2, dist)) : add(jaw, mul(norm(sub(obEnd, jaw)), dist - dJ));
-  // stop shot: after contact the cue ball leaves along the tangent line, farther on thinner hits
-  let tan = sub(v2, mul(n2, dot(v2, n2))); const tl = len(tan);
-  const cbEnd = tl > 0.05 ? rayToCushion(g2, mul(tan, 1/tl), 26*tl) : g2;
-  const cl = (x,a,b)=>Math.max(a, Math.min(b, x));
-  const d1 = len(sub(g2, cb0)), d2 = jaw ? dJ + len(sub(obEnd, jaw)) : len(sub(obEnd, ob0)), d3 = len(sub(cbEnd, g2));
-  // one constant speed (inches per second) for every ball, scaled to the shot's length: short shots play slower so
-  // you can see (and hear) the contact and the pocket as two things; long firm shots still move at full pace
-  const V = Math.max(55, Math.min(s.speed ? ROLL_V[s.speed] : 75, d1/0.18));   // never slower than a believable stun shot
-  // after contact the speed splits by the cut: object ball V·cos(cut), cue ball V·sin(cut); both then slow as they roll
-  const cosC = Math.max(0.05, Math.min(1, dot(v2, n2))), sinC = Math.sqrt(1 - cosC*cosC);
-  const vOb = V*cosC, vCb = Math.max(4, V*sinC);
-  const decel = (v, d) => Math.min(22, 0.8*v*v/(2*Math.max(d, 0.1)));   // rolling slows it, but it always gets where it's going
-  const aOb = decel(vOb, d2), aCb = decel(vCb, d3);
-  const tAt = (v, a, x) => a < 1e-6 ? x/v : (v - Math.sqrt(Math.max(0, v*v - 2*a*x)))/a;   // time to cover x
-  const xAt = (v, a, t, d) => Math.min(d, v*t - a*t*t/2);                                    // distance covered by time t
-  const T1 = d1/V, T2 = tAt(vOb, aOb, d2), T3 = d3 > 0.01 ? tAt(vCb, aCb, d3) : 0;
-  // cue ball spin: none on the way in (it slides), then after contact the cloth builds forward roll
-  const dirA = d1 > 0.01 ? mul(sub(g2, cb0), 1/d1) : [0,1], kA = [-dirA[1], dirA[0], 0];
-  const dirT = d3 > 0.01 ? mul(sub(cbEnd, g2), 1/d3) : [0,1], kC = [-dirT[1], dirT[0], 0];
-  const spinA = t => 0;                                            // a firm stun: the cue ball slides to the object ball without turning
-  const ALPHA = 150;                                               // rad/s²: how fast friction spins the sliding ball up
-  const tRoll = vCb/R/(ALPHA + aCb/R);                             // when sliding turns into rolling
-  const spinC = t => (t = Math.min(t, T3), d3 <= 0.01) ? 0 : t <= tRoll ?   // stops turning when the cue ball stops (at the cushion or wherever it ends)
-    ALPHA*t*t/2 : ALPHA*tRoll*tRoll/2 + (xAt(vCb, aCb, Math.min(t, T3), d3) - xAt(vCb, aCb, tRoll, d3))/R;
+  const sink = oc.made;
+  const jawHit = !oc.made && toPocket > 4 && lat < s.tol + 2.4 && mOb.stop >= toPocket - 2.8;
+  let d2;
+  if(sink) d2 = toPocket + 2.6;
+  else if(jawHit) d2 = toPocket - (s.P.side ? 1.6 : 2.8);
+  else d2 = len(sub(rayToCushion(ob0, oc.u2), ob0));
+  const obRail = !sink && !jawHit && mOb.stop >= d2;
+  d2 = Math.min(d2, sink ? d2 : mOb.stop);
+  const obEnd = add(ob0, mul(oc.u2, d2));
+  // the cue ball after a stun: along the tangent line until it stops or meets a cushion (nothing rebounds)
+  const tan = sub(v2, mul(n2, dot(v2, n2))), tl = len(tan);
+  const dirT = tl > 0.05 ? mul(tan, 1/tl) : [0,1];
+  const cbCush = tl > 0.05 ? len(sub(rayToCushion(g2, dirT), g2)) : 0;
+  const d3 = tl > 0.05 && vCb > 0.5 ? Math.min(cbCush, mCb.stop) : 0;
+  const cbRail = d3 > 0 && mCb.stop >= cbCush;
+  const cbEnd = add(g2, mul(dirT, d3));
+  const obTime = d => mOb.tFor(Math.min(d, mOb.stop));
+  const T2 = obTime(d2), T3 = d3 > 0 ? mCb.tFor(d3) : 0;
+  // cue ball spin: backspin that wears off by contact, then after contact the cloth builds forward roll
+  const dirA = d1 > 0.01 ? mul(sub(g2, cb0), 1/d1) : [0,1], kA = [-dirA[1], dirA[0], 0], kC = [-dirT[1], dirT[0], 0];
+  const ALPHA = 2.5*MU_G/R;                                         // rad/s²: how fast sliding friction changes the spin (5/2·μg/R)
+  const spinA = t => -(ALPHA*T1*t - ALPHA*t*t/2);                  // backspin that wears off to nothing at contact: a stun
+  const spinC = t => { if(d3 <= 0) return 0; t = Math.min(t, T3);      // stops turning when the cue ball stops
+    return t <= mCb.ts ? ALPHA*t*t/2 : ALPHA*mCb.ts*mCb.ts/2 + (mCb.x(t) - mCb.x(mCb.ts))/R; };
   const total = (T1 + Math.max(T2, T3)) * 1000 + 280;   // short hold so you see where the balls stopped
-  const cbRail = tl > 0.05 && len(sub(rayToCushion(g2, mul(tan, 1/tl)), cbEnd)) < 0.5;   // the cue ball's path reached a cushion
-  const bus = tableSounds(shotPlan(s, oc, T1, sink ? tAt(vOb, aOb, Math.max(0, toPocket - 1.2)) : T2, T3, cbRail, jawHit), s.duck);
+  const plan = [[T1, 'click', 1]];
+  if(sink) plan.push([T1 + obTime(Math.max(0, toPocket - 1.2)), 'drop', 1]);
+  else if(jawHit) plan.push([T1 + T2, 'jaw', 1]);
+  else if(obRail) plan.push([T1 + T2, 'rail', 1]);
+  const bus = tableSounds(plan, s.duck);
   const t0 = performance.now();
   const frame = now => {
     if(!anim) return;
     const t = (now - t0) / 1000;
     let cb, ob = ob0, obScale = 1;
-    if(t < T1){ cb = add(cb0, mul(sub(g2, cb0), t/T1)); }
+    if(t < T1){ cb = add(cb0, mul(sub(g2, cb0), d1 > 0 ? Math.min(d1, xA(t))/d1 : 1)); }
     else {
-      const x2 = xAt(vOb, aOb, t-T1, d2), x3 = d3 > 0.01 ? xAt(vCb, aCb, t-T1, d3) : 0;
-      ob = jaw ? obAt(x2) : add(ob0, mul(sub(obEnd, ob0), d2 > 0 ? x2/d2 : 1));
-      cb = d3 > 0.01 ? add(g2, mul(sub(cbEnd, g2), x3/d3)) : g2;
-      if(sink){ const past = len(sub(ob, ob0)) - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
+      const x2 = Math.min(d2, mOb.x(t-T1)), x3 = d3 > 0 ? Math.min(d3, mCb.x(t-T1)) : 0;
+      ob = add(ob0, mul(oc.u2, x2));
+      cb = add(g2, mul(dirT, x3));
+      if(sink){ const past = x2 - toPocket; obScale = Math.max(0, 1 - Math.max(0, past)/2.6); }
     }
     const spin = {kA, kC, aA: spinA(Math.min(t, T1)), aC: t > T1 ? spinC(t - T1) : 0};
-    s.anim = {cb, spin, ob: obScale > 0.02 ? ob : null, obScale, run: t < T1 ? 0 : vOb*(t-T1),   // run: how far the correct path has drawn since contact (at the object ball's starting speed)
-      trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : (jaw && len(sub(ob, ob0)) > dJ ? [ob0, jaw, ob] : [ob0, ob]), obCol}};
+    s.anim = {cb, spin, ob: obScale > 0.02 ? ob : null, obScale, run: t < T1 ? 0 : Vc*cosTrue*(t-T1),   // run: how far the correct path has drawn since contact
+      trail: {cb: t < T1 ? [cb0, cb] : [cb0, g2, cb], ob: t < T1 ? null : [ob0, ob], obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
