@@ -1609,7 +1609,7 @@ function sfxTone(out, at, dur, f0, f1, gain, type){   // a short pitched knock t
 // arcade-style: short pitched blips with a light echo
 const SFX = {
   click:  (o, t, v)=>{ sfxTone(o, t, .12, 1175, 0, .55*v); sfxTone(o, t, .08, 1760, 0, .3*v); sfxTone(o, t, .025, 2349, 0, .12*v, 'triangle'); },   // tink
-  drop:   (o, t, v)=>{ sfxTone(o, t, .075, 330, 140, .9*v, 'triangle'); sfxNoise(o, t, .02, 'bandpass', 3000, 1, .3*v); },   // pok (the arcade strike)
+  drop:   (o, t, v)=>{ sfxTone(o, t, .14, 405, 127, .8*v, 'triangle'); },   // bloop
   rail:   (o, t, v)=>{ sfxNoise(o, t, .08, 'lowpass', 500, .9, .6*v); sfxTone(o, t, .1, 140, 90, .6*v); },                                    // a muted, woody thump
   jaw:    (o, t, v)=>{ sfxTone(o, t, .06, 430, 300, .6*v, 'triangle'); sfxTone(o, t + .08, .28, 220, 90, .55*v); },   // clack-bwomp
 };
