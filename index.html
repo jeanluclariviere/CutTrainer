@@ -333,8 +333,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.pulse{animation:none!important}}
 .pulse{animation:pulse 1.4s ease-in-out infinite}
 .noanim .pulse,.noanim .spark{animation:none!important}.noanim .table-box > #tablefx{will-change:auto}
-/* Firefox on macOS leaves black seam lines on the page while these endless animations run: keep them still there */
-@supports (-moz-appearance:none){.pulse,.spark{animation:none!important}.table-box > #tablefx{will-change:auto}}
 @keyframes pulse{0%,100%{opacity:.95}50%{opacity:.35}}
 
 /* Desktop: one screen, two columns on a shared grid.
@@ -841,8 +839,9 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-if(/noanim/.test(location.href)) document.documentElement.classList.add('noanim');   // testing: no endless animations (pulse, spark)
-const BUILD = 116;   // one per commit to main
+// no endless animations (pulse, spark) with ?noanim, and always in Firefox: on macOS it leaves black seam lines on the page while they run
+if(/noanim/.test(location.href) || /firefox/i.test(navigator.userAgent)) document.documentElement.classList.add('noanim');
+const BUILD = 117;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
