@@ -662,7 +662,7 @@ const SPEED_LABEL = {slow:'Slow', medium:'Medium', firm:'Firm'};
 const THROW_MAX = {slow:5, medium:3.5, firm:2};      // degrees, at the peak
 const ROLL_V = {slow:45, medium:75, firm:120};       // animation speed, inches per second
 function throwAt(speed, phi){ if(!speed || phi <= 0) return 0; const x = phi/32; return THROW_MAX[speed]*x*Math.exp(1-x); }
-function throwFor(s, phi){ return s && s.speed ? throwAt(s.speed, phi) : 0; }
+function throwFor(s, phi){ return s && s.phys && s.speed ? throwAt(s.speed, phi) : 0; }   // throw only counts once it's part of the call (B+)
 // the contact cut needed so that, after throw, the object ball leaves at the geometric cut tp
 function contactFor(speed, tp){ let c = tp; for(let i=0;i<6;i++) c = tp + throwAt(speed, c); return c; }
 const MOD_DEG = 3;
@@ -726,7 +726,7 @@ function cueScratches(c){
 }
 function generate(){
   const w = bucketWeights();
-  const throwOn = false, phys = physOn(), speed = phys ? (level() >= ALL_SPEEDS_AT ? pick(SPEEDS) : 'medium') : null;
+  const throwOn = false, phys = physOn(), speed = SHOT_SPEED;   // every shot is firm for now: the cue ball's path is drawn as a stun shot (the tangent line), which fits a firm hit
   const lenCls = tut.on ? 'short' : Math.random() < longShare() ? 'long' : 'short';   // the grade sets the mix of short and long shots
   const k = H/100;
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
@@ -792,7 +792,7 @@ const AIDS = {
 };
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
 const PHYS_AT = 9;                                           // B+: speed & throw (medium only), called with thick / center / thin
-const ALL_SPEEDS_AT = 10;                                    // A-: slow, medium and firm
+const SHOT_SPEED = 'firm';                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
 const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
 const LEAN_AT = 7;                                           // the weak-spot lean starts once you read unaided (B-)
 const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
@@ -842,11 +842,11 @@ function enforceLocks(){
 // what reaching each grade brings (first time only for aids going away)
 const LADDER_UP = {1:'Guide line fades after 1.5 s', 2:'Guide line fades after 0.75 s', 3:'Guide line gone: now an optional aid',
   4:'👻 Ghost ball fades after 1.5 s', 5:'👻 Ghost ball fades after 0.75 s', 6:'Ghost ball gone: now an optional aid',
-  7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Speed & throw', 10:'All three speeds',
+  7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Throw',
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
 const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide line fades after 1.5 s', 'Guide line fades after 0.75 s', 'Guide line gone: now an optional aid',
   'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone: now an optional aid', 'Ball line: read it from behind the cue ball',
-  'Any angle', 'Speed & throw, medium speed', 'All three speeds', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+  'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -871,7 +871,7 @@ function renderProgress(){
     return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
   }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
 }
-const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more speed & throw', 10:'Medium speed only', 11:'🔒 0.75 s Flash'};
+const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more throw', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = stats.level;
   L.pts += ok ? PT_RIGHT : PT_WRONG;
