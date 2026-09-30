@@ -90,6 +90,9 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menuhead{display:flex;justify-content:space-between;align-items:center;font:700 20px var(--display)}
 .menuclose{background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer;padding:4px 6px}
 .menucard .opt{justify-content:space-between}
+.tutlist{display:flex;flex-direction:column;gap:8px}
+.tutlist button{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;font:600 15px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer}
+.tutlist button small{color:var(--muted);font-weight:500}
 .aids{display:flex;flex-direction:column;gap:4px}
 .aid{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .aid .seg button{padding:4px 12px}
@@ -366,6 +369,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   </header>
 
 
+  <div class="menu" id="tutmenu" hidden>
+    <div class="menucard" role="dialog" aria-label="Tutorials">
+      <div class="menuhead"><span>Tutorials</span><button class="menuclose" id="tutmenuclose" aria-label="Close">✕</button></div>
+      <div class="tutlist" id="tutlist"></div>
+    </div>
+  </div>
   <div class="menu" id="menu" hidden>
     <div class="menucard" role="dialog" aria-label="Settings">
       <div class="menuhead"><span>Settings</span><button class="menuclose" id="menuclose" aria-label="Close">✕</button></div>
@@ -669,6 +678,7 @@ function weightedIndex(w){
   return w.length-1;
 }
 function chooseAim(i){
+  if(forceDeg != null) return forceDeg;   // the tutorial asks for an exact cut
   const r = REFS[i];
   if(throwNow()){ const [lo, hi] = BOUNDS[i]; return rnd(Math.max(lo > 0 ? lo + 1 : 0, r.deg - PHYS_SPREAD), Math.min(hi - 1, r.deg + PHYS_SPREAD)); }   // close to a fraction: speed & throw decide the adjustment
   if(anyOn()){ const [lo, hi] = BOUNDS[i]; return rnd(lo > 0 ? lo + 1 : 0, hi - 1); }   // any angle, but never within 1° of a boundary: every answer is clear
@@ -839,7 +849,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 121;   // one per commit to main
+const BUILD = 122;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1479,6 +1489,8 @@ function unpackShot(o){
 }
 function deal(){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
+  // a new element is explained the first time you reach the grade that brings it in
+  if(!tut.on && settings.task === 'sess'){ const k = Object.keys(LESSONS).find(k=>k !== 'intro' && LESSONS[k].at <= (level() ?? -1) && !(settings.tutSeen || {})[k]); if(k) return startTut(k); }
   walk = null; walkDrag = null;
   if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
   syncRefs();
@@ -2523,7 +2535,30 @@ const TSTEPS = [
   {finish:true, aids:{},
    text:'That’s it. The aids come and go as your grade climbs, and you can open this again with the <b>?</b> button.'},
 ];
-const tstep = () => TSTEPS[tut.i];
+// B+: cuts that sit between two fractions, called with thick / center / thin
+const BSTEPS = [
+  {deg:35, mustMiss:30, aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Real shots don’t always sit on a fraction. Here the ghost ball covers <b>a bit less than half</b> of the object ball.'},
+  {aids:{stance:1, ghost:1}, demo:30, next:true,
+   text:'Hit it as a plain <b>½</b> and it goes a little full. Watch it miss.'},
+  {aids:{stance:1, ghost:1}, demo:'right', next:true,
+   text:'Take a touch less ball, <b>½ thin</b>, and it drops.'},
+  {aids:{}, next:true,
+   text:'So from B+ a call has two parts: the fraction it’s closest to, then <b>thick</b> (a bit more ball than that fraction), <b>center</b> (just the fraction) or <b>thin</b> (a bit less ball).'},
+  {finish:true, aids:{},
+   text:'Thick and thin are always measured from the fraction you name. When a cut sits right between two, either name counts: <b>½ thin</b> is the same hit as <b>¼ thick</b>.'},
+];
+const LESSONS = {
+  intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
+  between: {name:'Between fractions: thick & thin', at:PHYS_AT, steps:BSTEPS},
+};
+const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
+const tstep = () => tsteps()[tut.i];
+const lessonsOpen = () => Object.entries(LESSONS).filter(([, L])=>L.at <= Math.max(level() ?? 0, (stats.level && stats.level.best) ?? 0));
+function openTutMenu(v){
+  $('tutmenu').hidden = !v;
+  if(v) $('tutlist').innerHTML = lessonsOpen().map(([k, L])=>`<button data-lesson="${k}">${L.name}<small>${L.at ? GRADES[L.at] : 'Start'}</small></button>`).join('');
+}
 function tutAid(key){
   const v = (tstep().aids || {})[key];
   if(v === 1) return 1;
@@ -2531,13 +2566,22 @@ function tutAid(key){
   return 0;
 }
 const fadeDelay = k => tut.on ? ((tstep().aids || {})[k] === 'fade' ? 1500 : 0) : (aidMode(k)==='fade' ? AIDS[k].fade[level()] : 0);
-let forceFrac = null;
+let forceFrac = null, forceDeg = null;
 function tutShot(id){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   forceFrac = id;
   let s1 = null;
   for(let k=0; k<200; k++){ const c = generate(); if(c.answer.id !== id) continue; s1 = c; if(c.L >= 16 && len(sub(c.ob, c.cb)) >= 14) break; }   // keep the balls apart and off the pocket, so the labels read
   forceFrac = null;
+  shot = s1; shot.t0 = performance.now();
+  shot.color = pick([OB_COLORS[1], OB_COLORS[2], OB_COLORS[3], OB_COLORS[5]]);   // never yellow: the lit-up overlap is yellow
+}
+function tutShotDeg(deg, mustMiss){   // a shot at an exact cut; mustMiss: a plain hit at that cut has to miss
+  if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
+  forceDeg = deg;
+  let s1 = null;
+  for(let k=0; k<400; k++){ const c = generate(); s1 = s1 || c; if(mustMiss != null && outcome(c, mustMiss).made) continue; s1 = c; if(c.L >= 16 && len(sub(c.ob, c.cb)) >= 14) break; }
+  forceDeg = null;
   shot = s1; shot.t0 = performance.now();
   shot.color = pick([OB_COLORS[1], OB_COLORS[2], OB_COLORS[3], OB_COLORS[5]]);   // never yellow: the lit-up overlap is yellow
 }
@@ -2563,9 +2607,16 @@ function zoomTo(target){
 function runStep(){
   const st = tstep();
   if(st.shot) tutShot(st.shot);
+  if(st.deg != null) tutShotDeg(st.deg, st.mustMiss);
   freshCall();
+  if(st.demo != null) setTimeout(()=>{   // the coach plays the hit for you
+    if(!tut.on || tstep() !== st || answered) return;
+    const oc = outcome(shot, st.demo === 'right' ? shot.theta : st.demo);
+    answered = true; shot.pick = {...oc, id: '', far: st.demo !== 'right'};
+    if(settings.animate !== '0') animateShot(oc, ()=>{ draw(true); }, st.demo === 'right' ? '#ffd34d' : MISS); else draw(true);
+  }, 700);
   zoomTo(st.zoom ? 1 : 0);
-  $('coachstep').textContent = `Tutorial · ${tut.i+1} of ${TSTEPS.length}`;
+  $('coachstep').textContent = `${tut.lesson === 'intro' ? 'Tutorial' : LESSONS[tut.lesson].name} · ${tut.i+1} of ${tsteps().length}`;
   $('coachtext').innerHTML = st.text;
   const nx = $('coachnext');
   nx.hidden = !(st.next || st.finish);
@@ -2573,9 +2624,9 @@ function runStep(){
   document.querySelectorAll('#answers button').forEach(b=>b.disabled = !st.ask);
   draw(false); scheduleFades(); updateControls();
 }
-function startTut(){
+function startTut(lesson){
   endFlash(); $('sesscover').hidden = true; $('endcover').hidden = true; $('startcover').hidden = true;
-  tut.on = true; tut.i = 0;
+  tut.on = true; tut.i = 0; tut.lesson = LESSONS[lesson] ? lesson : 'intro';
   $('coach').hidden = false; $('question').hidden = true; $('sessrow').hidden = true;
   showSessIdle(); runStep();
   $('coach').scrollIntoView({block:'nearest'});
@@ -2583,6 +2634,7 @@ function startTut(){
 function endTut(thenBaseline){
   tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf);
   if(!settings.tut){ settings.tut = 1; saveSettings(); }
+  settings.tutSeen = {...(settings.tutSeen || {}), [tut.lesson]: 1}; saveSettings();
   $('coach').hidden = true;
   renderSession(); deal();
   if(thenBaseline && !hasBaseline() && settings.task==='sess') startSession(100, true);
@@ -2658,7 +2710,9 @@ function tutLayer(cam, s, reveal){
   }
   return o;
 }
-$('help').addEventListener('click', ()=>startTut());
+$('help').addEventListener('click', ()=>openTutMenu(true));
+$('tutmenuclose').addEventListener('click', ()=>openTutMenu(false));
+$('tutmenu').addEventListener('click', e=>{ const b = e.target.closest('[data-lesson]'); if(b){ openTutMenu(false); startTut(b.dataset.lesson); } else if(e.target === $('tutmenu')) openTutMenu(false); });
 $('coachnext').addEventListener('click', ()=>tutNext());
 $('coachskip').addEventListener('click', ()=>endTut(false));
 
