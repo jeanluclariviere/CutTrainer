@@ -835,7 +835,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 106;   // one per commit to main
+const BUILD = 107;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1151,8 +1151,31 @@ function convexHull(P){
   for(const q of pts.slice().reverse()){ while(up.length>=2 && cr(up[up.length-2],up[up.length-1],q)<=0) up.pop(); up.push(q); }
   return lo.slice(0,-1).concat(up.slice(0,-1));
 }
+// The perspective drawing is split into layers so a frame only rebuilds what moves: the table behind the balls and
+// the near rails in front of them are kept until the camera, the shot or the window changes.
+let pcache = {key: null}, shotSeq = 0;
+function tableSegs(){
+  const e = PK[0]/Math.SQRT2, sd = PK[1]/2;
+  return [
+    [[e,0],[W-e,0],[0,1]], [[W-e,H],[e,H],[0,-1]],
+    [[0,H/2-sd],[0,e],[1,0]], [[0,H-e],[0,H/2+sd],[1,0]],
+    [[W,e],[W,H/2-sd],[-1,0]], [[W,H/2+sd],[W,H-e],[-1,0]],
+  ];
+}
 function perspSVG(s, reveal, view){
   const cam = (walk && walk.blend > 0) ? walkCam(s, view) : makeCam(s, view); lastCam = cam;
+  if(!s.seq) s.seq = ++shotSeq;
+  const f = [cam.toCam([0,0,0]), cam.toCam([W,H,1.6]), cam.toCam([W,0,0])].flat().map(x=>x.toFixed(3)).join(',');
+  const key = [VW, VH, curTable, reveal ? 1 : 0, s.seq, f].join('|');
+  if(key !== pcache.key){
+    const segs = tableSegs();
+    const ringArc = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+    const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
+    pcache = {key, back: perspBack(cam, s, reveal, segs, ring), front: perspFront(cam, s, reveal, segs, ring)};
+  }
+  return {back: pcache.back, dyn: perspDyn(cam, s, reveal), front: pcache.front, top: perspTop(cam, s, reveal)};
+}
+function perspBack(cam, s, reveal, segs, ring){
   let o = `<defs>
     <linearGradient id="pfelt" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stop-color="#1b5286"/><stop offset="1" stop-color="#2b76b4"/></linearGradient>
     <radialGradient id="cbg" cx="38%" cy="35%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#efe9d8"/><stop offset="1" stop-color="#cfc6ae"/></radialGradient>
@@ -1176,12 +1199,6 @@ function perspSVG(s, reveal, view){
       o += `<path d="M${hull.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L')}Z" fill="url(#${gid})"/>`;
     }
   }
-  const e = PK[0]/Math.SQRT2, sd = PK[1]/2;
-  const segs = [
-    [[e,0],[W-e,0],[0,1]], [[W-e,H],[e,H],[0,-1]],
-    [[0,H/2-sd],[0,e],[1,0]], [[0,H-e],[0,H/2+sd],[1,0]],
-    [[W,e],[W,H/2-sd],[-1,0]], [[W,H/2+sd],[W,H-e],[-1,0]],
-  ];
   for(const [a,b,n] of segs){                       // cushion noses facing the eye
     const mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
     if(n[0]*(cam.E[0]-mid[0]) + n[1]*(cam.E[1]-mid[1]) <= 0) continue;
@@ -1197,10 +1214,12 @@ function perspSVG(s, reveal, view){
   }
   for(const x of [1,2,3].map(i=>i*W/4)) for(const y of [-3.6,H+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
   for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
-  const ringArc = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
-  const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
   o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
 
+  return o;
+}
+function perspDyn(cam, s, reveal){
+  let o = '';
   // the correct path to the pocket draws itself from contact on, as if the object ball were rolling along it
   if(reveal || (s.anim && s.anim.run > 0)){
     const pe = pocketEdge(s.ob, s.P), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
@@ -1300,6 +1319,10 @@ function perspSVG(s, reveal, view){
         + ball + `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#000" fill-opacity="${dark.toFixed(3)}"/></g>`;
     }
   }
+  return o;
+}
+function perspFront(cam, s, reveal, segs, ring){
+  let o = '';
   // Rails between the eye and the balls hide the bottom of anything behind them: redraw the near side on top.
   const sides = [
     {n:[0,1],  mid:[W/2,0], rail:[[-6,-6],[W+6,-6],[W+6,-1.6],[-6,-1.6]]},
@@ -1325,6 +1348,10 @@ function perspSVG(s, reveal, view){
     for(const y of [1,2,3,5,6,7].map(i=>i*H/8)) for(const x of [-3.6,W+3.6]) o += `<path d="${polyD(cam,circ3([x,y],.4,1.62,8))}" fill="#eadcbf"/>`;
     o += ring ? `<path class="${reveal?'':'pulse'}" d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : '';
   }
+  return o;
+}
+function perspTop(cam, s, reveal){
+  let o = '';
   // pocket pointer: only when no part of the pocket ring is on screen
   const ringPts = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
   const ringVisible = ringPts.some(([x,y])=>x>=0 && x<=VW && y>=0 && y<=VH);
@@ -1357,8 +1384,16 @@ function draw(reveal){
   document.querySelector('.main').classList.toggle('persp', v!=='top');
   box.classList.toggle('persp', v!=='top');
   if(v==='top'){ svg.setAttribute('viewBox', viewBoxFor(shot)); svg.innerHTML = tableSVG(shot, reveal); }
-  else { fitViewBox(); svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`); svg.innerHTML = perspSVG(shot, reveal, v); }
+  else {
+    if(vbDirty) fitViewBox();
+    const vb = `0 0 ${VW} ${VH}`; if(svg.getAttribute('viewBox') !== vb) svg.setAttribute('viewBox', vb);
+    const L = perspSVG(shot, reveal, v);
+    if(!svg.querySelector(':scope > #lyD')){ svg.innerHTML = '<g id="lyB"></g><g id="lyD"></g><g id="lyF"></g><g id="lyT"></g>'; layerHTML = {}; }
+    for(const [id, html] of [['lyB', L.back], ['lyD', L.dyn], ['lyF', L.front], ['lyT', L.top]])
+      if(layerHTML[id] !== html){ svg.querySelector('#' + id).innerHTML = html; layerHTML[id] = html; }   // only the layers that changed
+  }
 }
+let layerHTML = {}, vbDirty = true;
 
 function overlapSVG(s){
   const right = [-s.v[1], s.v[0]];
@@ -2407,12 +2442,15 @@ $('replay').addEventListener('click', e=>{ e.stopPropagation(); replay(); });
 // Desktop: the table fills the column down to the bottom of the window; the drawing matches the box shape.
 const mqDesk = matchMedia('(min-width: 900px)');
 function sizeTable(){ if(shot) draw(answered); }
-function fitViewBox(){
+function fitViewBox(){   // reading the box's size forces a layout, so it's only done when the box may have changed size
+  vbDirty = false;
   const box = document.querySelector('.table-box');
   const w = box.clientWidth, h = box.clientHeight;
   VH = (w && h) ? Math.round(VW*h/w) : 400;
 }
+if(window.ResizeObserver) new ResizeObserver(()=>{ vbDirty = true; if(shot && !anim) sizeTable(); }).observe(document.querySelector('.table-box'));
 let rsz = null;
+window.addEventListener('resize', ()=>{ vbDirty = true; });
 window.addEventListener('resize', ()=>{ clearTimeout(rsz); rsz = setTimeout(sizeTable, 60); });
 if(mqDesk.addEventListener) mqDesk.addEventListener('change', sizeTable);
 function showTab(t){
