@@ -835,7 +835,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Throw: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 109;   // one per commit to main
+const BUILD = 110;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1261,12 +1261,7 @@ function perspDyn(cam, s, reveal){
   // once the balls meet: a faint mark where the object ball started, so the lines out of it start from something
   // (always yellow, like the line to the pocket: a ball's own colour can vanish on the cloth)
   const obNow = A ? A.ob : F ? F.ob : null;
-  if(contact || F){
-    if(!s.markT0) s.markT0 = performance.now();   // it fades in a couple of seconds after contact
-    const ma = Math.max(0, Math.min(1, (performance.now() - s.markT0 - MARK_DELAY)/MARK_FADE));
-    if(ma < 1 && !A && !markRaf) markRaf = requestAnimationFrame(()=>{ markRaf = null; if(shot === s && !s.anim && answered) draw(true); });   // balls at rest: keep drawing until it's in
-    if(ma > 0 && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: ma});
-  }
+  if((contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: 1});
   // on a miss, a see-through object ball rolls the path the right call would have sent it on, into the pocket
   if(A && A.obGhost) items.push({p: A.obGhost.p, kind:'ob', ghost: true, z: A.obGhost.z, shadow: A.obGhost.shadow, pocket: s.P});
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
@@ -1384,8 +1379,6 @@ function perspTop(cam, s, reveal){
 // a dashed path on the cloth, as one continuous line so the dashes run evenly round curves and corners
 // (split into pieces only when part of it is behind the eye)
 const DASH_W = 1.3;
-const MARK_DELAY = 2000, MARK_FADE = 800;   // the object ball's start mark: wait, then fade in (ms)
-let markRaf = null;
 function dashedLine(cam, pts, col, op, dash){
   const attrs = `fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width="${DASH_W}" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${dash}"`;
   const cs = pts.map(q=>cam.toCam([q[0], q[1], .03]));
