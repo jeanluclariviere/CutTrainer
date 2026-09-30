@@ -50,8 +50,8 @@ function nz(o, at, dur, type, freq, q, gain){
 const SETS = {
   A: {name:'A · Arcade (in the trainer now, no strike)', note:'Pitched blips with a light echo', echo:.16, sfx:{
     strike:(o,t)=>{ tn(o,t,.075,330,140,.9,'triangle'); nz(o,t,.02,'bandpass',3000,1,.3); },
-    click:(o,t)=>{ tn(o,t,.12,1568,0,.55); tn(o,t,.08,2349,0,.3); tn(o,t,.025,3136,0,.12,'triangle'); },
-    drop:(o,t)=>{ tn(o,t,.14,540,170,.8,'triangle'); tn(o,t+.13,.26,1046.5,0,.45); },
+    click:(o,t)=>{ tn(o,t,.12,1175,0,.55); tn(o,t,.08,1760,0,.3); tn(o,t,.025,2349,0,.12,'triangle'); },
+    drop:(o,t)=>{ tn(o,t,.14,405,127,.8,'triangle'); tn(o,t+.13,.26,784,0,.45); },
     rail:(o,t)=>{ nz(o,t,.08,'lowpass',500,.9,.6); tn(o,t,.1,140,90,.6); },
     jaw:(o,t)=>{ tn(o,t,.06,430,300,.6,'triangle'); tn(o,t+.08,.28,220,90,.55); },
   }},
