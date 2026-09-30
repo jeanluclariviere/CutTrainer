@@ -850,8 +850,8 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 123;   // one per commit to main
-if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up on next right call</button>`);
+const BUILD = 124;   // one per commit to main
+if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
 function setGradeForTesting(i){
@@ -2725,7 +2725,12 @@ function openProg(v){ if(v) renderProgress(); $('prog').hidden = !v; if(v){ $('p
 $('badge').addEventListener('click', ()=>openProg(true));
 $('badge').addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); openProg(true); } });
 $('progclose').addEventListener('click', ()=>openProg(false));
-if(DEV) $('devlvl').addEventListener('click', ()=>{ if(!stats.level) return; stats.level.pts = PTS_UP - PT_RIGHT; save(); renderBadge(); });   // testing: one right call from the next grade
+if(DEV) $('devlvl').addEventListener('click', ()=>{   // testing: level up now, as a right call would, then skip to the next shot
+  if(!stats.level || tut.on) return;
+  const from = level(); stats.level.bestBefore = bestLevel(); stats.level.pts = PTS_UP - PT_RIGHT;
+  const d = levelPoint(true); if(stats.active) stats.active.pending = null; save();
+  if(d){ showLevel(d, from); setTimeout(()=>{ if(!tut.on) deal(); }, 2900); }
+});
 $('ladder').addEventListener('click', e=>{ const li = e.target.closest('li[data-g]'); if(DEV && li) setGradeForTesting(+li.dataset.g); });
 $('prog').addEventListener('click', e=>{ if(e.target === $('prog')) openProg(false); });
 $('menuclose').addEventListener('click', ()=>openMenu(false));
