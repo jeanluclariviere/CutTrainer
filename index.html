@@ -70,6 +70,7 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .ladder .here-bar{display:block;margin-top:5px;height:4px;border-radius:2px;background:var(--chip);overflow:hidden;max-width:180px}
 .ladder .here-bar i{display:block;height:100%;background:var(--accent)}
 .ladder .here-bar i.neg{background:var(--bad)}
+.ladder li.dev{cursor:pointer}
 .ladder small{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:2px}
 .hright{display:flex;align-items:center;gap:10px;margin-left:auto}
 .cog{display:grid;place-items:center;width:40px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;padding:0}
@@ -819,6 +820,13 @@ const LADDER_UP = {1:'👻 Ghost ball fades after 3 s', 2:'👻 Ghost ball fades
 const LADDER_TEXT = ['Ghost ball, aim line and aim-line stance all on', 'Ghost ball fades after 3 s', 'Ghost ball fades after 1.5 s', 'Ghost ball gone: now an optional aid',
   'Aim line fades after 3 s', 'Aim line fades after 1.5 s', 'Aim line gone: now an optional aid', 'Ball line: read it from behind the cue ball',
   'Any angle', 'Speed & throw, medium speed', 'All three speeds', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+// Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
+const DEV = /#dev\b/.test(location.href);
+function setGradeForTesting(i){
+  stats.level = {g: i, best: i, pts: 0, v: 2}; save();
+  enforceLocks(); syncPressed(); renderBadge(true); renderProgress(); renderStats();
+  if(!answered) deal();
+}
 function renderProgress(){
   const g = level(), best = bestLevel(), pts = stats.level ? stats.level.pts : 0;
   $('ladder').innerHTML = GRADES.map((G, i)=>{
@@ -826,8 +834,8 @@ function renderProgress(){
     const bar = i===g ? (i < GRADES.length-1
       ? `<span class="here-bar"><i class="${pts<0?'neg':''}" style="width:${Math.min(100, Math.abs(pts)/PTS_UP*100)}%"></i></span><small>${pts >= 0 ? `${pts} of ${PTS_UP} to ${GRADES[i+1]}` : `${-pts} of ${PTS_UP} toward dropping to ${GRADES[i-1] || G}`}</small>`
       : '<small>You made it.</small>') : '';
-    return `<li class="${cls}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
-  }).reverse().join('');
+    return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
+  }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
 }
 const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more speed & throw', 10:'Medium speed only', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
@@ -2159,6 +2167,7 @@ function openProg(v){ if(v) renderProgress(); $('prog').hidden = !v; if(v){ $('p
 $('badge').addEventListener('click', ()=>openProg(true));
 $('badge').addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); openProg(true); } });
 $('progclose').addEventListener('click', ()=>openProg(false));
+$('ladder').addEventListener('click', e=>{ const li = e.target.closest('li[data-g]'); if(DEV && li) setGradeForTesting(+li.dataset.g); });
 $('prog').addEventListener('click', e=>{ if(e.target === $('prog')) openProg(false); });
 $('menuclose').addEventListener('click', ()=>openMenu(false));
 $('menu').addEventListener('click', e=>{ if(e.target === $('menu')) openMenu(false); });
