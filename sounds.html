@@ -14,93 +14,97 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
   .card h2{margin:0 0 2px;font-size:18px}
   .card small{display:block;color:var(--muted);margin-bottom:10px}
-  .row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .row{display:flex;flex-wrap:wrap;gap:8px}
   button{font:600 14px system-ui,sans-serif;border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:9px 12px;cursor:pointer}
   button:active{transform:scale(.97)}
   button.seq{background:var(--accent);border-color:var(--accent);color:#fff}
 </style>
 </head>
 <body>
-<h1>Pick the table sounds</h1>
-<p>Tap to listen. Tell me a letter for the whole set, or mix them per sound (e.g. "strike C, pocket A, rail B").</p>
-<div class="grid" id="grid"></div>
+<h1>Cut Trainer sounds</h1>
+<p>The sounds the trainer plays now. Tap to listen.</p>
+<div class="grid">
+  <div class="card"><h2>Shot</h2><small>Two sounds per shot: the contact, then what the object ball does</small>
+    <div class="row">
+      <button data-p="click">Contact</button><button data-p="drop">Pocket</button><button data-p="rail">Rail</button><button data-p="jaw">Jaw</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="seq" data-p="make">▶ Make</button><button class="seq" data-p="miss">▶ Miss</button><button class="seq" data-p="jawshot">▶ Jaw rattle</button>
+    </div>
+  </div>
+  <div class="card"><h2>Streaks &amp; grades</h2><small>The only chimes left; a streak chime plays instead of the shot sounds</small>
+    <div class="row">
+      <button data-p="streak">Streak</button><button data-p="streakEnd">Streak over</button><button data-p="levelup">Level up</button><button data-p="leveldown">Down a grade</button>
+    </div>
+  </div>
+</div>
 <script>
-let ctx = null, noiseBuf = null;
-function ac(){ if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); } if(ctx.state==='suspended') ctx.resume(); return ctx; }
-function noise(){ if(!noiseBuf){ noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = Math.random()*2-1; } return noiseBuf; }
-function bus(echo){
-  const g = ctx.createGain(); g.gain.value = .55;
-  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
-  g.connect(lp); lp.connect(ctx.destination);
-  if(echo){ const d = ctx.createDelay(); d.delayTime.value = .08; const fb = ctx.createGain(); fb.gain.value = echo; lp.connect(d); d.connect(fb); fb.connect(d); d.connect(ctx.destination); }
-  return g;
+// Copied from index.html so this page plays exactly what the trainer plays.
+let actx = null, noiseBuf = null;
+function audioCtx(){ if(!actx){ const AC = window.AudioContext || window.webkitAudioContext; try{ actx = new AC({latencyHint:'interactive'}); }catch(e){ actx = new AC(); } } if(actx.state === 'suspended') actx.resume(); return actx; }
+const semis = (f, n)=>f*Math.pow(2, n/12);
+function noise(){ if(!noiseBuf){ noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate); const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = Math.random()*2 - 1; } return noiseBuf; }
+function sfxNoise(out, at, dur, type, freq, q, gain){
+  const t = actx.currentTime + at, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  src.buffer = noise(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(out); src.start(t, Math.random()*0.5); src.stop(t + dur + 0.02);
 }
-function tn(o, at, dur, f0, f1, gain, type){
-  const t = ctx.currentTime + at, osc = ctx.createOscillator(), g = ctx.createGain();
-  osc.type = type || 'sine'; osc.frequency.setValueAtTime(f0, t); if(f1) osc.frequency.exponentialRampToValueAtTime(f1, t + dur);
-  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + .004); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  osc.connect(g).connect(o); osc.start(t); osc.stop(t + dur + .02);
+function sfxTone(out, at, dur, f0, f1, gain, type){
+  const t = actx.currentTime + at, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(f0, t); if(f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
-function nz(o, at, dur, type, freq, q, gain){
-  const t = ctx.currentTime + at, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
-  s.buffer = noise(); f.type = type; f.frequency.value = freq; f.Q.value = q;
-  g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-  s.connect(f).connect(g).connect(o); s.start(t, Math.random()*.5); s.stop(t + dur + .02);
-}
-const SETS = {
-  A: {name:'A · Arcade (in the trainer now, no strike)', note:'Pitched blips with a light echo', echo:.16, sfx:{
-    strike:(o,t)=>{ tn(o,t,.075,330,140,.9,'triangle'); nz(o,t,.02,'bandpass',3000,1,.3); },
-    click:(o,t)=>{ tn(o,t,.12,1175,0,.55); tn(o,t,.08,1760,0,.3); tn(o,t,.025,2349,0,.12,'triangle'); },
-    drop:(o,t)=>{ tn(o,t,.14,405,127,.8,'triangle'); tn(o,t+.13,.26,784,0,.45); },
-    rail:(o,t)=>{ nz(o,t,.08,'lowpass',500,.9,.6); tn(o,t,.1,140,90,.6); },
-    jaw:(o,t)=>{ tn(o,t,.06,430,300,.6,'triangle'); tn(o,t+.08,.28,220,90,.55); },
-  }},
-  B: {name:'B · Soft pop', note:'Round, gentle bubbles, easy on the ears', echo:.12, sfx:{
-    strike:(o,t)=>{ tn(o,t,.09,420,210,.8); },
-    click:(o,t)=>{ tn(o,t,.1,880,1100,.6); tn(o,t+.01,.08,1320,0,.25); },
-    drop:(o,t)=>{ tn(o,t,.16,700,240,.7); tn(o,t+.16,.12,660,990,.5); tn(o,t+.26,.25,1320,0,.4); },
-    rail:(o,t)=>{ tn(o,t,.2,300,150,.7); },
-    jaw:(o,t)=>{ tn(o,t,.07,500,380,.5); tn(o,t+.09,.07,440,330,.45); tn(o,t+.18,.25,260,130,.5); },
-  }},
-  C: {name:'C · Retro 8-bit', note:'Square-wave chiptune, like an old console', echo:0, sfx:{
-    strike:(o,t)=>{ tn(o,t,.06,200,90,.35,'square'); },
-    click:(o,t)=>{ tn(o,t,.05,1200,1800,.28,'square'); },
-    drop:(o,t)=>{ tn(o,t,.08,660,0,.28,'square'); tn(o,t+.08,.08,880,0,.28,'square'); tn(o,t+.16,.18,1320,0,.28,'square'); },
-    rail:(o,t)=>{ tn(o,t,.16,220,70,.32,'square'); },
-    jaw:(o,t)=>{ tn(o,t,.05,300,0,.28,'square'); tn(o,t+.07,.05,260,0,.28,'square'); tn(o,t+.14,.25,180,60,.3,'square'); },
-  }},
-  D: {name:'D · Wood & felt', note:'Muted, woody knocks; the least musical', echo:.08, sfx:{
-    strike:(o,t)=>{ nz(o,t,.04,'bandpass',1800,2,.6); tn(o,t,.05,240,160,.5,'triangle'); },
-    click:(o,t)=>{ tn(o,t,.06,1900,1700,.5,'triangle'); nz(o,t,.02,'highpass',2500,.7,.35); },
-    drop:(o,t)=>{ tn(o,t,.12,300,140,.7,'triangle'); nz(o,t+.03,.15,'lowpass',500,.8,.35); tn(o,t+.14,.18,180,90,.5); },
-    rail:(o,t)=>{ nz(o,t,.08,'lowpass',500,.9,.6); tn(o,t,.1,140,90,.6); },
-    jaw:(o,t)=>{ nz(o,t,.04,'bandpass',900,2,.5); tn(o,t,.06,260,200,.45,'triangle'); nz(o,t+.07,.05,'bandpass',800,2,.4); tn(o,t+.12,.16,150,90,.4); },
-  }},
-  F: {name:'F · Few notes', note:'Warm tones: 1 strike, 1 contact, 3 pocket, 1 rail, 2 jaw', echo:.1, sfx:{
-    strike:(o,t)=>{ tn(o,t,.08,226,143,.7,'triangle'); },
-    click:(o,t)=>{ tn(o,t,.07,1397,1250,.45); },
-    drop:(o,t)=>{ tn(o,t,.1,293.66,0,.5,'triangle'); tn(o,t+.09,.1,392,0,.5,'triangle'); tn(o,t+.18,.26,493.88,0,.55,'triangle'); },
-    rail:(o,t)=>{ tn(o,t,.2,202,101,.7); },
-    jaw:(o,t)=>{ tn(o,t,.07,393,333,.55,'triangle'); tn(o,t+.09,.24,238,131,.6); },
-  }},
-  E: {name:'E · Punchy', note:'Arcade, but with more thump and a bigger payoff', echo:.2, sfx:{
-    strike:(o,t)=>{ tn(o,t,.09,180,60,1,'sine'); nz(o,t,.03,'bandpass',2500,1,.45); },
-    click:(o,t)=>{ tn(o,t,.14,2093,0,.5); tn(o,t,.1,3136,0,.25); nz(o,t,.015,'highpass',4000,.7,.35); },
-    drop:(o,t)=>{ tn(o,t,.18,500,120,.9,'triangle'); tn(o,t+.15,.12,784,0,.4); tn(o,t+.22,.12,1046.5,0,.4); tn(o,t+.29,.35,1568,0,.45); },
-    rail:(o,t)=>{ tn(o,t,.25,200,70,.9); nz(o,t,.06,'lowpass',400,.8,.5); },
-    jaw:(o,t)=>{ tn(o,t,.07,520,340,.6,'triangle'); tn(o,t+.09,.07,460,300,.55,'triangle'); tn(o,t+.18,.35,200,60,.7); },
-  }},
+const SFX = {
+  click:  (o, t, v)=>{ sfxTone(o, t, .12, 1175, 0, .55*v); sfxTone(o, t, .08, 1760, 0, .3*v); sfxTone(o, t, .025, 2349, 0, .12*v, 'triangle'); },
+  drop:   (o, t, v)=>{ sfxTone(o, t, .14, 405, 127, .8*v, 'triangle'); sfxTone(o, t + .13, .26, 784, 0, .45); },
+  rail:   (o, t, v)=>{ sfxNoise(o, t, .08, 'lowpass', 500, .9, .6*v); sfxTone(o, t, .1, 140, 90, .6*v); },
+  jaw:    (o, t, v)=>{ sfxTone(o, t, .06, 430, 300, .6*v, 'triangle'); sfxTone(o, t + .08, .28, 220, 90, .55*v); },
 };
-const ONE = [['strike','Strike'],['click','Contact'],['drop','Pocket'],['rail','Rail'],['jaw','Jaw']];
-function play(set, seq){ ac(); const o = bus(SETS[set].echo); seq.forEach(([t,k])=>SETS[set].sfx[k](o, t)); }
-document.getElementById('grid').innerHTML = Object.entries(SETS).map(([k,v])=>`<div class="card"><h2>${v.name}</h2><small>${v.note}</small>
-  <div class="row">${ONE.map(([s,l])=>`<button data-set="${k}" data-one="${s}">${l}</button>`).join('')}</div>
-  <div class="row"><button class="seq" data-set="${k}" data-seq="make">▶ Make</button><button class="seq" data-set="${k}" data-seq="miss">▶ Miss</button><button class="seq" data-set="${k}" data-seq="jaw">▶ Jaw rattle</button></div></div>`).join('');
-const SEQ = {make:[[0,'strike'],[.35,'click'],[.9,'drop']], miss:[[0,'strike'],[.35,'click'],[.95,'rail']], jaw:[[0,'strike'],[.35,'click'],[.9,'jaw']]};
-document.getElementById('grid').addEventListener('click', e=>{
+function tableSounds(plan){
+  audioCtx();
+  const bus = actx.createGain(); bus.gain.value = 0.55;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 7000;
+  const dly = actx.createDelay(); dly.delayTime.value = 0.08; const fb = actx.createGain(); fb.gain.value = 0.16;
+  bus.connect(lp); lp.connect(actx.destination); lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(actx.destination);
+  plan.forEach(([t, kind])=>SFX[kind](bus, t, 1));
+}
+function audioOut(level){
+  audioCtx();
+  const out = actx.createGain(); out.gain.value = level;
+  const dly = actx.createDelay(); dly.delayTime.value = 0.09;
+  const fb = actx.createGain(); fb.gain.value = 0.18;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5500;
+  out.connect(lp); lp.connect(actx.destination); lp.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(actx.destination);
+  return out;
+}
+function tone(out, freq, at, dur, gain, glideTo){
+  const t = actx.currentTime + at;
+  [[1, 1], [2, 0.12]].forEach(([mult, amp])=>{
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(freq*mult, t);
+    if(glideTo) o.frequency.exponentialRampToValueAtTime(glideTo*mult, t + dur*0.8);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(gain*amp, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.05);
+  });
+}
+const CHIMES = {
+  streak: ()=>{ const o = audioOut(0.2), r = 659.25; [0, 4, 7, 12].forEach((n,i)=>tone(o, semis(r, n), i*0.055, i===3 ? 0.42 : 0.2, i===3 ? 1 : 0.85)); },
+  streakEnd: ()=>{ const o = audioOut(0.22); [12, 7, 3, 0].forEach((n,i)=>tone(o, semis(440, n), i*0.09, i===3 ? 0.55 : 0.22, 0.85, i===3 ? semis(440,-2) : 0)); },
+  levelup: ()=>{ const o = audioOut(0.2), C = 523.25; [[0,0,.15],[.13,4,.15],[.26,7,.15],[.39,12,.34],[.78,7,.15],[.93,12,1.5],[.93,16,1.5],[.93,19,1.5]].forEach(([t,n,d])=>tone(o, semis(C,n), t, d, n > 12 ? 0.55 : 0.9)); },
+  leveldown: ()=>{ const o = audioOut(0.2); [[0,7,.22],[.2,3,.22],[.4,0,.7]].forEach(([t,n,d])=>tone(o, semis(392,n), t, d, 0.8)); },
+};
+const PLAYS = {
+  click: [[0,'click']], drop: [[0,'drop']], rail: [[0,'rail']], jaw: [[0,'jaw']],
+  make: [[0,'click'],[.6,'drop']], miss: [[0,'click'],[.6,'rail']], jawshot: [[0,'click'],[.6,'jaw']],
+};
+document.addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
-  if(b.dataset.one) play(b.dataset.set, [[0, b.dataset.one]]);
-  else play(b.dataset.set, SEQ[b.dataset.seq]);
+  const k = b.dataset.p;
+  if(PLAYS[k]) tableSounds(PLAYS[k]); else if(CHIMES[k]){ audioCtx(); CHIMES[k](); }
 });
 </script>
 </body>
