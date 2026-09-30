@@ -1875,8 +1875,9 @@ function rollOut(v0){
   const v = t => t <= ts ? v0 - MU_G*t : Math.max(0, v1 - A_ROLL*(t-ts));
   return {x, tFor, v, stop: ds + dr, ts, v1};
 }
-// ---------- the cue ball, simulated: hit at centre, it slides, friction builds roll; after contact it keeps that roll,
+// ---------- the cue ball, simulated: hit 2/5 of a radius above centre it rolls from the start; after contact it keeps that roll,
 // so its path bends forward off the tangent line before it rolls straight (the natural-roll path) ----------
+const CUE_TIP = [0, .4];   // where the tip strikes, in radii from centre (x right, y up): natural roll
 const I3 = [[1,0,0],[0,1,0],[0,0,1]];
 function matRot(M, k, a){   // rotation by a about unit axis k, applied after M
   const c = Math.cos(a), sn = Math.sin(a), C = 1 - c, [x, y, z] = k;
@@ -1884,15 +1885,11 @@ function matRot(M, k, a){   // rotation by a about unit axis k, applied after M
   return Rm.map(row=>[0,1,2].map(j=>row[0]*M[0][j] + row[1]*M[1][j] + row[2]*M[2][j]));
 }
 const matVec = (M, v) => M.map(row=>row[0]*v[0] + row[1]*v[1] + row[2]*v[2]);
-function tipSpeed(Vc, d1){   // how hard it's hit so it arrives at the object ball at Vc
-  let lo = Vc, hi = Vc + 600;
-  for(let i=0;i<40;i++){ const mid = (lo+hi)/2, m = rollOut(mid); if(m.stop < d1 || m.v(m.tFor(d1)) < Vc) lo = mid; else hi = mid; }
-  return hi;
-}
+function tipSpeed(Vc, d1){ return Math.sqrt(Vc*Vc + 2*A_ROLL*d1); }   // how hard it's hit so it arrives rolling at the object ball at Vc
 function simCue(s, g2, withSpin){
   const cb0 = s.cb, n2 = norm(sub(s.ob, g2)), d1 = len(sub(g2, cb0)), dA = d1 > 1e-6 ? mul(sub(g2, cb0), 1/d1) : [0,1];
   const Vc = contactSpeed(s), v0 = tipSpeed(Vc, d1), dt = withSpin ? 1/240 : 1/100;
-  let p = [...cb0], v = mul(dA, v0), rv = [0,0], t = 0, contact = d1 < 1e-6, T1 = 0, M = I3, rail = false;
+  let p = [...cb0], v = mul(dA, v0), rv = mul(dA, v0), t = 0, contact = d1 < 1e-6, T1 = 0, M = I3, rail = false;
   const pts = [{t:0, p:[...p], M}];
   for(let k=0; k<6000; k++){
     // friction: while the ball slides (its speed and its spin disagree), it slows and its spin catches up; then it rolls
@@ -1932,7 +1929,7 @@ function animateShot(oc, done, obCol){
   const s = shot, cb0 = s.cb, ob0 = s.ob, g2 = oc.g2;
   const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
   const toPocket = dot(sub(s.P.t, ob0), oc.u2);
-  // the cue ball, simulated from the tip to where it stops: slide, roll, the hit, and its curving path after
+  // the cue ball, simulated from the tip to where it stops: rolling, the hit, and its curving path after
   const sim = simCue(s, g2, true), pts = sim.pts, T1 = sim.T1, tEnd = sim.end.t;
   const Vc = contactSpeed(s), cosTrue = Math.cos(s.theta*RAD);
   // after contact the object ball leaves along the line of centres at Vc·cos(cut), with no spin: it slides, then rolls
@@ -2006,10 +2003,10 @@ function finishAnim(){
 function showResult(){
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(shot)}${tipSVG(shot)}</div>`;   // the diagrams speak for themselves
 }
-// where the cue tip struck the cue ball, seen from behind it (centre ball for now)
+// where the cue tip struck the cue ball, seen from behind it
 function tipSVG(s){
-  const tip = s.tip || [0, 0], lab = !tip[0] && !tip[1] ? 'Centre' : '';
-  return `<svg viewBox="-1.5 -2.45 3 4.9" aria-label="Cue ball struck at ${lab.toLowerCase() || 'an offset'}">
+  const tip = s.tip || CUE_TIP, lab = !tip[0] && !tip[1] ? 'Centre' : !tip[0] && Math.abs(tip[1] - .4) < .01 ? 'Rolling' : '';
+  return `<svg viewBox="-1.5 -2.45 3 4.9" aria-label="Cue tip: ${lab || 'offset'}">
     <rect x="-1.5" y="-2.45" width="3" height="4.9" rx=".35" fill="#1f5f96"/>
     <text x="0" y="-1.72" font-size=".56" text-anchor="middle" fill="#ffffff" font-family="Barlow Condensed, sans-serif" font-weight="700">${lab}</text>
     <defs><radialGradient id="tipg" cx="40%" cy="36%" r="70%"><stop offset="0" stop-color="#ffffff"/><stop offset=".7" stop-color="#efe9d8"/><stop offset="1" stop-color="#cfc6ae"/></radialGradient></defs>
