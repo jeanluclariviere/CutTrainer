@@ -767,7 +767,7 @@ const GRADE_FROM = [0,30,35,40,45,50,55,60,66,72,78,84];   // baseline % for eac
 // Each aid: forced on, then fading away (after a delay, in ms), then gone for good and yours to switch on as practice.
 const AIDS = {
   ghost:  {name:'Ghost ball', fade:{4:3000, 5:1500}, goneAt:6, tip:'Shows where the cue ball has to be at contact.'},
-  line:   {name:'Aim line',   fade:{1:3000, 2:1500}, goneAt:3, tip:'A line drawn from the cue ball along the shot line, to the ghost ball.'},
+  line:   {name:'Aim line',   fade:{1:1500, 2:750}, goneAt:3, tip:'A line drawn from the cue ball along the shot line, to the ghost ball.'},
   stance: {name:'Aim-line stance', fade:{},          goneAt:7, tip:'You look from directly behind the cue, on the line it travels, so the overlap is plain to see. From the ball line you stand behind the cue ball instead, as in a real read.'},
 };
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
@@ -813,11 +813,11 @@ function enforceLocks(){
   if(fastFlashLocked() && settings.flash==='750'){ settings.flash = '1500'; saveSettings(); }
 }
 // what reaching each grade brings (first time only for aids going away)
-const LADDER_UP = {1:'Aim line fades after 3 s', 2:'Aim line fades after 1.5 s', 3:'Aim line gone: now an optional aid',
+const LADDER_UP = {1:'Aim line fades after 1.5 s', 2:'Aim line fades after 0.75 s', 3:'Aim line gone: now an optional aid',
   4:'👻 Ghost ball fades after 3 s', 5:'👻 Ghost ball fades after 1.5 s', 6:'Ghost ball gone: now an optional aid',
   7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'💨 Speed & throw', 10:'All three speeds',
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
-const LADDER_TEXT = ['Aim line, ghost ball and aim-line stance all on', 'Aim line fades after 3 s', 'Aim line fades after 1.5 s', 'Aim line gone: now an optional aid',
+const LADDER_TEXT = ['Aim line, ghost ball and aim-line stance all on', 'Aim line fades after 1.5 s', 'Aim line fades after 0.75 s', 'Aim line gone: now an optional aid',
   'Ghost ball fades after 3 s', 'Ghost ball fades after 1.5 s', 'Ghost ball gone: now an optional aid', 'Ball line: read it from behind the cue ball',
   'Any angle', 'Speed & throw, medium speed', 'All three speeds', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
@@ -2038,7 +2038,7 @@ function syncPressed(){
   $('task-flash').title = hasBaseline() ? '' : 'Unlocks after your baseline';
   // aids: forced / fading ones show as on and can't be changed; earned ones are yours to switch
   const SCHED = {
-    line: 'F: always on. D-: fades after 3 s. D: after 1.5 s. From D+ it is yours to switch on; shots with it on are practice.',
+    line: 'F: always on. D-: fades after 1.5 s. D: after 0.75 s. From D+ it is yours to switch on; shots with it on are practice.',
     ghost: 'Up to D+: always on. C-: fades after 3 s. C: after 1.5 s. From C+ it is yours to switch on; shots with it on are practice.',
     stance: 'Up to C+: you stand on the aim line. From B- you read from the ball line; the aim-line stance is yours to switch on, as practice.',
   };
