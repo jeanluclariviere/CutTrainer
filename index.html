@@ -775,7 +775,7 @@ function generate(){
     }
     if(!outcome(cand, cut).made) continue;                // the right call has to drop
     if(!fallback) fallback = cand;
-    if(cand.any && !phys && !outcome(cand, cand.answer.deg).made) continue;   // any angle: only cuts the plain fraction still pockets
+    if(cand.any && !phys && level() < BETWEEN_AT && !outcome(cand, cand.answer.deg).made) continue;   // any angle (B): only cuts the plain fraction still pockets; from B+ any cut at all
     if(cueScratches(cand)) continue;                   // don't deal shots where the cue ball rolls into a pocket
     if(Math.abs(u[0]) > 0.85 && dist > W*0.55) continue;   // no long runs across the table along an end rail: that layout only ever came up as a thin cut, so it gave the answer away
     if(pocketInView(cand)) return cand;
@@ -799,7 +799,8 @@ const AIDS = {
   stance: {name:'Aim-line stance', fade:{},          goneAt:7, tip:'You look from directly behind the cue, on the line it travels, so the overlap is plain to see. From the ball line you stand behind the cue ball instead, as in a real read.'},
 };
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
-const PHYS_AT = 9;                                           // B+: cuts between fractions, called with thick / center / thin
+const PHYS_AT = 99;                                          // thick / center / thin as part of the call: retired (too fine a judgement); B+ gives it as feedback instead
+const BETWEEN_AT = 9;                                        // B+: cuts between fractions; you call the nearest, the result says which way to nudge
 const THROW_AT = 99;                                         // throw joins the call later (A-, with its own explainer); off until then
 const SHOT_SPEED = 'medium';   // pocket speed: throw as for a medium-soft hit                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
 const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
@@ -853,10 +854,10 @@ const LADDER_UP = {1:'Guide line fades after 1.5 s', 2:'Guide line fades after 0
   11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
 const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide line fades after 1.5 s', 'Guide line fades after 0.75 s', 'Guide line gone',
   'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone', 'Ball line: read it from behind the cue ball',
-  'Any angle', 'Between fractions: thick, center or thin', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+  'Any angle', 'Between fractions: call the nearest', 'Harder dealing', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 127;   // one per commit to main
+const BUILD = 128;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -881,7 +882,7 @@ function renderProgress(){
     return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
   }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
 }
-const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'No more thick & thin', 11:'🔒 0.75 s Flash'};
+const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 11:'🔒 0.75 s Flash'};
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = stats.level;
   L.pts += ok ? PT_RIGHT : PT_WRONG;
@@ -2574,19 +2575,17 @@ const BSTEPS = [
   {deg:35, mustMiss:30, aids:{stance:1, ghost:1, line:1}, next:true,
    text:'You’re at <b>B+</b>. From here, some cuts don’t sit on a fraction. Here’s one.'},
   {aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
-   text:'Up close: the ghost ball covers <b>a bit less than half</b> of the object ball. Between ½ and ¼, closer to ½.'},
+   text:'Up close: the ghost ball covers <b>a bit less than half</b> of the object ball. It’s nearest to <b>½</b>.'},
   {aids:{stance:1, ghost:1}, demo:30, next:true,
    text:'Hit it as a plain <b>½</b> and it goes a little full. Watch it miss.'},
   {aids:{stance:1, ghost:1}, demo:'right', next:true,
-   text:'Take a touch less ball, <b>½ thin</b>, and it drops.'},
-  {aids:{}, next:true,
-   text:'So from B+ a call has two parts: the fraction it’s closest to, then <b>thick</b> (a bit more ball than that fraction), <b>center</b> (just the fraction) or <b>thin</b> (a bit less ball).'},
+   text:'Take a touch less ball than ½ and it drops.'},
   {finish:true, aids:{},
-   text:'Thick and thin are always measured from the fraction you name. When a cut sits right between two, either name counts: <b>½ thin</b> is the same hit as <b>¼ thick</b>.'},
+   text:'You still just call the <b>nearest fraction</b>: ½ here is right. When the plain fraction would miss, the result tells you which way to nudge it, <b>a touch thinner</b> or <b>a touch fuller</b>.'},
 ];
 const LESSONS = {
   intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
-  between: {name:'Between fractions: thick & thin', at:PHYS_AT, steps:BSTEPS},
+  nudge: {name:'Between fractions', at:BETWEEN_AT, steps:BSTEPS},
 };
 const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
 const tstep = () => tsteps()[tut.i];
