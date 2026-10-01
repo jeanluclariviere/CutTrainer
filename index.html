@@ -910,7 +910,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 158;   // one per commit to main
+const BUILD = 159;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -3322,6 +3322,11 @@ function applyStance(){
   const back = Math.max(24, Math.min(48, +settings.standBack || 30));
   // reading a shot you lean in a little: eyes about 0.86 of your height off the floor
   VIEWS.stand.h = Math.max(14, hc/2.54*0.86 - BED); VIEWS.stand.back = back;
+  // down on the shot, a pool stance (not snooker's chin on the cue): chin 1–2" over the cue, eyes straight over it.
+  // The bridge sits a forearm minus 1¼" from the cue ball; the eyes are about a fifth of your height behind the bridge.
+  const H = hc/2.54, CUE_Z = 2.5, CHIN_GAP = 1.5;
+  VIEWS.down.h = CUE_Z + CHIN_GAP + 0.065*H;          // chin to eyes is about 6.5% of your height: ~9" up at 175 cm
+  VIEWS.down.back = (0.146*H - 1.25) + 0.2*H;          // ~23" back at 175 cm
   const ft = Math.floor(hc/2.54/12), inch = Math.round(hc/2.54 - ft*12);
   $('heightval').textContent = $('st-heightval').textContent = `${ft}′${inch}″ · ${hc} cm`; $('backval').textContent = $('st-backval').textContent = `${back}″`;
   $('heightrange').value = $('st-height').value = hc; $('backrange').value = $('st-back').value = back;
