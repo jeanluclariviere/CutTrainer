@@ -1,0 +1,5 @@
+#!/bin/sh
+# Bump the build number shown in #dev on every commit.
+f=index.html
+[ -f "$f" ] || exit 0
+perl -pi -e 's/const BUILD = (\d+)/"const BUILD = ".($1+1)/e' "$f" && git add "$f"
