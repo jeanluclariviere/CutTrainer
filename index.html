@@ -135,6 +135,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .shootctl{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;align-items:center;margin:8px 0}
 .tippad{display:flex;flex-direction:column;align-items:center;gap:4px;touch-action:none}
 .tippad svg{width:96px;height:96px;cursor:crosshair}
+.ckeys{display:flex;gap:2px}.ckeys kbd,#tipcentre kbd{font:600 10px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;border:1px solid #cfc6ae}
+@media (hover:none){.ckeys,#tipcentre kbd{display:none}}
 .tippad small{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .modes button{font-size:15px;padding:9px 14px}
 .quick{flex-direction:column;align-items:flex-start;gap:2px;min-height:66px}
@@ -486,7 +488,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
         <div class="speedchip" id="speedchip" hidden></div>
         <div class="routinechip" id="routinechip" hidden></div>
-        <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b></div>
+        <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
       </div>
@@ -522,7 +524,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="shootctl" id="shootctl" hidden>
         <div class="tippad" id="tippad" hidden><small>Tip</small>
           <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".1" stroke="#1b6fd1" stroke-opacity=".5" stroke-width=".02" stroke-dasharray=".06 .05"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
-          <button class="link" id="tipcentre">Centre</button>
+          <span class="ckeys" id="tipkeys"></span><button class="link" id="tipcentre">Centre <kbd>X</kbd></button>
         </div>
         <div class="freebtns" id="freebtns" hidden><button class="sumdone" id="freereset">Reset balls</button><button class="sumdone" id="freenew">New layout</button><small>Drag a ball to move it · tap a pocket to aim for it</small></div>
       </div>
@@ -905,7 +907,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 138;   // one per commit to main
+const BUILD = 139;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1070,7 +1072,6 @@ function shootDeal(){
   return finishDeal(best || generate());
 }
 function finishDeal(s){
-  s.place = add(s.ob, mul(norm(sub(s.cb, s.ob)), 2*R));   // aim starts straight at the object ball
   s.cam = {phase: 'stand', k: 0};
   return s;
 }
@@ -1103,7 +1104,7 @@ function renderRoutineChip(){
 }
 // The Shoot camera: standing on the ball line, standing behind your aim line, or down on your aim line, blended by the routine.
 function shootCam(s, view){
-  const aim = norm(sub(s.place || s.gb, s.cb)), d = norm(sub(s.ob, s.cb));
+  const d = norm(sub(s.ob, s.cb)), aim = d;   // no aiming of your own for now: you get down on the ball line, so the camera never gives the cut away
   const stand = camAlong(s, d, VIEWS.stand), standAim = camAlong(s, aim, VIEWS.stand), down = camAlong(s, aim, VIEWS.down);
   const c = s.cam || {phase:'stand', k:0};
   const mix = (A, B, k) => camFrom(A.E.map((x, i)=>x + (B.E[i]-x)*k), norm3(A.f.map((x, i)=>x + (B.f[i]-x)*k)), A.hfov + (B.hfov - A.hfov)*k);
@@ -1141,6 +1142,7 @@ function renderShootControls(){
     const t = shotStroke(shot || {}).tip || [0,0];
     $('tipdot').setAttribute('cx', (t[0]).toFixed(2)); $('tipdot').setAttribute('cy', (-t[1]).toFixed(2));
     $('tiplimit').setAttribute('d', tipLimitPath(c));
+    $('tipkeys').innerHTML = [c.up && 'W', c.side && 'A', c.down && 'S', c.side && 'D'].filter(Boolean).map(k=>`<kbd>${k}</kbd>`).join('');
   }
 }
 function tipLimitPath(c){   // the part of the cue ball you're allowed to strike, outlined
@@ -1221,7 +1223,7 @@ function takeShot(id){
   const bits = [];
   if(!ok) bits.push(`It was <b>${lab(right)}</b>`);
   if(run.scratch) bits.push('Scratch: the cue ball went in');
-  else if(!run.hit) bits.push('Missed the object ball');
+  else if(!run.hit) bits.push(run.scratch ? 'Missed the object ball' : 'Too soft to reach it');
   else if(!run.made) bits.push(run.obIn ? 'Wrong pocket' : 'Missed the pocket');
   if(s.zone && run.made && !run.scratch) bits.push(run.inZone ? 'In the zone' : `Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
   if(ctrl().speed) bits.push(`Speed ${speedLevel()} <small>· ideal ${levelForSpeed(idealV)}</small>`);
@@ -1247,7 +1249,6 @@ function rebuildShot(s){
   s.sign = cr >= 0 ? -1 : 1;
   s.theta = Math.acos(Math.max(-1, Math.min(1, dot(v, uC))))/RAD; s.pathDeg = s.theta;
   s.answer = nearestRef(s.theta); s.tol = pocketTol(P, uC); s.strk = null; s.zone = null;
-  s.place = add(s.ob, mul(norm(sub(s.cb, s.ob)), 2*R));
 }
 
 // the ladder you're playing: Shoot sessions climb the Shoot ladder, everything else the Read ladder
@@ -1925,8 +1926,8 @@ function endFlash(){ clearTimeout(flashTimer); $('cover').hidden = true; $('flas
 
 // ---------- round ----------
 const PLACEHOLDER = `How full do you hit the object ball?`;
-const PLACE_HINT = `Set your stroke first: speed <kbd>↑</kbd> <kbd>↓</kbd>, tip <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> (<kbd>X</kbd> centres it). Then call the fraction, <kbd>1</kbd>–<kbd>5</kbd>: the call takes the shot.`;
-const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?', shoot:'Aim it, then shoot.', free:'Set it up, aim it, shoot.'};
+const PLACE_HINT = `Tap or drag around the object ball to set the ghost ball. Fine-tune with the arrows, then Shoot. Keys <kbd>←</kbd> <kbd>→</kbd> nudge, <kbd>Enter</kbd> shoots.`;
+const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?', shoot:'How full do you hit the object ball?', free:'How full do you hit the object ball?'};
 const tableBox = document.querySelector('.table-box');
 
 function packShot(s){
@@ -1970,7 +1971,7 @@ function deal(){
   $('mods').hidden = !shot.phys;
   const sc = $('speedchip'); sc.hidden = true;   // no speed shown for now: every shot is pocket speed if(shot.speed){ sc.textContent = SPEED_LABEL[shot.speed]; sc.className = 'speedchip ' + shot.speed; }
   $('result').innerHTML = '';
-  $('quick').innerHTML = `<div class="ql hint">${isShooting() ? PLACE_HINT : isPlace() ? PLACE_HINT : PLACEHOLDER}</div>`;
+  $('quick').innerHTML = `<div class="ql hint">${isPlace() ? PLACE_HINT : PLACEHOLDER}</div>`;
   tableBox.classList.remove('tappable');
   tableBox.classList.toggle('placing', isPlace());
   updateControls();
