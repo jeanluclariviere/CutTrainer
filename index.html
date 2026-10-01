@@ -227,6 +227,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .opt .seg button{padding:4px 10px;text-transform:none;letter-spacing:0}
 .main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
 .main.persp{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.dip{position:absolute;inset:0;z-index:4;background:#15100c;opacity:0;pointer-events:none;transition:opacity .15s ease-in}
+.dip.out{transition:opacity .2s ease-out}
 .table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
@@ -457,6 +459,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="tablecol">
       <div class="table-box">
         <canvas id="table3d" aria-hidden="true"></canvas>
+        <div class="dip" id="dip" aria-hidden="true"></div>
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
         <svg id="tablefx" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
         <div class="cover" id="cover" hidden>Call it<button class="replay" id="replay" aria-label="Replay the shot"><svg class="replayicon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.5 13.5a8.5 8.5 0 1 0 2.4-7.4L3 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3.5V9h5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">5 left</span></button></div>
@@ -916,7 +919,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 167;   // one per commit to main
+const BUILD = 168;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -2983,11 +2986,20 @@ $('nudge-l').addEventListener('click', ()=>nudge(-1));
 $('nudge-r').addEventListener('click', ()=>nudge(1));
 // Next shot: always straight to a new shot. A running animation is simply dropped (the shot still counts).
 let jumpingAhead = false;
+// Next shot: a quick blink through the dark room, not a hard cut (about 0.35 s)
+let dipping = false;
+function dip(fn){
+  const el = $('dip');
+  if(dipping) return;
+  if(!el || matchMedia('(prefers-reduced-motion: reduce)').matches){ fn(); return; }
+  dipping = true; el.classList.remove('out'); el.style.opacity = '1';
+  setTimeout(()=>{ try{ fn(); } finally { requestAnimationFrame(()=>{ el.classList.add('out'); el.style.opacity = '0'; dipping = false; }); } }, 150);
+}
 function nextShot(){
   if(tut.on){ tutNext(); return; }
   if(!answered || !$('endcover').hidden || cueStroke) return;
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
-  if($('sesscover').hidden) deal();
+  if($('sesscover').hidden) dip(deal);
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) (isShooting() ? takeShot() : shoot()); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
@@ -3025,7 +3037,7 @@ function walkRelease(){
 }
 svgEl.addEventListener('pointerup', walkRelease);
 svgEl.addEventListener('pointercancel', walkRelease);
-tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) deal(); });
+tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) dip(deal); });
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
 const MAX_REPLAYS = 5, REPLAY_WINDOW = 50;   // replays per 50 Flash shots
 function replaysLeft(){   // a rolling budget: 5 over your last 50 Flash shots (this one included)
@@ -3438,7 +3450,7 @@ document.addEventListener('keydown', e=>{
   else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1, e.shiftKey ? 6 : 1); e.preventDefault(); }
   else if(isShooting() && !answered && ctrl().speed && (e.key==='ArrowUp' || e.key==='ArrowDown')){ setSpeedLevel(speedLevel() + (e.key==='ArrowUp' ? 1 : -1)); e.preventDefault(); }
   else if(isShooting() && !answered && /^[wasdx]$/i.test(e.key) && !e.metaKey && !e.ctrlKey){ nudgeTip(e.key.toLowerCase()); e.preventDefault(); }
-  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ if(answered){ dip(deal); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
 if(!['stand','down'].includes(settings.view)) settings.view='stand';
