@@ -211,6 +211,23 @@ function make(canvas){
     }
   }
 
+  // ---------- the cue ball's target zone, on the cloth (under the balls, so a ball sitting in it hides it) ----------
+  const zone = new T3.Group(); world.add(zone); let zoneKey = '';
+  function setZone(z){   // z: {c:[x, y], r} or null
+    zone.visible = !!z; if(!z) return;
+    const key = z.r.toFixed(2);
+    if(key !== zoneKey){
+      zoneKey = key; zone.children.slice().forEach(m=>{ zone.remove(m); m.geometry.dispose(); });
+      const col = 0x5be0c8;
+      const fill = new T3.Mesh(new T3.CircleGeometry(z.r, 64), new T3.MeshBasicMaterial({color: col, transparent: true, opacity: .16, depthWrite: false, side: T3.DoubleSide}));
+      zone.add(fill);
+      const dashMat = new T3.MeshBasicMaterial({color: col, transparent: true, opacity: .9, depthWrite: false, side: T3.DoubleSide});
+      const n = Math.max(12, Math.round(2*Math.PI*z.r/1.6));   // dashes about 1" long with 0.6" gaps
+      for(let i = 0; i < n; i++){ const a0 = i/n*2*Math.PI; zone.add(new T3.Mesh(new T3.RingGeometry(z.r - .22, z.r + .22, 6, 1, a0, 2*Math.PI/n*.62), dashMat)); }
+    }
+    zone.position.set(z.c[0], z.c[1], .03);
+  }
+
   // ---------- frame ----------
   // cam: {E, f, focal}; vw, vh: the SVG viewBox size the camera's focal length is in
   function render(cam, vw, vh, pxW, pxH){
@@ -222,7 +239,7 @@ function make(canvas){
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
   }
-  return {build, setBalls, setArrow, render, renderer};
+  return {build, setBalls, setArrow, setZone, render, renderer};
 }
 root.Table3D = {make};
 })(typeof window !== 'undefined' ? window : this);

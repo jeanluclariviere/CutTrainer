@@ -960,7 +960,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 218;   // one per commit to main
+const BUILD = 219;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -1850,7 +1850,7 @@ function perspBack(cam, s, reveal, segs, ring){
 function perspDyn(cam, s, reveal){
   let o = '';
   // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
-  if(s.zone) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  if(s.zone && !G3) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
   if(isShooting() && !reveal && !s.anim && shootAid('path')){
     const pe = pocketEdge(s.ob, s.P, s.T);
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
@@ -2208,7 +2208,7 @@ function draw(reveal){
     const fx = $('tablefx');
     if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
-    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
+    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setZone(shot && shot.zone && settings.view !== 'top' ? shot.zone : null); setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
   }
 }
 // The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
