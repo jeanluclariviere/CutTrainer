@@ -889,7 +889,7 @@ function aidAlpha(key){
 const stanceAim = () => aidAlpha('stance') > 0;
 const physOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= PHYS_AT;
 const throwNow = () => tut.on ? tut.lesson === 'throw' : !isShooting() && adaptiveOn() && level()!==null && level() >= THROW_AT;
-const anyOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= ANY_AT;
+const anyOn = () => !tut.on && (isShooting() ? shootLevel() >= SH.any && (isFree() || adaptiveOn()) : adaptiveOn() && level()!==null && level() >= ANY_AT);   // on the ladder from its own step; Flash always
 const fastFlashLocked = () => ladderBest() < FAST_FLASH_GRADE;
 const AID_SET = {ghost:['ghost','0'], line:['line','0'], stance:['cam','line']};
 function aidsOffBelow(from, to){   // aids whose grade you've just reached for the first time start off
@@ -911,7 +911,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 145;   // one per commit to main
+const BUILD = 146;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -945,15 +945,15 @@ const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain f
 
 // ---------- the Shoot ladder ----------
 const SHOOT_GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S-','S','S+'];
-const SH = {noPath:1, noLine:2, noGhost:3, down:4, speed:7, path:8, stun:9, follow:10, draw:11, throw:12, cushion:13, english:14, all:15};
+const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:7, speed:8, throw:9, follow:10, stun:11, draw:12, cushion:13, english:14, all:15};
 const SHOOT_TEXT = [
   'Aim with the ghost ball, guide line and the object ball’s path', 'Object-ball path gone', 'Guide line gone', 'Ghost ball gone: aim from your own read',
   'Down on the shot: 5 s standing', 'Down on the shot: 4 s standing', 'Down on the shot: 3 s standing',
-  'Speed: you set it', 'Cue ball path: land it in the zone', 'Stun: stop it, or send it along the tangent line',
-  'Follow', 'Draw', 'Throw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english'];
+  'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
+  'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english'];
 const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot', 5:'Down on the shot: 4 s', 6:'Down on the shot: 3 s',
-  7:'🎚️ Speed · 🎱 Free play unlocked', 8:'🎯 Cue ball path · 0.75 s Flash', 9:'⏹️ Stun', 10:'⤴️ Follow', 11:'⤵️ Draw', 12:'🌀 Throw', 13:'↩️ Off a cushion', 14:'🌪️ English', 15:'🏆 Everything'};
-const SHOOT_DOWN = {3:'Ghost ball back', 4:'Standing, untimed', 7:'Speed set for you', 8:'No more zones', 10:'Tip back to centre', 14:'No more english'};
+  7:'📐 Any angle · 🎱 Free play unlocked', 8:'🎚️ Speed · 0.75 s Flash', 9:'🌀 Throw', 10:'⤴️ Follow · 🎯 Cue ball zones', 11:'⏹️ Stun', 12:'⤵️ Draw', 13:'↩️ Off a cushion', 14:'🌪️ English', 15:'🏆 Everything'};
+const SHOOT_DOWN = {3:'Ghost ball back', 4:'Standing, untimed', 7:'Fraction angles only', 8:'Speed set for you', 10:'No more zones · tip back to centre', 12:'No more draw', 14:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
 const ladderBest = () => stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0;
@@ -1006,7 +1006,7 @@ const fmtD = d => d < 10 ? (Math.round(d*2)/2).toString().replace('.5', '½').re
 function shotStroke(s){
   const c = ctrl(), g = shootLevel(), ideal = strikeOf(s);
   const V = c.speed ? speedFromDiamonds(speedSetting()) : ideal.V;
-  let tip = g < SH.path ? [0, ideal.b] : [0, 0];
+  let tip = g === SH.throw && !isFree() ? [0, -.35] : [0, ideal.b];   // the throw step plays soft stun for you: that's where throw shows most
   if(c.up || c.side){ const t = settings.shotTip || [0, 0]; tip = [c.side ? t[0] : 0, Math.max(c.down ? -0.6 : 0, Math.min(c.up ? 0.6 : 0, t[1]))]; }
   return {V, tip};
 }
@@ -1036,14 +1036,13 @@ function aimFor(s, stroke){
 
 // ---------- dealing ----------
 const STEP_STROKES = {   // the kind of stroke a step's zones are made from (the player can use any stroke they have)
-  [SH.path]:   s => ({tip:[0,0], k:[1.1, 2.4]}),
   [SH.stun]:   s => ({tip:[0,0], stun:true}),
   [SH.follow]: s => ({tip:[0, rnd(.3,.55)], k:[1.1, 2.2]}),
   [SH.draw]:   s => ({tip:[0, -rnd(.35,.6)], k:[1.6, 3.2]}),
   [SH.cushion]:s => ({tip:[0, rnd(-.2,.45)], k:[1.6, 3.2], cushion:true}),
   [SH.english]:s => ({tip:[(Math.random()<.5?-1:1)*rnd(.3,.5), rnd(-.2,.35)], k:[1.6, 3.2], cushion:true}),
 };
-function zoneStep(g){ if(g < SH.path || g === SH.throw) return null; if(g >= SH.all) return pick([SH.path, SH.stun, SH.follow, SH.draw, SH.cushion, SH.english]); return g === SH.cushion ? SH.cushion : g >= SH.english ? SH.english : g; }
+function zoneStep(g){ if(g < SH.follow) return null; if(g >= SH.all) return pick([SH.follow, SH.stun, SH.draw, SH.cushion, SH.english]); return g === SH.cushion ? SH.cushion : g >= SH.english ? SH.english : g; }
 // Deal a Shoot shot: any angle (the Read ladder's dealer), plus a target zone from a stroke that really gets there.
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
@@ -2971,7 +2970,7 @@ const TSTEPS_THROW = [
   {aids:{stance:1, ghost:1}, demo:'right', next:true,
    text:'A touch thinner, allowing for the throw, and it drops.'},
   {finish:true, aids:{},
-   text:'Throw is biggest <b>soft</b>, with <b>stun</b>, around a <b>half-ball</b> hit; top or back spin and pace cut it right down. From here it decides some shots: with a soft stun stroke a cut that looks ¾ can need ½.'},
+   text:'Throw is biggest <b>soft</b>, with <b>stun</b>, around a <b>half-ball</b> hit; top or back spin and pace cut it right down. On this step every shot is struck that way for you, so throw decides some of them: a cut that looks ¾ can need ½.'},
 ];
 // ---------- Shoot lessons ----------
 const SL_SHOOT = [
@@ -2998,23 +2997,29 @@ const SL_SPEED = [
   {aids:{}, play:{k:3.2, tip:[0,.4]}, next:true, text:'Much harder still goes, but the pocket gets less forgiving and the cue ball runs wild.'},
   {finish:true, aids:{}, text:'Full points from pocket speed up to about double. Harder than that scores nothing, either way. Your speed stays where you left it.'},
 ];
-const SL_PATH = [
-  {deg:30, aids:{}, play:{k:1.2, tip:[0,0]}, next:true,
-   text:'Now the cue ball has somewhere to be: land it in the <b>green zone</b>. The tip is at centre. Watch where a centre-ball hit goes.'},
-  {aids:{}, play:{k:2.4, tip:[0,0]}, next:true, text:'Same aim, more pace: a different place. Speed is your first tool for position.'},
-  {finish:true, aids:{}, text:'Pot it and stop in the zone for full points. Potting it but missing the zone scores nothing either way.'},
+const SL_ANY = [
+  {deg:35, aids:{stance:1, ghost:1, line:1}, next:true,
+   text:'From here cuts come at <b>any angle</b>, not just on a fraction. Here’s one.'},
+  {aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Up close: the ghost ball covers <b>a bit less than half</b> of the object ball. It’s nearest to <b>½</b>.'},
+  {aids:{stance:1, ghost:1}, demo:'right', next:true,
+   text:'Call the <b>nearest fraction</b>, ½ here, and the shot takes the touch less ball it needs. It drops.'},
+  {finish:true, aids:{},
+   text:'Always call the nearest fraction. No cut sits right between two: look again and it’s nearer one of them.'},
 ];
 const SL_STUN = [
   {deg:30, aids:{}, play:{k:2.6, tip:[0,0], stun:true}, next:true,
-   text:'<b>Stun</b>: hit centre, or a little below, firmly enough that the cue ball is still sliding when it arrives. With no spin it leaves along the <b>tangent line</b>, at right angles to the object ball.'},
+   text:'<b>Stun</b>: hit dead centre (<b>X</b>), firmly enough that the cue ball is still sliding when it arrives. With no spin it leaves along the <b>tangent line</b>, at right angles to the object ball.'},
   {deg:0, aids:{}, play:{k:2.6, tip:[0,0], stun:true}, next:true, text:'Straight in, the same stroke is a <b>stop shot</b>: the cue ball stays where it hit.'},
   {finish:true, aids:{}, text:'The farther the cue ball travels, the lower or harder you have to hit it for the backspin to last.'},
 ];
 const SL_FOLLOW = [
-  {deg:30, aids:{}, play:{k:1.6, tip:[0,.5]}, next:true,
+  {deg:30, aids:{}, play:{k:1.2, tip:[0,0]}, next:true,
+   text:'Now the cue ball has somewhere to be: land it in the <b>green zone</b>. A centre-ball hit goes about here.'},
+  {aids:{}, play:{k:1.6, tip:[0,.5]}, next:true,
    text:'<b>Follow</b>: strike above centre with the <b>tip pad</b> (or <b>W</b>). The topspin bends the cue ball forward off the tangent line after contact.'},
   {deg:0, aids:{}, play:{k:1.6, tip:[0,.5]}, next:true, text:'Straight in, it rolls on through after the object ball.'},
-  {finish:true, aids:{}, text:'More top, or more pace, carries it further forward.'},
+  {finish:true, aids:{}, text:'More top, or more pace, carries it further forward. Pot it and stop in the zone for full points; potting it but missing the zone scores nothing either way.'},
 ];
 const SL_DRAW = [
   {deg:30, aids:{}, play:{k:2.8, tip:[0,-.55]}, next:true,
@@ -3038,15 +3043,14 @@ const SL_ALL = [
 ];
 const LESSONS = {
   intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
-  nudge: {name:'Between fractions', at:BETWEEN_AT, steps:BSTEPS},
   shoot:   {name:'Shooting', at:0, track:'shoot', steps:SL_SHOOT},
   down:    {name:'Down on the shot', at:SH.down, track:'shoot', steps:SL_DOWN},
+  any:     {name:'Any angle', at:SH.any, track:'shoot', steps:SL_ANY},
   speed:   {name:'Speed', at:SH.speed, track:'shoot', steps:SL_SPEED},
-  path:    {name:'Cue ball path', at:SH.path, track:'shoot', steps:SL_PATH},
-  stun:    {name:'Stun', at:SH.stun, track:'shoot', steps:SL_STUN},
-  follow:  {name:'Follow', at:SH.follow, track:'shoot', steps:SL_FOLLOW},
-  draw:    {name:'Draw', at:SH.draw, track:'shoot', steps:SL_DRAW},
   throw:   {name:'Throw', at:SH.throw, track:'shoot', steps:TSTEPS_THROW},
+  follow:  {name:'Follow', at:SH.follow, track:'shoot', steps:SL_FOLLOW},
+  stun:    {name:'Stun', at:SH.stun, track:'shoot', steps:SL_STUN},
+  draw:    {name:'Draw', at:SH.draw, track:'shoot', steps:SL_DRAW},
   cushion: {name:'Off a cushion', at:SH.cushion, track:'shoot', steps:SL_CUSHION},
   english: {name:'English', at:SH.english, track:'shoot', steps:SL_ENGLISH},
   all:     {name:'Everything', at:SH.all, track:'shoot', steps:SL_ALL},
@@ -3060,7 +3064,7 @@ const lessonsOpen = () => Object.entries(LESSONS).filter(([, L])=>{
 });
 function openTutMenu(v){
   $('tutmenu').hidden = !v;
-  if(v) $('tutlist').innerHTML = lessonsOpen().map(([k, L])=>`<button data-lesson="${k}">${L.name}<small>${L.at ? GRADES[L.at] : 'Start'}</small></button>`).join('');
+  if(v) $('tutlist').innerHTML = lessonsOpen().map(([k, L])=>`<button data-lesson="${k}">${L.name}<small>${L.at ? (L.track === 'shoot' ? SHOOT_GRADES : GRADES)[L.at] : 'Start'}</small></button>`).join('');
 }
 function tutAid(key){
   const v = (tstep().aids || {})[key];
