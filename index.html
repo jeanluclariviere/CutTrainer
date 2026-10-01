@@ -411,19 +411,13 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <input type="range" id="heightrange" min="150" max="200" step="1" aria-label="Your height, cm">
       </div>
       <div class="opt optrange">Standing back from the cue ball <span id="backval"></span>
-        <input type="range" id="backrange" min="12" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
+        <input type="range" id="backrange" min="24" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
       </div>
       <div class="opt">Table
         <div class="seg" role="group" aria-label="Table size">
           <button id="table-7" data-set="table" data-val="7">7 ft</button>
           <button id="table-8" data-set="table" data-val="8">8 ft</button>
           <button id="table-9" data-set="table" data-val="9">9 ft</button>
-        </div>
-      </div>
-      <div class="opt">Full-ball shots
-        <div class="seg" role="group" aria-label="Full-ball shots">
-          <button id="full-0" data-set="full" data-val="0">Off</button>
-          <button id="full-1" data-set="full" data-val="1">On</button>
         </div>
       </div>
       <div class="opt">Shot animation
@@ -468,7 +462,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <b>Where do you stand?</b>
           <small>Set your height and how far back from the cue ball you stand. The table view follows.</small>
           <label>Your height <span id="st-heightval"></span><input type="range" id="st-height" min="150" max="200" step="1" aria-label="Your height, cm"></label>
-          <label>Standing back from the cue ball <span id="st-backval"></span><input type="range" id="st-back" min="12" max="48" step="1" aria-label="How far you stand behind the cue ball, inches"></label>
+          <label>Standing back from the cue ball <span id="st-backval"></span><input type="range" id="st-back" min="24" max="48" step="1" aria-label="How far you stand behind the cue ball, inches"></label>
           <small>You can change these any time in Settings ⚙️.</small>
           <button class="startbtn" id="stancedone">Done</button>
         </div>
@@ -918,7 +912,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 149;   // one per commit to main
+const BUILD = 150;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -3314,7 +3308,7 @@ wireShootControls();
 const BED = 29.5;   // the cloth's height above the floor, inches
 function applyStance(){
   const hc = +settings.heightCm >= 150 && +settings.heightCm <= 200 ? +settings.heightCm : 175;
-  const back = +settings.standBack >= 12 && +settings.standBack <= 48 ? +settings.standBack : 30;
+  const back = Math.max(24, Math.min(48, +settings.standBack || 30));
   // reading a shot you lean in a little: eyes about 0.86 of your height off the floor
   VIEWS.stand.h = Math.max(14, hc/2.54*0.86 - BED); VIEWS.stand.back = back;
   const ft = Math.floor(hc/2.54/12), inch = Math.round(hc/2.54 - ft*12);
@@ -3335,7 +3329,8 @@ settings.throw='0';   // throw option removed
 if(!TABLES[settings.table]) settings.table='9';
 settings.pockets = 'std';   // pockets fixed at 4.5″: with reference cuts only, pocket size never changed a result
 setTable(settings.table, settings.pockets);
-if(!settings.sv){ settings.full='1'; settings.sv=2; }   // full-ball shots are now on by default
+if(!settings.sv) settings.sv=2;
+settings.full = '1';   // full-ball shots always come up (rarely): no longer a setting
 settings.view = 'stand';   // the view isn't a setting any more: you start standing, and the routine takes you down
 if(settings.task==='call') settings.task = 'sess';   // Freeplay and Sessions merged: Freeplay is now played in sessions
 if(!['flash','shoot','free'].includes(settings.task) || (settings.task==='free' && !freeUnlocked()) || (settings.task==='flash' && !flashUnlocked())) settings.task = 'shoot';   // one ladder: Sessions are shooting
