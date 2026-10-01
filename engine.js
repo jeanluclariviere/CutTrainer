@@ -7,8 +7,8 @@
 const R = 1.125;                 // ball radius (2.25" ball)
 const G = 386.1;                 // gravity, in/s²
 const C = {
-  muSlide: 0.28,                 // ball-cloth sliding friction
-  rollDecel: 6,                  // rolling resistance, in/s²
+  muSlide: 0.2,                  // ball-cloth sliding friction (Dr. Dave, TP B.6: typical 0.2)
+  rollDecel: 3.861,              // rolling resistance, in/s² (Dr. Dave, TP B.6: μr 0.01 × g)
   muSpin: 0.044,                 // ball-cloth friction slowing sidespin
   eBall: 0.95,                   // ball-ball restitution
   eCushion: 0.85,                // cushion restitution (the contact sits above centre, so the rebound off the cloth is about 0.74)

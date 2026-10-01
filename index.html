@@ -94,6 +94,8 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
 .optrange span{color:var(--muted);font-weight:500;margin-left:6px}
 .optrange input{width:100%;accent-color:#1f6fb2}
+.optcolor{display:flex;align-items:center;justify-content:space-between}
+.optcolor input{width:44px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
 .stancecard{position:absolute;left:12px;right:12px;bottom:12px;z-index:8;max-width:420px;margin:0 auto;background:rgba(9,20,31,.92);color:#e6eef3;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;font:400 14px var(--body);text-align:left}
 .stancecard[hidden]{display:none}
 .stancecard b{font-size:16px}.stancecard small{color:#b9c8d3}
@@ -130,6 +132,10 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
 .trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
+.lookbtn{position:absolute;right:12px;bottom:12px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
+.practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
+.practicechip b{color:#ffd34d;margin-left:8px}
+.ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
 .routinechip kbd{font:600 10px var(--body);padding:0 4px;margin-left:6px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d}
 @media (hover:none){.routinechip kbd{display:none}}
 .speedbar{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:none;cursor:ns-resize;user-select:none}
@@ -219,6 +225,11 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .tabpanel .options{gap:12px 18px}
 .quick .ql{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
 .quick .ql.tap{font-size:13px}
+.quick .vgrid{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:baseline;width:100%;margin-top:4px;font-size:13px}
+.quick .vgrid>span{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px;font-weight:600}
+.quick .vgrid i{font-style:normal;font-weight:600;color:var(--ink)} .quick .vgrid i.ok{color:var(--good)} .quick .vgrid i.no{color:var(--bad)}
+.quick .vgrid em{font-style:normal;display:flex;align-items:baseline;gap:12px}
+.quick .vgrid em>span{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px;font-weight:600}
 .nudge{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .nudge button{font:600 15px var(--body);padding:12px 0;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
 .nudge button:disabled{opacity:.4;cursor:default}
@@ -227,6 +238,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .opt .seg button{padding:4px 10px;text-transform:none;letter-spacing:0}
 .main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
 .main.persp{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.dip{position:absolute;inset:0;z-index:4;background:#15100c;opacity:0;pointer-events:none;transition:opacity .15s ease-in}
+.dip.out{transition:opacity .2s ease-out}
 .table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
@@ -413,11 +426,39 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="opt optrange">Standing back from the cue ball <span id="backval"></span>
         <input type="range" id="backrange" min="24" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
       </div>
+      <div class="opt">Shooting hand
+        <div class="seg" role="group" aria-label="Shooting hand">
+          <button id="hand-R" data-set="hand" data-val="R">Right</button>
+          <button id="hand-L" data-set="hand" data-val="L">Left</button>
+        </div>
+      </div>
+      <div class="opt optrange">Cue and hand opacity <span id="rigopval"></span>
+        <input type="range" id="rigoprange" min="50" max="100" step="5" aria-label="Cue and hand opacity, percent">
+      </div>
+      <div class="opt">Bridge
+        <div class="seg" role="group" aria-label="Bridge">
+          <button id="bridge-open" data-set="bridge" data-val="open">Open</button>
+          <button id="bridge-closed" data-set="bridge" data-val="closed">Closed</button>
+        </div>
+      </div>
+      <div class="opt optcolor">Glove <input type="color" id="glovecolor" aria-label="Glove colour"></div>
+      <div class="opt optcolor">Hand <input type="color" id="skincolor" aria-label="Hand colour"></div>
       <div class="opt">Flash: each shot shows for
         <div class="seg" role="group" aria-label="How long each Flash shot shows">
           <button id="flash-1500" data-set="flash" data-val="1500">1.5 s</button>
           <button id="flash-750" data-set="flash" data-val="750">0.75 s<span class="lock" id="fastlock" hidden> 🔒</span></button>
         </div>
+      </div>
+      <div class="opt">Music <small class="muted">(M to switch)</small>
+        <div class="seg" role="group" aria-label="Music">
+          <button id="music-off" data-set="music" data-val="off">Off</button>
+          <button id="music-parlor" data-set="music" data-val="parlor">Parlor</button>
+          <button id="music-smoke" data-set="music" data-val="smoke">Smoke</button>
+          <button id="music-felt" data-set="music" data-val="felt">Felt</button>
+        </div>
+      </div>
+      <div class="opt optrange">Music volume <span id="musicvolval"></span>
+        <input type="range" id="musicvol" min="0" max="100" step="5" aria-label="Music volume, percent">
       </div>
       <div class="opt">Streaks
         <div class="seg" role="group" aria-label="Streaks">
@@ -451,6 +492,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     <div class="tablecol">
       <div class="table-box">
         <canvas id="table3d" aria-hidden="true"></canvas>
+        <div class="dip" id="dip" aria-hidden="true"></div>
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
         <svg id="tablefx" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
         <div class="cover" id="cover" hidden>Call it<button class="replay" id="replay" aria-label="Replay the shot"><svg class="replayicon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3.5 13.5a8.5 8.5 0 1 0 2.4-7.4L3 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 3.5V9h5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="replaytext">5 left</span></button></div>
@@ -489,6 +531,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
         <div class="speedchip" id="speedchip" hidden></div>
         <button class="routinechip" id="routinechip" hidden></button>
+        <button class="practicechip" id="practicechip" hidden></button>
+        <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁</button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
@@ -524,7 +568,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="shootctl" id="shootctl" hidden>
         <div class="tippad" id="tippad" hidden><small>Tip</small>
-          <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".1" stroke="#1b6fd1" stroke-opacity=".5" stroke-width=".02" stroke-dasharray=".06 .05"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
+          <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".45"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
           <span class="ckeys" id="tipkeys"></span><button class="link" id="tipcentre">Centre <kbd>X</kbd></button>
         </div>
         <div class="freebtns" id="freebtns" hidden><button class="sumdone" id="freereset">Reset balls</button><button class="sumdone" id="freenew">New layout</button><small>Drag a ball to move it · tap a pocket to aim for it</small></div>
@@ -611,6 +655,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
 <script src="engine.js"></script>
 <script src="vendor/three.min.js"></script>
 <script src="table3d.js"></script>
+<script src="music.js"></script>
 <script>
 (function(){
 const R = 1.125;               // ball radius, inches (2.25" ball)
@@ -639,7 +684,8 @@ function boundsFor(refs){
 }
 BOUNDS = boundsFor(REFS);
 const VIEW_LABEL = {top:'Overhead', stand:'Standing', down:'Down on the ball'};
-const OB_COLORS = [['#f2b705','1'],['#1f4fbf','2'],['#d22b2b','3'],['#6b2fa0','4'],['#f07a12','5'],['#1d8a4a','6'],['#8a1f24','7']];
+const OB_COLORS = [['#f2b705','1'],['#1f4fbf','2'],['#d22b2b','3'],['#6b2fa0','4'],['#f07a12','5'],['#1d8a4a','6'],['#8a1f24','7'],['#151515','8'],
+  ['#f2b705','9'],['#1f4fbf','10'],['#d22b2b','11'],['#6b2fa0','12'],['#f07a12','13'],['#1d8a4a','14'],['#8a1f24','15']];   // the whole rack: 9–15 are stripes
 let POCKETS = [];
 let curTable = null;
 function setTable(size, pockets){
@@ -719,11 +765,11 @@ function nearestRef(theta){
   return best;
 }
 
-const FULL_SHARE = .4;   // full-ball shots come up less than the cuts (about 1 in 11)
+const FULL_SHARE = .4, FULL_SHARE_LATE = .12;   // full-ball shots come up less than the cuts (about 1 in 11), and rarely after B (about 1 in 34)
 function bucketWeights(){
   if(forceFrac) return REFS.map(r=>r.id===forceFrac ? 1 : 0);
   const w = REFS.map(()=>1);
-  w[0] = settings.full!=='1' ? 0 : FULL_SHARE;
+  w[0] = settings.full!=='1' ? 0 : isShooting() && shootLevel() > SH.throw ? FULL_SHARE_LATE : FULL_SHARE;
   return w;
 }
 function weightedIndex(w){
@@ -910,11 +956,12 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 159;   // one per commit to main
+const BUILD = 206;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
 function setGradeForTesting(i){
+  settings.practice = null; saveSettings(); setTimeout(renderPracticeChip, 0);
   if(settings.tutSeen){ const tr = isShooting() ? 'shoot' : 'read'; for(const k in LESSONS) if((LESSONS[k].track || 'read') === tr && LESSONS[k].at > i) delete settings.tutSeen[k]; saveSettings(); }   // lessons above the picked grade play again when you reach them
   if(!hasBaseline()){   // #dev skips the baseline: record a stand-in so everything that needs one opens up
     const p0 = GRADE_FROM[Math.min(i, GRADE_FROM.length-1)];
@@ -931,12 +978,13 @@ function renderProgress(){
   const g = L ? L.g : 0, best = L ? Math.max(L.best ?? 0, L.g) : 0, pts = L ? L.pts : 0;
   $('proghead').textContent = 'Progress';
   $('ladder').innerHTML = GR.map((G, i)=>{
-    const cls = i===g ? 'here' : i <= best ? 'done' : '';
+    const pr = practicing() && i === +settings.practice;
+    const cls = (i===g ? 'here' : i <= best ? 'done' : '') + (i < g ? ' pick' : '') + (pr ? ' practice' : '');
     const bar = i===g ? (i < GR.length-1
-      ? `<span class="here-bar"><i class="${pts<0?'neg':''}" style="width:${Math.min(100, Math.abs(pts)/PTS_UP*100)}%"></i></span><small>${pts >= 0 ? `${pts} of ${PTS_UP} to ${GR[i+1]}` : `${-pts} of ${PTS_UP} toward dropping to ${GR[i-1] || G}`}</small>`
-      : '<small>You made it.</small>') : '';
+      ? `<span class="here-bar"><i style="width:${Math.min(100, Math.max(0, pts)/PTS_UP*100)}%"></i></span><small>${Math.max(0, pts)} of ${PTS_UP} to ${GR[i+1]}</small>`
+      : '<small>You made it.</small>') : pr ? '<small>Practising: not scored</small>' : '';
     return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${TX[i]}${bar}</span></li>`;
-  }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
+  }).reverse().join('') + `<li class="devnote"><span></span><small>${DEV ? 'Testing: tap a grade to jump there.' : 'Tap a grade you\'ve passed to practise it, as long as you like. Practice shots don\'t count.'}</small></li>`;
 }
 const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 10:'🔒 0.75 s Flash'};
 // ==================== the Shoot half ====================
@@ -950,14 +998,14 @@ const SHOOT_TEXT = [
   'Down on the shot: 5 s standing', 'Down on the shot: 3 s standing · 9 ft table',
   'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
   'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Top of the ladder'];
-const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot', 5:'Down on the shot: 3 s · 9 ft table',
-  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Top of the ladder'};
+const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand', 5:'Down on the shot: 3 s · 9 ft table',
+  6:'📐 Any angle · no down timer · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Top of the ladder'};
 const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
 // the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C (Sessions by your grade; Flash and Free play by your best)
 const TABLE_AT = {'8': 2, '9': 5};
-const progTable = () => { const g = settings.task === 'shoot' ? (stats.shoot ? stats.shoot.g : 0) : ladderBest(); return g >= TABLE_AT['9'] ? '9' : g >= TABLE_AT['8'] ? '8' : '7'; };
+const progTable = () => { const g = settings.task === 'shoot' ? shootLevel() : ladderBest(); return g >= TABLE_AT['9'] ? '9' : g >= TABLE_AT['8'] ? '8' : '7'; };
 const ladderBest = () => stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0;
 const FLASH_AT = 3, FREE_AT = SH.any, FAST_FLASH_GRADE = SH.speed;   // Flash opens at D+ (once you aim without the ghost ball), Free play with any angle (C+), 0.75 s Flash with speed (B-)
 const flashUnlocked = () => DEV || ladderBest() >= FLASH_AT;
@@ -966,8 +1014,21 @@ const isShoot = () => settings.task === 'shoot';
 const isFree = () => settings.task === 'free';
 const isShooting = () => isShoot() || isFree();
 function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
-const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : (stats.shoot ? stats.shoot.g : 0);
-const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : 3;
+// You can go back to any grade you've passed and practise it as long as you like: those shots aren't scored.
+const practicing = () => isShoot() && settings.practice != null && stats.shoot && +settings.practice < stats.shoot.g;
+const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : practicing() ? +settings.practice : (stats.shoot ? stats.shoot.g : 0);
+function setPractice(i){
+  const g = stats.shoot ? stats.shoot.g : 0;
+  settings.practice = i != null && i < g ? i : null; saveSettings();
+  renderPracticeChip(); renderProgress(); if(!answered && !anim) deal();
+}
+function renderPracticeChip(){
+  const el = $('practicechip'); if(!el) return;
+  el.hidden = !practicing();
+  if(practicing()) el.innerHTML = `Practising ${SHOOT_GRADES[+settings.practice]} · not scored <b>Back to ${SHOOT_GRADES[stats.shoot.g]}</b>`;
+}
+const NO_TIMER = 1e6;   // from Any angle on, nothing hurries you: you get down when you're ready
+const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : g < SH.any ? 3 : NO_TIMER;
 // what you control at each step (Free play: everything you've unlocked)
 const ctrl = () => {
   const g = shootLevel();
@@ -988,28 +1049,54 @@ const diamondsFromSpeed = V => V*V/(2*PE.C.rollDecel*diamond());
 const SPEED_MIN = 0.5, SPEED_MAX = 48;
 // ten whole-number speeds (keys 1–9, 0 for 10): each is how many diamonds a rolling cue ball hit that hard would travel
 const SPEED_LEVELS = [1, 2, 3, 4, 6, 8, 11, 15, 20, 28];
-const speedLevel = () => { const n = +settings.speedLevel; return n >= 1 && n <= 10 ? Math.round(n) : 5; };
+const speedLevel = () => { const n = +settings.speedLevel, v = n >= 1 && n <= 10 ? Math.round(n) : 5; return coarseSpeed() ? nearestCoarse(v) : v; };
+// The four strokes as cue ball speeds, from Dr. Dave's typical speeds (TP B.6): ¼ a touch shot (1.5 mph, under a table length),
+// ½ a lag (3.5 mph, about 2 lengths), ¾ medium (7 mph, about 3 lengths), the full stroke a power shot (20 mph, about 5 lengths;
+// eased to 15 mph, about 4 lengths, for now).
+const MPH = 17.6, STROKE_MPH = {3:1.5, 5:3.5, 8:7, 10:15};   // full stroke eased from Dr. Dave's 20 mph power shot to 15 for now
 function speedSetting(){ return SPEED_LEVELS[speedLevel() - 1]; }
-const levelForSpeed = V => { const d = diamondsFromSpeed(V); let best = 1; SPEED_LEVELS.forEach((x, i)=>{ if(Math.abs(Math.log(x/d)) < Math.abs(Math.log(SPEED_LEVELS[best-1]/d))) best = i + 1; }); return best; };
-function nudgeTip(k){   // W up, S down, A left, D right, X back to centre; within what you've unlocked
-  const c = ctrl(); if(!(c.up || c.side)) return;
-  let [x, y] = settings.shotTip || [0, 0];
-  if(k === 'x'){ x = 0; y = 0; }
-  if(k === 'w') y += .1; if(k === 's') y -= .1; if(k === 'a') x -= .1; if(k === 'd') x += .1;
-  y = Math.max(c.down ? -.6 : 0, Math.min(c.up ? .6 : 0, y)); x = c.side ? Math.max(-.6, Math.min(.6, x)) : 0;
-  const l = Math.hypot(x, y); if(l > .6){ x *= .6/l; y *= .6/l; }
-  settings.shotTip = [Math.round(x*20)/20, Math.round(y*20)/20]; saveSettings(); renderShootControls();
+const levelForSpeed = V => coarseSpeed() ? COARSE.reduce((b, c)=>Math.abs(Math.log(STROKE_MPH[c]*MPH/V)) < Math.abs(Math.log(STROKE_MPH[b]*MPH/V)) ? c : b, COARSE[0]) : levelForSpeedFine(V);
+const levelForSpeedFine = V => { const d = diamondsFromSpeed(V); let best = 1; SPEED_LEVELS.forEach((x, i)=>{ if(Math.abs(Math.log(x/d)) < Math.abs(Math.log(SPEED_LEVELS[best-1]/d))) best = i + 1; }); return best; };
+// The tip moves in half-tip steps: half a 12.5 mm tip is 6.25 mm, about 0.22 of the ball's radius. Two steps (a full tip)
+// each way, and never past half the radius from the centre (Dr. Dave's miscue limit).
+const TIP_STEP = 6.25/28.575, TIP_STEPS = 2, TIP_MAX = .5 + 1e-6;
+function snapTip(t, c = {up:true, down:true, side:true}){
+  let nx = c.side ? Math.max(-TIP_STEPS, Math.min(TIP_STEPS, Math.round((t[0] || 0)/TIP_STEP))) : 0;
+  let ny = Math.max(c.down ? -TIP_STEPS : 0, Math.min(c.up ? TIP_STEPS : 0, Math.round((t[1] || 0)/TIP_STEP)));
+  while(Math.hypot(nx, ny)*TIP_STEP > TIP_MAX){ if(Math.abs(nx) >= Math.abs(ny)) nx -= Math.sign(nx); else ny -= Math.sign(ny); }
+  return [+(nx*TIP_STEP).toFixed(4), +(ny*TIP_STEP).toFixed(4)];
 }
-function setSpeedLevel(n){ settings.speedLevel = Math.max(1, Math.min(10, n)); saveSettings(); renderShootControls(); }
+function nudgeTip(k){   // W up, S down, A left, D right (half a tip each), X back to centre; within what you've unlocked
+  const c = ctrl(); if(!(c.up || c.side)) return;
+  let [x, y] = snapTip(settings.shotTip || [0, 0], c);
+  if(k === 'x'){ x = 0; y = 0; }
+  if(k === 'w') y += TIP_STEP; if(k === 's') y -= TIP_STEP; if(k === 'a') x -= TIP_STEP; if(k === 'd') x += TIP_STEP;
+  const n = snapTip([x, y], c);
+  if(Math.hypot(...n) > TIP_MAX) return;
+  settings.shotTip = n; saveSettings(); renderShootControls();
+}
+// Speed is four strokes: ¼, ½, ¾ and the full stroke (the finer 1–10 is off for now).
+const COARSE = [3, 5, 8, 10], COARSE_F = {3:.25, 5:.5, 8:.75, 10:1}, COARSE_LBL = {3:'¼', 5:'½', 8:'¾', 10:'Full'};
+const coarseSpeed = () => true;
+const nearestCoarse = n => COARSE.reduce((b, c)=>Math.abs(c - n) < Math.abs(b - n) ? c : b, COARSE[0]);
+const speedLabel = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] + ' stroke' : String(n);
+const strokeFrac = n => coarseSpeed() ? COARSE_F[nearestCoarse(n)] : n/10;   // how much of your full stroke a speed uses
+function setSpeedLevel(n){
+  if(coarseSpeed()){   // a one-step nudge moves to the next stroke that way; anything else snaps to the nearest
+    const cur = nearestCoarse(speedLevel());
+    n = Math.abs(n - speedLevel()) === 1 ? (n > speedLevel() ? COARSE.find(c=>c > cur) ?? cur : [...COARSE].reverse().find(c=>c < cur) ?? cur) : nearestCoarse(n);
+  }
+  settings.speedLevel = Math.max(1, Math.min(10, n)); saveSettings(); renderShootControls();
+}
 const fmtD = d => d < 10 ? (Math.round(d*2)/2).toString().replace('.5', '½').replace(/^0½$/, '½') : String(Math.round(d));
 
 // ---------- the stroke ----------
 // Before speed is yours it's the shot's ideal pocket speed; before spin is yours the tip is set for you.
 function shotStroke(s){
   const c = ctrl(), g = shootLevel(), ideal = strikeOf(s);
-  const V = c.speed ? speedFromDiamonds(speedSetting()) : ideal.V;
+  const V = c.speed ? (coarseSpeed() ? STROKE_MPH[speedLevel()]*MPH : speedFromDiamonds(speedSetting())) : ideal.V;
   let tip = g === SH.throw && !isFree() ? [0, -.35] : [0, ideal.b];   // the throw step plays soft stun for you: that's where throw shows most
-  if(c.up || c.side){ const t = settings.shotTip || [0, 0]; tip = [c.side ? t[0] : 0, Math.max(c.down ? -0.6 : 0, Math.min(c.up ? 0.6 : 0, t[1]))]; }
+  if(c.up || c.side) tip = snapTip(settings.shotTip || [0, 0], c);
   return {V, tip};
 }
 // Play the shot from the cue ball along dir with a stroke: the engine runs it. Squirt is in the engine's strike.
@@ -1046,12 +1133,21 @@ const STEP_STROKES = {   // the kind of stroke a step's zones are made from (the
 };
 function zoneStep(g){ if(g < SH.follow) return null; if(g >= SH.all) return pick([SH.follow, SH.stun, SH.draw, SH.cushion, SH.english]); return g === SH.cushion ? SH.cushion : g >= SH.english ? SH.english : g; }
 // Deal a Shoot shot: any angle (the Read ladder's dealer), plus a target zone from a stroke that really gets there.
+// Room behind the cue ball, along the aim, for a bridge hand on the cloth: a forearm's length to the bridge plus the hand (about 4").
+// Closer to the cushion you'd be bridging on the rail, with the cue raised, and couldn't strike low on the ball.
+function railBehind(p, u){   // distance from p back along -u to the cushion
+  let t = Infinity;
+  for(const k of [0, 1]){ const d = -u[k], hi = k ? H : W; if(d > 1e-9) t = Math.min(t, (hi - p[k])/d); else if(d < -1e-9) t = Math.min(t, (0 - p[k])/d); }
+  return t;
+}
+function handRoom(s){ return railBehind(s.cb, norm(sub(s.gbLook || s.gb, s.cb))) >= 0.146*stanceIn() - 1.25 + 4; }
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
   let best = null;
   for(let tries = 0; tries < 40; tries++){
     const s = dealShot();   // leaning on your weak spots
     if(!s) continue;
+    if(!handRoom(s) && tries < 36) continue;   // your bridge hand has to fit on the cloth behind the cue ball (no rail bridges yet)
     best = best || s;
     if(diamondsFromSpeed(strikeOf(s).V) > 24) continue;   // no shots that need a near-break stroke just to reach the pocket
     if(g === SH.throw && !isFree()){   // throw: cut shots where the plain aim, played soft with stun, misses: throw decides it
@@ -1061,17 +1157,23 @@ function shootDeal(){
       return finishDeal(s);
     }
     if(!step) return finishDeal(s);
+    // the zone is made with a stroke you can actually play: one of your four speeds, and a tip on the pad's 0.1 steps
     const spec = STEP_STROKES[step](s), V0 = strikeOf(s).V, d1 = len(sub(s.gb, s.cb));
-    let V = V0*rnd(...(spec.k || [1, 1]));
-    if(spec.stun){ const ug = PE.C.muSlide*PE.G; V = Math.max(V0, Math.sqrt(d1*49*ug/12))*rnd(1.05, 1.35); }
-    const r = playAim(s, idealDir(s), {V, tip: spec.tip}, false);
+    let want = V0*rnd(...(spec.k || [1, 1]));
+    if(spec.stun){ const ug = PE.C.muSlide*PE.G; want = Math.max(V0, Math.sqrt(d1*49*ug/12))*1.05; }
+    const lvl = COARSE.find(l=>STROKE_MPH[l]*MPH >= want);
+    if(!lvl) continue;
+    const zs = {V: STROKE_MPH[lvl]*MPH, tip: snapTip(spec.tip)};
+    let r = playAim(s, idealDir(s), zs, false);
+    if(!r.made || r.scratch || !r.hit) continue;
+    r = playAim(s, aimFor(s, zs), zs, false);           // and played exactly as your right call would play it
     if(!r.made || r.scratch || !r.hit) continue;
     if(spec.cushion && !r.cushionAfter) continue;
     const c = r.cueEnd, zr = g >= SH.cushion ? 5 : 6;
     if(c[0] < 3 || c[0] > W-3 || c[1] < 3 || c[1] > H-3) continue;
     if(POCKETS.some(P=>len(sub(c, P.c)) < 7)) continue;
     if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
-    s.zone = {c, r: zr, step};
+    s.zone = {c, r: zr, step, lvl, tip: zs.tip};
     return finishDeal(s);
   }
   return finishDeal(best || generate());
@@ -1094,8 +1196,8 @@ function startRoutine(){
     if(el < T){ c.phase = 'stand'; c.k = 0; c.left = T - el; }
     else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
     else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
-    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); return; }
-    renderRoutineChip(); draw(false);
+    else { c.phase = 'down'; c.k = 1; c.downAt = now; renderRoutineChip(); draw(false); featherLoop(s); return; }
+    renderRoutineChip(); if(c.phase !== 'stand') draw(false);   // standing still needs no redraw
     routineRaf = requestAnimationFrame(tick);
   };
   routineRaf = requestAnimationFrame(tick);
@@ -1104,13 +1206,16 @@ const ease = u => u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
 function renderRoutineChip(){
   const el = $('routinechip'); if(!el) return;
   const c = shot && shot.cam;
-  if(!isShoot() || tut.on || answered || !c || !c.T || c.phase !== 'stand'){ el.hidden = true; return; }
-  el.hidden = false; el.innerHTML = `Down in ${Math.ceil(c.left)}<kbd>Enter</kbd>`;
+  const upAgain = c && c.up && c.phase === 'down' && c.k < 1;
+  if(!isShoot() || tut.on || answered || !c || !c.T || (c.phase !== 'stand' && !upAgain) || look.k > 0){ el.hidden = true; return; }
+  el.hidden = false; el.innerHTML = (c.T >= NO_TIMER || upAgain ? 'Get down' : `Down in ${Math.ceil(c.left)}`) + '<kbd>Enter</kbd>';
 }
 // Enter (or the chip) gets you down now instead of waiting out the standing time
 function goDown(){
   const c = shot && shot.cam;
-  if(!c || !c.T || c.phase !== 'stand' || answered || !isShoot() || tut.on) return false;
+  if(!c || !c.T || answered || !isShoot() || tut.on || look.target) return false;
+  if(c.phase === 'down' && c.up && c.k < 1){ c.up = false; renderRoutineChip(); riseCam(shot, 1, ()=>{ c.downAt = performance.now(); featherLoop(shot); }); return true; }   // back down after a look
+  if(c.phase !== 'stand') return false;
   c.t0 = performance.now() - c.T*1000; return true;
 }
 // The Shoot camera: standing on the ball line, standing behind your aim line, or down on your aim line, blended by the routine.
@@ -1119,9 +1224,48 @@ function shootCam(s, view){
   const stand = camAlong(s, d, VIEWS.stand), standAim = camAlong(s, aim, VIEWS.stand), down = camAlong(s, aim, VIEWS.down);
   const c = s.cam || {phase:'stand', k:0};
   const mix = (A, B, k) => camFrom(A.E.map((x, i)=>x + (B.E[i]-x)*k), norm3(A.f.map((x, i)=>x + (B.f[i]-x)*k)), A.hfov + (B.hfov - A.hfov)*k);
-  if(c.phase === 'step') return mix(stand, standAim, c.k);
-  if(c.phase === 'down') return mix(standAim, down, c.k);
-  return view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
+  const base = c.phase === 'step' ? mix(stand, standAim, c.k) : c.phase === 'down' ? mix(standAim, down, c.k) : view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
+  return look.k > 0 ? mix(base, overviewCam(s), ease(look.k)) : base;
+}
+// Step back (hold Space, or the eye button): up high behind the shot, the whole table in view. Free while standing;
+// down on the shot it stands you up first, and you get down again (Enter, a call or the chip) when you're ready.
+const look = {k: 0, target: 0, raf: 0};
+function overviewCam(s){
+  const d = norm(sub(s.ob, s.cb)), pts = [[0,0,0],[W,0,0],[W,H,0],[0,H,0], [s.cb[0],s.cb[1],R], [s.ob[0],s.ob[1],R]];
+  if(s.zone) pts.push([s.zone.c[0], s.zone.c[1], 0]);
+  const T = [W/2, H/2, 0], m = 14;
+  let cam = null;
+  for(let dist = 40; dist <= 260; dist += 8){
+    const E = [T[0] - d[0]*dist*.55, T[1] - d[1]*dist*.55, 18 + dist*.85];
+    cam = camFrom(E, norm3([T[0]-E[0], T[1]-E[1], T[2]-E[2]]), 64);
+    if(pts.every(P=>{ const q = cam.toCam(P); if(q[2] <= NEAR) return false; const [x, y] = cam.proj(q); return x >= m && x <= VW-m && y >= m && y <= VH-m; })) break;
+  }
+  return cam;
+}
+function setLook(on){
+  if(!shot || !isShooting() || tut.on || settings.view === 'top') return;
+  look.target = on ? 1 : 0;
+  const c = shot.cam;
+  if(on && !answered && c && c.T && c.phase === 'down' && c.k > 0){ c.up = true; cancelAnimationFrame(featherRaf); riseCam(shot, 0); }
+  cancelAnimationFrame(look.raf);
+  let last = performance.now();
+  const tick = now => {
+    const dt = now - last; last = now;
+    look.k = look.target ? Math.min(1, look.k + dt/350) : Math.max(0, look.k - dt/350);
+    draw(answered); renderRoutineChip();
+    if(look.k !== look.target) look.raf = requestAnimationFrame(tick);
+  };
+  look.raf = requestAnimationFrame(tick);
+}
+function riseCam(s, k1, done){   // move between standing behind the aim line (0) and down on it (1)
+  const c = s.cam, k0 = c.k, t0 = performance.now();
+  const tick = now => {
+    if(shot !== s) return;
+    const u = Math.min(1, (now - t0)/450); c.k = k0 + (k1 - k0)*ease(u);
+    if(!look.k) draw(answered);
+    if(u < 1) requestAnimationFrame(tick); else if(done) done();
+  };
+  requestAnimationFrame(tick);
 }
 // a camera behind the cue ball looking along dir, tilted to keep the cue ball (and, standing, the pocket) in frame
 function camAlong(s, dir, c){
@@ -1139,7 +1283,7 @@ function camAlong(s, dir, c){
 function renderShootControls(){
   const box = $('shootctl'); if(!box) return;
   const on = isShooting() && !tut.on, c = ctrl();
-  box.hidden = !on;
+  box.hidden = !on; $('lookbtn').hidden = !on;
   if(!on) return;
   $('speedbar').hidden = !c.speed;
   $('freebtns').hidden = !isFree();
@@ -1147,7 +1291,7 @@ function renderShootControls(){
   if(c.speed){
     const n = speedLevel(), f = n/10;
     $('speedfill').style.height = (f*100).toFixed(1) + '%';
-    $('speedval').textContent = String(n);
+    $('speedval').textContent = coarseSpeed() ? COARSE_LBL[n] : String(n);
   }
   if(c.up || c.side){
     const t = shotStroke(shot || {}).tip || [0,0];
@@ -1156,9 +1300,14 @@ function renderShootControls(){
     $('tipkeys').innerHTML = [c.up && 'W', c.side && 'A', c.down && 'S', c.side && 'D'].filter(Boolean).map(k=>`<kbd>${k}</kbd>`).join('');
   }
 }
-function tipLimitPath(c){   // the part of the cue ball you're allowed to strike, outlined
-  const x0 = c.side ? -.6 : -.06, x1 = c.side ? .6 : .06, y0 = c.up ? -.6 : 0, y1 = c.down ? .6 : 0;
-  return `M${x0} ${y0 - .02}H${x1}V${y1 + .02}H${x0}Z`;
+function tipLimitPath(c){   // the points you can strike: one dot per half-tip step you've unlocked
+  let d = '';
+  for(let i = -TIP_STEPS; i <= TIP_STEPS; i++) for(let j = -TIP_STEPS; j <= TIP_STEPS; j++){
+    const [x, y] = snapTip([i*TIP_STEP, j*TIP_STEP], c);
+    if(Math.abs(x - i*TIP_STEP) > 1e-3 || Math.abs(y - j*TIP_STEP) > 1e-3) continue;
+    d += `M${(x - .035).toFixed(3)} ${(-y).toFixed(3)}a.035 .035 0 1 0 .07 0a.035 .035 0 1 0 -.07 0`;
+  }
+  return d;
 }
 function wireShootControls(){
   $('routinechip').addEventListener('click', ()=>goDown());
@@ -1174,10 +1323,7 @@ function wireShootControls(){
   const setTipFrom = ev => {
     const svg = $('tipsvg'), pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
     const q = pt.matrixTransform(svg.getScreenCTM().inverse()), c = ctrl();
-    let x = c.side ? q.x : 0, y = -q.y;
-    y = Math.max(c.down ? -.6 : 0, Math.min(c.up ? .6 : 0, y)); x = Math.max(-.6, Math.min(.6, x));
-    const l = Math.hypot(x, y); if(l > .6){ x *= .6/l; y *= .6/l; }
-    settings.shotTip = [Math.round(x*20)/20, Math.round(y*20)/20]; saveSettings(); renderShootControls();
+    settings.shotTip = snapTip([c.side ? q.x : 0, -q.y], c); saveSettings(); renderShootControls();
   };
   let tDrag = false;
   pad.addEventListener('pointerdown', ev=>{ if(answered) return; tDrag = true; try{ pad.setPointerCapture(ev.pointerId); }catch(e){} setTipFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
@@ -1205,7 +1351,7 @@ function cutForDir(s, dir){
 // any other call plays that fraction's contact exactly
 function takeShot(id){
   if(answered || !shot || !isShooting() || anim) return;
-  const s = shot, stroke = shotStroke(s);
+  const s = shot, stroke = shotStroke(s), withCue = rigAlpha(s).a > .01;
   const needDir = aimFor(s, stroke), need = cutForDir(s, needDir), right = nearestRef(need);
   const picked = ALL.find(r=>r.id===id) || right, ok = picked.id === right.id;
   const dir = ok ? needDir : dirForCut(s, picked.deg);
@@ -1222,8 +1368,12 @@ function takeShot(id){
   const partial = ok && clean && !full;
   const q = sub(s.ob, s.cb), qb = dot(q, dir), disc = qb*qb - dot(q, q) + 4*R*R;   // where the cue ball meets the object ball on your call
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
-  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });
-  if(isShoot()){
+  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===id ? (ok && run.made ? 'right' : run.made ? 'also' : 'wrong') : x.dataset.id===right.id ? 'right' : ''; });   // your call is marked straight away: the right fraction played too soft or too hard is still a miss
+  cancelAnimationFrame(featherRaf);
+  const play = () => {
+  if(isShoot() && practicing()){   // practice: logged as practice, nothing scored
+    logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, gh: 1, pr: g});
+  } else if(isShoot()){
     const prevStreak = curStreak();
     logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
     if(!partial){
@@ -1236,22 +1386,43 @@ function takeShot(id){
     showStreak(st, !full && prevStreak >= STREAK_HOT ? prevStreak : 0);
   }
   const lab = r => r.id === 'full' ? 'Full' : r.label;
-  const bits = [];
-  if(!ok) bits.push(`It was <b>${lab(right)}</b>`);
-  if(run.scratch) bits.push('Scratch: the cue ball went in');
-  else if(!run.hit) bits.push('Missed the object ball');
-  else if(!run.made) bits.push(run.obIn ? 'Wrong pocket' : 'Missed the pocket');
-  if(s.zone && run.made && !run.scratch) bits.push(run.inZone ? 'In the zone' : `Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
-  if(ctrl().speed) bits.push(`Speed ${speedLevel()} <small>· ideal ${levelForSpeed(idealV)}</small>`);
+  // the verdict as a small table: your call and the right one, your stroke and the one it wanted, and what the balls did
+  const spd = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] : String(n), want = s.zone && s.zone.lvl ? s.zone.lvl : levelForSpeed(idealV), mine = speedLevel();
+  const rows = [['Call', lab(picked), ok, ok ? '' : lab(right)]];
+  if(ctrl().speed) rows.push(['Stroke', spd(mine), spd(mine) === spd(want), spd(mine) === spd(want) ? '' : spd(want)]);
+  const ball = run.scratch ? 'Scratch: the cue ball went in' : !run.hit ? 'Missed the object ball' : !run.made ? (run.obIn ? 'Wrong pocket' : 'Missed the pocket')
+    : s.zone ? (run.inZone ? 'Pocketed, in the zone' : `Pocketed, missed the zone by ${run.zoneMiss.toFixed(1)}″`) : 'Pocketed';
+  rows.push(['Ball', ball, run.made && !run.scratch && (!s.zone || run.inZone), '']);
+  const bits = [], grid = `<div class="vgrid">${rows.map(([k, v, good, right])=>`<span>${k}</span><em><i class="${good ? 'ok' : 'no'}">${v}</i>${right ? `<span>Right</span><i class="ok">${right}</i>` : ''}</em>`).join('')}</div>`;   // a miss shows the right answer beside it
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
-  $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>`;
+  $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>${grid}`;
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
+  const hitT = (run.sim.events.find(e=>e.type==='ball') || {}).t ?? 0;
+  const obT = run.sim.events.find(e=>e.ids && e.ids[0]==='o' && e.t > hitT && (e.type==='cushion' || e.type==='jaw' || e.type==='pocket'));
+  if(obT) setTimeout(()=>{ if(shot === s) standUp(s); }, obT.t*1000 + 120);   // you come up as the object ball gets there, not when everything stops
   animateShot({made: run.made}, ms=>{   // the shot counts once it's played out (or skipped), so the last one of a session is watched too
     if(isShoot() && stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (ms||0);
-    if(!jumpingAhead) draw(true);
-    if(isShoot()) sessionTick(full, run.made);
+    if(!jumpingAhead){ draw(true); standUp(s); }
+    if(isShoot() && !practicing()) sessionTick(full, run.made);
   }, ok ? '#ffd34d' : MISS, run);
   finishRound();
+  };
+  if(!withCue){ s.follow = 0; return play(); }
+  // The stroke: the bridge stays put and speed comes from how much of your stroke you use, from a tenth (speed 1)
+  // up to the full stroke (speed 10: the tip comes back to just short of the bridge hand). Same tempo every time,
+  // so a longer stroke is a faster one, and the same follow-through whatever the speed.
+  s.follow = FOLLOW_THROUGH;
+  // the call doesn't cut the practice stroke short: it finishes, the cue rests at the ball for a beat (as long as the pause at
+  // the back), then the backswing
+  const now0 = performance.now(), TP = 180, x0 = rigAlpha(s).push || 0, fb = Math.max(.1, (s.cam && s.cam.fBack) || strokeBack(s));
+  const ft = x0 < -.05 ? Math.max(120, 520*Math.abs(x0)/fb) : 0;   // the practice stroke comes forward to the ball from where it is
+  const st = cueStroke = {s, x0, t1: now0, ft, t0: now0 + ft + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
+  const tick = now => {
+    if(shot !== s){ cueStroke = null; return; }
+    if(now - st.t0 >= st.tb + st.tp + st.tf){ cueStroke = null; play(); return; }
+    draw(false); requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 // Free play: put the layout back, or a new one
 let freeLayout = null;
@@ -1277,8 +1448,7 @@ function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = trk(), G = trkGrades();
   L.pts += ok ? PT_RIGHT : PT_WRONG;
   if(L.pts >= PTS_UP && L.g < G.length-1){ L.g++; L.pts = 0; L.best = Math.max(L.best ?? 0, L.g); return 1; }
-  if(L.pts <= -PTS_UP && L.g > 0){ L.g--; L.pts = 0; return -1; }
-  L.pts = Math.max(-PTS_UP, Math.min(PTS_UP, L.pts));
+  L.pts = Math.max(0, Math.min(PTS_UP, L.pts));   // grades only go up: a miss costs progress toward the next one, never the grade
   return 0;
 }
 function renderBadge(pop){
@@ -1609,7 +1779,7 @@ function perspSVG(s, reveal, view){
   if(key !== pcache.key){
     const segs = tableSegs();
     const ringArc = ringArc3(s.P).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
-    const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
+    const ring = !G3 && ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';   // with the 3D table, a floating arrow marks the pocket instead
     pcache = {key, back: G3 ? '' : perspBack(cam, s, reveal, segs, ring), front: G3 ? '' : perspFront(cam, s, reveal, segs, ring),
       fx: ring && !reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : ''};
   }
@@ -1723,6 +1893,9 @@ function perspDyn(cam, s, reveal){
   const obNow = A ? A.ob : F ? F.ob : null;
   const refA = A ? Math.max(0, Math.min(1, (A.tHit ?? 0)/REF_FADE)) : 1;   // the reference balls fade in just after the hit
   if((contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: refA});
+  // where the cue ball started, once it has left: shown as you stand back up (down on the shot it would only be under your cue)
+  const cbNow = A ? A.cb : F ? F.cb : null, sc = s.cam, upK = sc && sc.T && sc.phase === 'down' ? 1 - sc.k : 1;
+  if(isShooting() && (contact || F) && upK > .01 && !(cbNow && len(sub(cbNow, s.cb)) < 2*R)) items.push({p: s.cb, kind:'refcb', a: refA*upK});
   // on a miss, a see-through object ball rolls the path the right call would have sent it on, into the pocket
   if(A && A.obGhost) items.push({p: A.obGhost.p, kind:'ob', ghost: true, z: A.obGhost.z, shadow: A.obGhost.shadow, pocket: s.P});
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
@@ -1742,7 +1915,7 @@ function perspDyn(cam, s, reveal){
     if(it.c[2] < NEAR) continue;
     const [x,y] = cam.proj(it.c), r = cam.focal*R/it.c[2]*(it.scale ?? 1);
     if(r < 0.3) continue;
-    if(it.kind==='refcb'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#f4efe0" fill-opacity=".28" stroke="#f4efe0" stroke-opacity=".7" stroke-width="1"/>`; continue; }
+    if(it.kind==='refcb'){ const ra = it.a ?? 1; o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#f4efe0" fill-opacity="${(.22*ra).toFixed(3)}" stroke="#f4efe0" stroke-opacity="${(.8*ra).toFixed(3)}" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
     if(it.kind==='refob'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${s.color[0]}" fill-opacity=".32" stroke="${s.color[0]}" stroke-opacity=".85" stroke-width="1"/>`; continue; }
     if(it.kind==='user'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" fill-opacity=".3" stroke="#fff" stroke-width="1.2"/>`; continue; }
     if(it.kind==='callghost'){ o += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="none" stroke="${s.pick.made ? NEAR_MISS_OK : MISS}" stroke-width=".75" stroke-dasharray="3.5 2.5"/>`; continue; }
@@ -1795,7 +1968,150 @@ function perspDyn(cam, s, reveal){
     }
     if(it.ghost) o = o.slice(0, itemStart) + `<g opacity=".5">${o.slice(itemStart)}</g>`;
   }
+  o += cueRig(cam, s);   // your cue and bridge hand, in front of everything
   return o;
+}
+
+// ---------- your cue and bridge hand, down on the shot ----------
+// Low-poly shapes in table space, drawn see-through over the table, so the cut is read around them as it is at a real table.
+// Faint from Down on the shot (C-), more solid at the top of the ladder (S+). An open bridge for now.
+const rigOpacity = () => Math.max(.5, Math.min(1, (+settings.rigOpacity || 75)/100));
+const stanceIn = () => (+settings.heightCm >= 150 && +settings.heightCm <= 200 ? +settings.heightCm : 175)/2.54;
+function rigAlpha(s){
+  if(!isShoot() || tut.on || settings.view === 'top' || !s) return {a:0};
+  const g = shootLevel(), c = s.cam;
+  if(g < SH.down || !c || !c.T) return {a:0};
+  const base = rigOpacity(),   // your setting, 50–100%
+    down = c.phase === 'down' ? c.k : 0, now = performance.now();
+  if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
+    // each practice stroke keeps the length it started with; a new speed shows from the next one, so nothing jumps
+    const cyc = c.downAt ? Math.floor((now - c.downAt)/1600) : 0;
+    if(c.downAt && c.fCycle !== cyc){ c.fCycle = cyc; c.fBack = strokeBack(s); }
+    const fe = c.downAt ? featherAt(now - c.downAt, c.fBack) : 0;
+    return {a: base*down, ac: base*down, push: fe};
+  }
+  if(cueStroke && cueStroke.s === s) return {a: base, ac: base, push: strokeAt(cueStroke, now)};
+  if(!s.follow) return {a:0};
+  if(!anim) return {a: base*down, ac: base*down, push: s.follow};   // the shot's played: cue and hand stay until you stand up
+  const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, and hold it there
+  return {a: base*down, ac: base*down, push: s.follow*(1 - (1 - k)*(1 - k))};
+}
+// Practice strokes: as long as the stroke you're about to play, a brief hold at the back, then forward; 1.6 s a cycle.
+const strokeBack = s => (0.146*stanceIn() - 1.25 - 1.5)*strokeFrac(levelForSpeed(shotStroke(s).V));
+function featherAt(t, back){
+  const p = (t % 1600)/1600, ease = k => (1 - Math.cos(Math.PI*k))/2;
+  return p < .4 ? -back*ease(p/.4) : p < .5 ? -back : -back*(1 - ease((p - .5)/.5));
+}
+// The final stroke: back (further for a harder shot), a pause, then forward, faster into the ball.
+let cueStroke = null, featherRaf = 0;
+const FOLLOW_THROUGH = 4;   // inches past the cue ball, every stroke
+function strokeAt(st, now){
+  if(now < st.t0 - st.tp){ const k = Math.min(1, (now - st.t1)/Math.max(1, st.ft)); return st.x0*(1 + Math.cos(Math.PI*k))/2; }   // the practice stroke you were in comes forward to the ball
+  if(now < st.t0) return 0;                                                          // a beat at the ball
+  const t = now - st.t0;
+  if(t < st.tb){ const k = t/st.tb; return st.from + (-st.back - st.from)*(1 - Math.cos(Math.PI*k))/2; }
+  if(t < st.tb + st.tp) return -st.back;
+  const k = Math.min(1, (t - st.tb - st.tp)/st.tf);
+  return -st.back*(1 - k*k);
+}
+// Once the balls have stopped, made or missed, you stand back up (behind the aim line) and the hand comes off the table.
+function standUp(s){
+  const c = s.cam;
+  if(!c || !c.T || c.phase !== 'down' || !isShoot()) return;
+  const t0 = performance.now(), k0 = c.k;
+  const tick = now => {
+    if(shot !== s) return;
+    c.k = k0*(1 - ease(Math.min(1, (now - t0)/600)));
+    if(!anim) draw(true);   // while the balls still run, their animation redraws
+    if(c.k > 0) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+function featherLoop(s){   // keeps the practice strokes moving while you're down and haven't called
+  cancelAnimationFrame(featherRaf);
+  const tick = ()=>{ if(shot !== s || answered || !isShoot() || tut.on || rigAlpha(s).a < .01) return; draw(false); featherRaf = requestAnimationFrame(tick); };
+  featherRaf = requestAnimationFrame(tick);
+}
+// Glove and hand colours (Settings, any colour): a black glove and a grey hand to start.
+const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
+const GLOVE_DEF = '#1a1a1a', HAND_DEF = '#8a8f96';
+const strapOf = c => { const l = [1, 3, 5].reduce((t, i)=>t + parseInt(c.slice(i, i + 2), 16), 0)/3; return l < 70 ? shadeHex(c, 1, 60) : shadeHex(c, .8); };   // a little lighter on a dark glove, darker on a light one
+const LIGHT = norm3([-.25, .35, .9]);
+const shadeHex = (hex, k, add = 0) => '#' + [1, 3, 5].map(i=>Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16)*k + add)).toString(16).padStart(2, '0')).join('');
+function cueRig(cam, s){
+  const {a, ac, push} = rigAlpha(s);
+  if(a < .01) return '';
+  const u = norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];          // forward along the aim, and to its left
+  const sd = settings.hand === 'L' ? mul(n, -1) : n;                        // the bridge hand's side: left of the cue for a right-handed player
+  const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
+  const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
+  // How steep the cue is: a touch more with top, a touch less with draw (you keep it level to hit low), and as steep as it
+  // has to be to clear the cushion behind the cue ball (the butt has to pass over the rail).
+  const t0 = railBehind(s.cb, u), rAt = d => .255 + (d/58)*(.6 - .255);
+  const clear = Math.atan2(1.6 + .15 + rAt(t0) - Cp[2], t0);
+  const EL = Math.max((4 + 2*ty)*RAD, clear), f3 = [u[0]*Math.cos(EL), u[1]*Math.cos(EL), -Math.sin(EL)];
+  const at = (P, d) => [P[0] - f3[0]*d, P[1] - f3[1]*d, P[2] - f3[2]*d];   // d inches back along the cue from P
+  const faces = [];   // [pts3, fill]
+  // the cue: a tapered band facing the eye, 58" long, tip 13 mm, butt 1.2"
+  const T0 = at(Cp, 0.4 - push), LEN = 58, cueR = t => .255 + t*(.6 - .255);
+  const st = [0, 1, 6, 16, 29, 36, 44, 54, 58];
+  for(let i = 0; i < st.length - 1 && ac >= .01; i++){
+    const A = at(T0, st[i]), B = at(T0, st[i+1]);
+    const side = P => { const v = norm3([cam.E[0]-P[0], cam.E[1]-P[1], cam.E[2]-P[2]]), w = cross3(f3, v), l = Math.hypot(...w) || 1; return [w[0]/l, w[1]/l, w[2]/l]; };
+    const sa = side(A), sb = side(B), ra = cueR(st[i]/LEN), rb = cueR(st[i+1]/LEN);
+    const col = i === 0 ? '#f2efe8' : st[i] >= 29 ? '#3b2a20' : '#d8b57a', NS = 6;
+    for(let j = 0; j < NS; j++){   // strips across the cue, shaded like a cylinder: lit along the top, darker at the edges
+      const t0 = Math.sin(-Math.PI/2 + Math.PI*j/NS), t1 = Math.sin(-Math.PI/2 + Math.PI*(j + 1)/NS), lit = Math.cos(-Math.PI/2 + Math.PI*(j + .5)/NS);
+      const P = (C, sv, rr, k) => [C[0] + sv[0]*rr*k, C[1] + sv[1]*rr*k, C[2] + sv[2]*rr*k];
+      faces.push([[P(A, sa, ra, t0), P(B, sb, rb, t0), P(B, sb, rb, t1), P(A, sa, ra, t1)], shadeHex(col, .55 + .45*lit), true]);
+    }
+  }
+  // the hand: an open bridge a forearm's length (less 1¼") behind the cue ball, the cue resting in the V of thumb and index knuckle
+  const Hh = stanceIn(), Lb = 0.146*Hh - 1.25;
+  const Bp = [Cp[0] - u[0]*Lb, Cp[1] - u[1]*Lb];
+  const zv = Math.max(.9, Cp[2] + Lb*Math.tan(EL) - .3);                     // the V: just under the cue
+  const L = (x, y, z) => [Bp[0] + u[0]*x + sd[0]*y, Bp[1] + u[1]*x + sd[1]*y, z];
+  const V = (x, y, z) => [u[0]*x + sd[0]*y, u[1]*x + sd[1]*y, z];
+  const box = (c, ax, ay, az, col, front) => {   // centre and half-axes (world): the faces that face the eye
+    const corner = (i, j, k) => [0,1,2].map(m=>c[m] + i*ax[m] + j*ay[m] + k*az[m]);
+    for(const [ax2, sgn] of [[0,1],[0,-1],[1,1],[1,-1],[2,1],[2,-1]]){
+      const nrm = [ax, ay, az][ax2].map(v=>v*sgn), fc = c.map((v, m)=>v + nrm[m]);
+      if((cam.E[0]-fc[0])*nrm[0] + (cam.E[1]-fc[1])*nrm[1] + (cam.E[2]-fc[2])*nrm[2] <= 0) continue;
+      const q = ax2 === 0 ? [corner(sgn,-1,-1), corner(sgn,1,-1), corner(sgn,1,1), corner(sgn,-1,1)]
+              : ax2 === 1 ? [corner(-1,sgn,-1), corner(1,sgn,-1), corner(1,sgn,1), corner(-1,sgn,1)]
+              :             [corner(-1,-1,sgn), corner(1,-1,sgn), corner(1,1,sgn), corner(-1,1,sgn)];
+      const nn = norm3(nrm), lit = Math.max(0, nn[0]*LIGHT[0] + nn[1]*LIGHT[1] + nn[2]*LIGHT[2]);
+      faces.push([q, shadeHex(col, .62 + .38*lit, 26*lit), false, front]);   // lit from above: tops lighter, sides darker
+    }
+  };
+  const limb = (P, Q, w, h, col, front) => {   // a box from P to Q (local), w wide, h thick
+    const a = L(...P), b = L(...Q), c = a.map((v, m)=>(v + b[m])/2), ax = a.map((v, m)=>(b[m] - v)/2);
+    const hz = [0, 0, 1], wy = norm3(cross3(hz, ax)), up = norm3(cross3(ax, wy));
+    box(c, ax, wy.map(v=>v*w/2), up.map(v=>v*h/2), col, front);
+  };
+  // a pool glove: palm, thumb, index and middle fingers covered, ring and little finger bare, a strap at the wrist
+  const gc = isHex(settings.glove) ? settings.glove : GLOVE_DEF, sk = isHex(settings.skin) ? settings.skin : HAND_DEF;
+  if(settings.bridge === 'closed'){
+    // closed bridge: the cue runs through a loop of the index finger, resting on the thumb and middle finger; the other fingers spread on the cloth
+    const zc = zv + .3;   // the cue's axis here
+    limb([-3.6, 1.4, .55], [-.2, 1.1, zc - .95], 3.0, 1.0, gc);              // palm, a little flatter, beside and below the cue
+    [[.6, .2], [1.4, .7], [2.1, 1.1]].forEach(([y, fan], i)=>limb([-.2, y, zc - .95], [2.4 - i*.25, y + fan, .3], .62, .55, i < 1 ? gc : sk));   // middle, ring, little finger
+    limb([-1.6, -.6, zc - .9], [.6, -.5, zc - .55], .6, .5, gc);             // thumb, below the cue on its far side
+    limb([-.2, .7, zc - .3], [.1, .5, zc + .55], .45, .45, gc);               // index finger, up the near side,
+    limb([.1, .5, zc + .55], [.25, -.5, zc + .5], .45, .4, gc, true);         // over the top of the cue (drawn over it),
+    limb([.25, -.5, zc + .5], [.35, -.6, zc - .45], .4, .4, gc, true);        // and down the far side to meet the thumb
+  } else {
+    limb([-3.6, 1.6, .55], [-.1, 1.5, zv - .35], 3.2, 1.0, gc);                // palm: heel on the cloth, knuckles up by the V
+    [[.4, .25], [1.2, .7], [2.0, 1.15], [2.7, 1.55]].forEach(([y, fan], i)=>limb([-.1, y, zv - .55], [2.6 - i*.25, y + fan, .3], .62, .55, i < 2 ? gc : sk));   // fingers spread on the cloth
+    limb([-1.7, -.5, zv - .85], [.8, -.45, zv - .3], .6, .55, gc);            // thumb, up beside the cue: the V it rests in
+  }
+  limb([-3.6, 1.6, .7], [-5, 1.9, 1.6], 2.6, 1.1, gc);                      // wrist, under the glove's strap
+  limb([-4.1, 1.7, .85], [-4.7, 1.8, 1.3], 2.85, 1.35, strapOf(gc));   // the strap
+  limb([-5, 1.9, 1.6], [-14.5, 5.8, 3.9], 2.9, 2.3, sk);                    // forearm, back toward the elbow, rising gently (about 13°)
+  // far to near, see-through
+  return faces.map(([q, col, cue, front])=>({q, col, cue, front: front ? 1 : 0, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>(x.front - y.front) || ((x.cue ? 1 : 0) - (y.cue ? 1 : 0)) || (y.z - x.z))
+    .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${ac.toFixed(3)}"/>`
+      : `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}"/>`; }).join('');
 }
 function perspFront(cam, s, reveal, segs, ring){
   let o = '';
@@ -1842,6 +2158,21 @@ function perspTop(cam, s, reveal){
     o += `<g transform="translate(${ax.toFixed(1)} ${ay.toFixed(1)})"><g transform="rotate(${ang.toFixed(1)})"><path d="M10 0L-6 -8L-6 8Z" fill="#ffd34d"/></g>
       <text y="${ay > VH/2 ? -14 : 22}" text-anchor="middle" font-size="13" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d">pocket</text></g>`;
   }
+  // the cue ball's zone, when none of it is on screen: a pointer at the edge, the same way
+  if(s.zone && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0) && !look.k){
+    // shown whenever most of it is off screen (a sliver at the edge is easy to miss)
+    const inV = ([x, y])=>x>=0 && x<=VW && y>=0 && y<=VH, ring = circ3(s.zone.c, s.zone.r, .03, 16).map(cam.toCam);
+    const seen = ring.filter(c=>c[2]>NEAR && inV(cam.proj(c))).length, zc0 = cam.toCam([s.zone.c[0], s.zone.c[1], .03]);
+    if(seen < ring.length/2 || zc0[2] <= NEAR || !inV(cam.proj(zc0))){
+      const zc = cam.toCam([s.zone.c[0], s.zone.c[1], .03]);
+      let dx = zc[0], dy = -zc[1];
+      if(zc[2] <= NEAR){ dy = Math.abs(dy)+1; }
+      const k = Math.min((VW/2-30)/Math.abs(dx||1e-6), (VH/2-30)/Math.abs(dy||1e-6));
+      const ax = VW/2+dx*k, ay = VH/2+dy*k, ang = Math.atan2(dy,dx)/RAD;
+      o += `<g transform="translate(${ax.toFixed(1)} ${ay.toFixed(1)})"><g transform="rotate(${ang.toFixed(1)})"><path d="M10 0L-6 -8L-6 8Z" fill="#5be0c8"/></g>
+        <text y="${ay > VH/2 ? -14 : 22}" text-anchor="middle" font-size="13" font-family="IBM Plex Sans, sans-serif" fill="#5be0c8">zone</text></g>`;
+    }
+  }
   return o;
 }
 
@@ -1872,9 +2203,27 @@ function draw(reveal){
     const fx = $('tablefx');
     if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
-    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
+    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setArrow(arrowAt()); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
   }
 }
+// The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
+function arrowAt(){
+  if(!shot || !shot.P || settings.view === 'top' || (tut.on && tut.zb > .5)) return null;
+  const E = engineTable().pockets[POCKETS.indexOf(shot.P)], t = performance.now()/1000;
+  return {p: E.hole, z: 4.2 + .7*Math.sin(t*2*Math.PI/1.6), spin: t*.6};
+}
+let arrowRaf = 0, arrowLast = 0;
+function arrowLoop(){
+  if(arrowRaf || !G3) return;
+  const tick = now => {
+    arrowRaf = 0;
+    if(!G3 || !lastCam || settings.view === 'top' || document.hidden) return;
+    if(now - arrowLast >= 33){ arrowLast = now; G3.setArrow(arrowAt()); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
+    arrowRaf = requestAnimationFrame(tick);
+  };
+  arrowRaf = requestAnimationFrame(tick);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && shot) arrowLoop(); });
 // the gold ring round the target pocket: round the engine's hole, the part that's outside the playing surface
 function ringArc3(P){
   const E = engineTable().pockets[POCKETS.indexOf(P)], r = E.holeR + 0.6, out = [];
@@ -1961,6 +2310,7 @@ function unpackShot(o){
   return s;
 }
 function deal(){
+  if(cueStroke && cueStroke.s === shot) return;   // mid-stroke: the shot goes first
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   // a new element is explained the first time you reach the grade that brings it in
   if(!tut.on && $('stancecover').hidden && (settings.task === 'sess' || settings.task === 'shoot')){
@@ -2170,6 +2520,7 @@ const SFX = {
   click:  (o, t, v)=>{ sfxTone(o, t, .12, 1175, 0, .55*v); sfxTone(o, t, .08, 1760, 0, .3*v); sfxTone(o, t, .025, 2349, 0, .12*v, 'triangle'); },   // tink
   drop:   (o, t, v)=>{ sfxTone(o, t, .14, 405, 127, .8*v, 'triangle'); },   // bloop
   rail:   (o, t, v)=>{ sfxNoise(o, t, .08, 'lowpass', 500, .9, .6*v); sfxTone(o, t, .1, 140, 90, .6*v); },                                    // a muted, woody thump
+  cue:    (o, t, v)=>{ sfxTone(o, t, .06, 760, 520, .55*v); sfxTone(o, t, .04, 1520, 1100, .14*v, 'triangle'); sfxNoise(o, t, .012, 'bandpass', 2400, 1.2, .3*v); },   // a hollow 'ponc'   // the tip on the cue ball: a short, medium thud
   jaw:    (o, t, v)=>{ sfxTone(o, t, .06, 430, 300, .6*v, 'triangle'); sfxTone(o, t + .08, .28, 220, 90, .55*v); },   // clack-bwomp
 };
 // schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
@@ -2450,6 +2801,8 @@ function animateShot(oc, done, obCol, pre){
   const total = Math.max(lastT(Pc), lastT(Po), isRight ? 0 : lastT(Pr))*1000 + 280;   // short hold so you see where the balls stopped
   // sounds, from the engine's events: the hit, cushions and jaws (softer the gentler; a rattle's rapid touches count once), pockets
   const plan = [], lastAt = {};
+  const v0 = Pc.length > 1 ? len(sub(Pc[1].p, Pc[0].p))/Math.max(1e-6, Pc[1].t - Pc[0].t) : 20;
+  plan.push([0, 'cue', Math.max(.35, Math.min(1, .3 + v0/50))]);   // the cue strikes the cue ball, firmer for a harder shot
   for(const e of sim.events){
     const kind = e.type === 'ball' ? 'click' : e.type === 'pocket' ? 'drop' : e.type === 'jaw' ? 'jaw' : 'rail';
     if(kind !== 'drop' && e.speed < 3) continue;
@@ -2815,10 +3168,11 @@ function applySetting(key, val){
   if(tut.on && key==='task') return;
   if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !flashUnlocked()) || (key==='ghost' && aidMode('ghost')!=='optional') || (key==='line' && aidMode('line')!=='optional') || (key==='cam' && aidMode('stance')!=='optional') || (key==='walk' && baseRun()) || (key==='flash' && val==='750' && fastFlashLocked())) return;
   settings[key] = val; saveSettings(); syncPressed();
-  if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
+  if(key==='task'){ setTimeout(renderPracticeChip, 0); setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
-  else if(key==='view' || key==='cam'){ if(shot) draw(answered); }   // same shot, new viewpoint
+  else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); }
+  else if(key==='view' || key==='cam' || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
   renderStats();
@@ -2845,11 +3199,20 @@ $('nudge-l').addEventListener('click', ()=>nudge(-1));
 $('nudge-r').addEventListener('click', ()=>nudge(1));
 // Next shot: always straight to a new shot. A running animation is simply dropped (the shot still counts).
 let jumpingAhead = false;
+// Next shot: a quick blink through the dark room, not a hard cut (about 0.35 s)
+let dipping = false;
+function dip(fn){
+  const el = $('dip');
+  if(dipping) return;
+  if(!el || matchMedia('(prefers-reduced-motion: reduce)').matches){ fn(); return; }
+  dipping = true; el.classList.remove('out'); el.style.opacity = '1';
+  setTimeout(()=>{ try{ fn(); } finally { requestAnimationFrame(()=>{ el.classList.add('out'); el.style.opacity = '0'; dipping = false; }); } }, 150);
+}
 function nextShot(){
   if(tut.on){ tutNext(); return; }
-  if(!answered || !$('endcover').hidden) return;
+  if(!answered || !$('endcover').hidden || cueStroke) return;
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
-  if($('sesscover').hidden) deal();
+  if($('sesscover').hidden) dip(deal);
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) (isShooting() ? takeShot() : shoot()); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
@@ -2887,7 +3250,7 @@ function walkRelease(){
 }
 svgEl.addEventListener('pointerup', walkRelease);
 svgEl.addEventListener('pointercancel', walkRelease);
-tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) deal(); });
+tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) dip(deal); });
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
 const MAX_REPLAYS = 5, REPLAY_WINDOW = 50;   // replays per 50 Flash shots
 function replaysLeft(){   // a rolling budget: 5 over your last 50 Flash shots (this one included)
@@ -3000,12 +3363,18 @@ const SL_DOWN = [
    text:'From here every shot is a routine. You start <b>standing on the ball line</b>, cue ball to object ball, to read the layout.'},
   {aids:{}, next:true,
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
+  {aids:{}, next:true,
+   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, hiding part of the view as they do at a real table. You can make them see-through in Settings.'},
   {finish:true, aids:{},
-   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
+   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three. From <b>Any angle</b> on there\'s no timer: you get down when you\'re ready.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
-   text:'<b>Speed</b> is yours now, from <b>1</b> to <b>10</b>: <b>↑ ↓</b>, or the bar on the right of the table. Set it before you call. Each step up rolls the cue ball about a third farther.'},
+   text:'<b>Speed</b> is yours now: four strokes, <b>¼</b>, <b>½</b>, <b>¾</b> and <b>full</b>. <b>↑ ↓</b>, or the bar on the right of the table. Set it before you call.'},
+  {aids:{}, next:true,
+   text:'Rolling, a <b>¼</b> stroke (a touch shot) goes under a table length, <b>½</b> (a lag) about two, <b>¾</b> about three, and the <b>full</b> stroke (a power shot) about four, rails included.'},
+  {aids:{}, next:true,
+   text:'Your <b>bridge</b> stays put: how much of your <b>stroke</b> you use sets the speed. The full stroke brings the tip back to your bridge; ½ goes half as far. Same tempo, same <b>follow-through</b> every time.'},
   {aids:{}, play:{k:.45, tip:[0,.4]}, next:true, text:'Too soft and it dies short. Watch.'},
   {aids:{}, play:{k:1, tip:[0,.4]}, next:true, text:'<b>Pocket speed</b>: just enough, and it drops.'},
   {aids:{}, play:{k:3.2, tip:[0,.4]}, next:true, text:'Much harder still goes, but the pocket gets less forgiving and the cue ball runs wild.'},
@@ -3260,7 +3629,15 @@ if(DEV) $('devlvl').addEventListener('click', ()=>{   // testing: level up now, 
   const d = levelPoint(true); if(stats.active) stats.active.pending = null; save();
   if(d){ showLevel(d, from); setTimeout(()=>{ if(!tut.on) deal(); }, 2900); }
 });
-$('ladder').addEventListener('click', e=>{ const li = e.target.closest('li[data-g]'); if(DEV && li) setGradeForTesting(+li.dataset.g); });
+document.addEventListener('keyup', e=>{ if(e.key===' ' && look.target){ e.preventDefault(); setLook(false); } });
+{ const b = $('lookbtn'); b.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); setLook(true); });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, e=>{ e.stopPropagation(); if(look.target) setLook(false); })); b.addEventListener('click', e=>e.stopPropagation()); }
+$('ladder').addEventListener('click', e=>{
+  const li = e.target.closest('li[data-g]'); if(!li) return;
+  const i = +li.dataset.g;
+  if(DEV) setGradeForTesting(i);
+  else if(stats.shoot && i <= stats.shoot.g){ setPractice(i < stats.shoot.g ? i : null); openProg(false); }
+});
 $('prog').addEventListener('click', e=>{ if(e.target === $('prog')) openProg(false); });
 $('menuclose').addEventListener('click', ()=>openMenu(false));
 $('menu').addEventListener('click', e=>{ if(e.target === $('menu')) openMenu(false); });
@@ -3276,6 +3653,8 @@ $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
+  if((e.key==='m' || e.key==='M') && !e.metaKey && !e.ctrlKey){ const L = ['off','parlor','smoke','felt']; applySetting('music', L[(L.indexOf(settings.music) + 1) % L.length]); e.preventDefault(); return; }
+  if(e.key===' ' && isShooting() && !tut.on && settings.view !== 'top' && $('stancecover').hidden){ e.preventDefault(); if(!e.repeat) setLook(true); return; }
   if(!$('stancecover').hidden){ if(e.key==='Enter'){ closeStance(); e.preventDefault(); } return; }
   if(tut.on && e.key==='Enter'){ tutNext(); e.preventDefault(); return; }
   if(tut.on && e.key==='Escape'){ endTut(); e.preventDefault(); return; }
@@ -3294,7 +3673,7 @@ document.addEventListener('keydown', e=>{
   else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1, e.shiftKey ? 6 : 1); e.preventDefault(); }
   else if(isShooting() && !answered && ctrl().speed && (e.key==='ArrowUp' || e.key==='ArrowDown')){ setSpeedLevel(speedLevel() + (e.key==='ArrowUp' ? 1 : -1)); e.preventDefault(); }
   else if(isShooting() && !answered && /^[wasdx]$/i.test(e.key) && !e.metaKey && !e.ctrlKey){ nudgeTip(e.key.toLowerCase()); e.preventDefault(); }
-  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ if(answered){ dip(deal); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
 if(!['stand','down'].includes(settings.view)) settings.view='stand';
@@ -3342,6 +3721,26 @@ $('stancedone').addEventListener('click', e=>{ e.stopPropagation(); closeStance(
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
+if(!['R','L'].includes(settings.hand)) settings.hand='R';
+if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
+if(stats.shoot) stats.shoot.g = Math.max(stats.shoot.g, stats.shoot.best ?? 0);   // grades only go up now: back to your best
+$('practicechip').addEventListener('click', e=>{ e.stopPropagation(); setPractice(null); });
+renderPracticeChip();
+// background music: off to start; it can only begin after a tap or key (browsers block sound before that)
+if(!['off','parlor','smoke','felt'].includes(settings.music)) settings.music = 'off';
+if(!(+settings.musicVol >= 0 && +settings.musicVol <= 100)) settings.musicVol = 50;
+$('musicvol').value = settings.musicVol; $('musicvolval').textContent = settings.musicVol + '%';
+if(window.Music) Music.setVolume(settings.musicVol/100);
+$('musicvol').addEventListener('input', e=>{ settings.musicVol = +e.target.value; $('musicvolval').textContent = settings.musicVol + '%'; saveSettings(); if(window.Music) Music.setVolume(settings.musicVol/100); });
+const startMusic = () => { if(window.Music && settings.music !== 'off' && !Music.playing()) Music.play(settings.music); };
+['pointerdown', 'keydown'].forEach(t=>document.addEventListener(t, startMusic, {once: false, passive: true}));
+if(!(+settings.rigOpacity >= 50 && +settings.rigOpacity <= 100) || !settings.rigOpV){ settings.rigOpacity = 75; settings.rigOpV = 1; }
+$('rigoprange').value = settings.rigOpacity; $('rigopval').textContent = settings.rigOpacity + '%';
+$('rigoprange').addEventListener('input', e=>{ settings.rigOpacity = +e.target.value; $('rigopval').textContent = settings.rigOpacity + '%'; saveSettings(); if(shot) draw(answered); });
+if(!isHex(settings.glove)) settings.glove = GLOVE_DEF;
+if(!isHex(settings.skin)) settings.skin = HAND_DEF;
+$('glovecolor').value = settings.glove; $('skincolor').value = settings.skin;
+[['glovecolor', 'glove'], ['skincolor', 'skin']].forEach(([id, k])=>$(id).addEventListener('input', e=>{ settings[k] = e.target.value; saveSettings(); if(shot) draw(answered); }));
 settings.throw='0';   // throw option removed
 settings.table = progTable();   // not a setting: your grade picks it
 if(stats.active){ stats.active.size = RUN_SIZE; delete stats.active.base; }   // a session left open from before just carries on as the run

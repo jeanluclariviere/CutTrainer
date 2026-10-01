@@ -155,7 +155,10 @@ function make(canvas){
       }
       x.putImageData(img, 0, 0);
     } else {
-      x.fillStyle = color; x.fillRect(0, 0, w, h);
+      if(+number >= 9){   // a stripe: white, with a coloured band round the middle that the number sits on
+        x.fillStyle = '#f4efe0'; x.fillRect(0, 0, w, h);
+        x.fillStyle = color; x.fillRect(0, h*0.31, w, h*0.38);
+      } else { x.fillStyle = color; x.fillRect(0, 0, w, h); }
       // the number spot sits at the texture's centre: local +x
       x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(w/2, h/2, w*0.072, h*0.145, 0, 0, Math.PI*2); x.fill();
       x.fillStyle = '#111'; x.font = `700 ${Math.round(h*0.17)}px Barlow Condensed, Arial Narrow, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -189,6 +192,20 @@ function make(canvas){
   const ID = [[1,0,0],[0,1,0],[0,0,1]];
   const mul3 = (A, B) => A.map(r=>[0,1,2].map(j=>r[0]*B[0][j] + r[1]*B[1][j] + r[2]*B[2][j]));
 
+  // ---------- the target pocket: a yellow arrow floating over it, pointing down ----------
+  const arrow = new T3.Group();
+  {
+    const mat = new T3.MeshStandardMaterial({color:0xffd34d, emissive:0x6b4f00, roughness:.45, metalness:0});
+    const head = new T3.Mesh(new T3.ConeGeometry(1.1, 1.8, 24), mat); head.rotation.x = Math.PI/2; head.position.z = 0.9;    // tip at z = 0, pointing down
+    const shaft = new T3.Mesh(new T3.CylinderGeometry(.42, .42, 2.2, 20), mat); shaft.rotation.x = Math.PI/2; shaft.position.z = 1.8 + 1.1;
+    head.rotation.x = -Math.PI/2;
+    arrow.add(head, shaft); arrow.visible = false; world.add(arrow);
+  }
+  function setArrow(a){   // a: {p:[x, y], z} (the tip), or null
+    arrow.visible = !!a;
+    if(a){ arrow.position.set(a.p[0], a.p[1], a.z); arrow.rotation.z = (a.spin || 0); }
+  }
+
   // ---------- frame ----------
   // cam: {E, f, focal}; vw, vh: the SVG viewBox size the camera's focal length is in
   function render(cam, vw, vh, pxW, pxH){
@@ -200,7 +217,7 @@ function make(canvas){
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
   }
-  return {build, setBalls, render, renderer};
+  return {build, setBalls, setArrow, render, renderer};
 }
 root.Table3D = {make};
 })(typeof window !== 'undefined' ? window : this);
