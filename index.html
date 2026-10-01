@@ -132,6 +132,9 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
 .trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
+.practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
+.practicechip b{color:#ffd34d;margin-left:8px}
+.ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
 .routinechip kbd{font:600 10px var(--body);padding:0 4px;margin-left:6px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d}
 @media (hover:none){.routinechip kbd{display:none}}
 .speedbar{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:none;cursor:ns-resize;user-select:none}
@@ -526,6 +529,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
         <div class="speedchip" id="speedchip" hidden></div>
         <button class="routinechip" id="routinechip" hidden></button>
+        <button class="practicechip" id="practicechip" hidden></button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
@@ -949,11 +953,12 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 197;   // one per commit to main
+const BUILD = 198;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
 function setGradeForTesting(i){
+  settings.practice = null; saveSettings(); setTimeout(renderPracticeChip, 0);
   if(settings.tutSeen){ const tr = isShooting() ? 'shoot' : 'read'; for(const k in LESSONS) if((LESSONS[k].track || 'read') === tr && LESSONS[k].at > i) delete settings.tutSeen[k]; saveSettings(); }   // lessons above the picked grade play again when you reach them
   if(!hasBaseline()){   // #dev skips the baseline: record a stand-in so everything that needs one opens up
     const p0 = GRADE_FROM[Math.min(i, GRADE_FROM.length-1)];
@@ -970,12 +975,13 @@ function renderProgress(){
   const g = L ? L.g : 0, best = L ? Math.max(L.best ?? 0, L.g) : 0, pts = L ? L.pts : 0;
   $('proghead').textContent = 'Progress';
   $('ladder').innerHTML = GR.map((G, i)=>{
-    const cls = i===g ? 'here' : i <= best ? 'done' : '';
+    const pr = practicing() && i === +settings.practice;
+    const cls = (i===g ? 'here' : i <= best ? 'done' : '') + (i < g ? ' pick' : '') + (pr ? ' practice' : '');
     const bar = i===g ? (i < GR.length-1
-      ? `<span class="here-bar"><i class="${pts<0?'neg':''}" style="width:${Math.min(100, Math.abs(pts)/PTS_UP*100)}%"></i></span><small>${pts >= 0 ? `${pts} of ${PTS_UP} to ${GR[i+1]}` : `${-pts} of ${PTS_UP} toward dropping to ${GR[i-1] || G}`}</small>`
-      : '<small>You made it.</small>') : '';
+      ? `<span class="here-bar"><i style="width:${Math.min(100, Math.max(0, pts)/PTS_UP*100)}%"></i></span><small>${Math.max(0, pts)} of ${PTS_UP} to ${GR[i+1]}</small>`
+      : '<small>You made it.</small>') : pr ? '<small>Practising: not scored</small>' : '';
     return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${TX[i]}${bar}</span></li>`;
-  }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
+  }).reverse().join('') + `<li class="devnote"><span></span><small>${DEV ? 'Testing: tap a grade to jump there.' : 'Tap a grade you\'ve passed to practise it, as long as you like. Practice shots don\'t count.'}</small></li>`;
 }
 const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 10:'🔒 0.75 s Flash'};
 // ==================== the Shoot half ====================
@@ -996,7 +1002,7 @@ const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free pla
 const shootUnlocked = () => true;
 // the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C (Sessions by your grade; Flash and Free play by your best)
 const TABLE_AT = {'8': 2, '9': 5};
-const progTable = () => { const g = settings.task === 'shoot' ? (stats.shoot ? stats.shoot.g : 0) : ladderBest(); return g >= TABLE_AT['9'] ? '9' : g >= TABLE_AT['8'] ? '8' : '7'; };
+const progTable = () => { const g = settings.task === 'shoot' ? shootLevel() : ladderBest(); return g >= TABLE_AT['9'] ? '9' : g >= TABLE_AT['8'] ? '8' : '7'; };
 const ladderBest = () => stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0;
 const FLASH_AT = 3, FREE_AT = SH.any, FAST_FLASH_GRADE = SH.speed;   // Flash opens at D+ (once you aim without the ghost ball), Free play with any angle (C+), 0.75 s Flash with speed (B-)
 const flashUnlocked = () => DEV || ladderBest() >= FLASH_AT;
@@ -1005,7 +1011,19 @@ const isShoot = () => settings.task === 'shoot';
 const isFree = () => settings.task === 'free';
 const isShooting = () => isShoot() || isFree();
 function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
-const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : (stats.shoot ? stats.shoot.g : 0);
+// You can go back to any grade you've passed and practise it as long as you like: those shots aren't scored.
+const practicing = () => isShoot() && settings.practice != null && stats.shoot && +settings.practice < stats.shoot.g;
+const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : practicing() ? +settings.practice : (stats.shoot ? stats.shoot.g : 0);
+function setPractice(i){
+  const g = stats.shoot ? stats.shoot.g : 0;
+  settings.practice = i != null && i < g ? i : null; saveSettings();
+  renderPracticeChip(); renderProgress(); if(!answered && !anim) deal();
+}
+function renderPracticeChip(){
+  const el = $('practicechip'); if(!el) return;
+  el.hidden = !practicing();
+  if(practicing()) el.innerHTML = `Practising ${SHOOT_GRADES[+settings.practice]} · not scored <b>Back to ${SHOOT_GRADES[stats.shoot.g]}</b>`;
+}
 const NO_TIMER = 1e6;   // from Any angle on, nothing hurries you: you get down when you're ready
 const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : g < SH.any ? 3 : NO_TIMER;
 // what you control at each step (Free play: everything you've unlocked)
@@ -1297,7 +1315,9 @@ function takeShot(id){
   document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===id ? (ok && run.made ? 'right' : run.made ? 'also' : 'wrong') : x.dataset.id===right.id ? 'right' : ''; });   // your call is marked straight away: the right fraction played too soft or too hard is still a miss
   cancelAnimationFrame(featherRaf);
   const play = () => {
-  if(isShoot()){
+  if(isShoot() && practicing()){   // practice: logged as practice, nothing scored
+    logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, gh: 1, pr: g});
+  } else if(isShoot()){
     const prevStreak = curStreak();
     logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
     if(!partial){
@@ -1327,7 +1347,7 @@ function takeShot(id){
   animateShot({made: run.made}, ms=>{   // the shot counts once it's played out (or skipped), so the last one of a session is watched too
     if(isShoot() && stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (ms||0);
     if(!jumpingAhead){ draw(true); standUp(s); }
-    if(isShoot()) sessionTick(full, run.made);
+    if(isShoot() && !practicing()) sessionTick(full, run.made);
   }, ok ? '#ffd34d' : MISS, run);
   finishRound();
   };
@@ -1372,8 +1392,7 @@ function levelPoint(ok){   // returns +1 / -1 when the grade changes
   const L = trk(), G = trkGrades();
   L.pts += ok ? PT_RIGHT : PT_WRONG;
   if(L.pts >= PTS_UP && L.g < G.length-1){ L.g++; L.pts = 0; L.best = Math.max(L.best ?? 0, L.g); return 1; }
-  if(L.pts <= -PTS_UP && L.g > 0){ L.g--; L.pts = 0; return -1; }
-  L.pts = Math.max(-PTS_UP, Math.min(PTS_UP, L.pts));
+  L.pts = Math.max(0, Math.min(PTS_UP, L.pts));   // grades only go up: a miss costs progress toward the next one, never the grade
   return 0;
 }
 function renderBadge(pop){
@@ -3078,7 +3097,7 @@ function applySetting(key, val){
   if(tut.on && key==='task') return;
   if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !flashUnlocked()) || (key==='ghost' && aidMode('ghost')!=='optional') || (key==='line' && aidMode('line')!=='optional') || (key==='cam' && aidMode('stance')!=='optional') || (key==='walk' && baseRun()) || (key==='flash' && val==='750' && fastFlashLocked())) return;
   settings[key] = val; saveSettings(); syncPressed();
-  if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
+  if(key==='task'){ setTimeout(renderPracticeChip, 0); setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
   else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); }
@@ -3539,7 +3558,12 @@ if(DEV) $('devlvl').addEventListener('click', ()=>{   // testing: level up now, 
   const d = levelPoint(true); if(stats.active) stats.active.pending = null; save();
   if(d){ showLevel(d, from); setTimeout(()=>{ if(!tut.on) deal(); }, 2900); }
 });
-$('ladder').addEventListener('click', e=>{ const li = e.target.closest('li[data-g]'); if(DEV && li) setGradeForTesting(+li.dataset.g); });
+$('ladder').addEventListener('click', e=>{
+  const li = e.target.closest('li[data-g]'); if(!li) return;
+  const i = +li.dataset.g;
+  if(DEV) setGradeForTesting(i);
+  else if(stats.shoot && i <= stats.shoot.g){ setPractice(i < stats.shoot.g ? i : null); openProg(false); }
+});
 $('prog').addEventListener('click', e=>{ if(e.target === $('prog')) openProg(false); });
 $('menuclose').addEventListener('click', ()=>openMenu(false));
 $('menu').addEventListener('click', e=>{ if(e.target === $('menu')) openMenu(false); });
@@ -3624,6 +3648,9 @@ if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
+if(stats.shoot) stats.shoot.g = Math.max(stats.shoot.g, stats.shoot.best ?? 0);   // grades only go up now: back to your best
+$('practicechip').addEventListener('click', e=>{ e.stopPropagation(); setPractice(null); });
+renderPracticeChip();
 // background music: off to start; it can only begin after a tap or key (browsers block sound before that)
 if(!['off','parlor','smoke','felt'].includes(settings.music)) settings.music = 'off';
 if(!(+settings.musicVol >= 0 && +settings.musicVol <= 100)) settings.musicVol = 50;
