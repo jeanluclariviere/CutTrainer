@@ -127,8 +127,11 @@ function hitBalls(a, b, n){
 // ---------- the cue ----------
 // Struck along dir at speed V with the tip at (side a, height b), both in ball radii from the centre.
 // A level cue, no squirt or swerve: the tip height sets top/back spin, the side offset sets sidespin.
+const SQUIRT = 3.5*Math.PI/180;   // how far side spin pushes the cue ball off the aim line, per ball radius of offset (a low-deflection shaft is less)
 function strike(ball, dir, V, tip){
-  const [a, b] = tip || [0, 0], d = v2.norm(dir);
+  const [a, b] = tip || [0, 0], d0 = v2.norm(dir);
+  // a > 0 strikes the side toward (-dy, dx); the cue ball squirts the other way
+  const q = -SQUIRT*a, d = [d0[0]*Math.cos(q) - d0[1]*Math.sin(q), d0[0]*Math.sin(q) + d0[1]*Math.cos(q)];
   ball.v = v2.mul(d, V);
   // rolling is surface speed = V: w = (V/R)(-dy, dx); a tip height b gives 5/2·b of that
   const k = 2.5*V/R;
@@ -293,6 +296,6 @@ function collide(dir, vc, spin, n){
   return {obDir: v2.norm(b.v), obSpeed: v2.len(b.v), cbV: a.v, cbW: a.w, obW: b.w};
 }
 
-const api = {R, G, C, makeTable, simulate, strike, arrive, strikeFor, collide, matRot, I3, muBall};
+const api = {R, G, C, SQUIRT, makeTable, simulate, strike, arrive, strikeFor, collide, matRot, I3, muBall};
 if(typeof module !== 'undefined' && module.exports) module.exports = api; else root.PoolEngine = api;
 })(typeof window !== 'undefined' ? window : this);

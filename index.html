@@ -42,6 +42,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font
 header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
 .gradebadge{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:58px;padding:7px 10px 8px;border-radius:12px;background:#10283d;color:#ffd34d;box-shadow:0 1px 3px rgba(0,0,0,.18)}
 .gradebadge b{font:700 26px/1 var(--display);letter-spacing:.02em}
+.gradebadge small{font:600 9px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:#9fb3c1}
 .bbar{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden}
 .bbar i{display:block;height:100%;width:0;background:#ffd34d;border-radius:2px;transition:width .25s}
 .bbar i.neg{background:#ff8a7a}
@@ -90,6 +91,9 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menuhead{display:flex;justify-content:space-between;align-items:center;font:700 20px var(--display)}
 .menuclose{background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer;padding:4px 6px}
 .menucard .opt{justify-content:space-between}
+.menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
+.optrange span{color:var(--muted);font-weight:500;margin-left:6px}
+.optrange input{width:100%;accent-color:#1f6fb2}
 .tutlist{display:flex;flex-direction:column;gap:8px}
 .tutlist button{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;font:600 15px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer}
 .tutlist button small{color:var(--muted);font-weight:500}
@@ -118,7 +122,20 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .table-box.walkable svg{touch-action:none;cursor:grab}
 .table-box.walkable svg:active{cursor:grabbing}
 .table-box.placing svg{touch-action:none;cursor:crosshair}
-.modes{display:grid;grid-template-columns:1fr 1fr;width:100%}
+.modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
+.trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
+.routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;pointer-events:none}
+.speedbar{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:none;cursor:ns-resize;user-select:none}
+.speedtrack{position:relative;width:16px;height:min(60%,180px);min-height:120px;border-radius:9px;background:rgba(255,255,255,.18);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.speedtrack i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#ffd34d,#f08a24)}
+.speedbar b{font:700 13px var(--body);color:#fff;text-shadow:0 1px 2px #000}
+.speedbar small{font:600 10px var(--body);color:#dfe8ef;text-shadow:0 1px 2px #000}
+.freebtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.freebtns small{width:100%;text-align:center;color:var(--muted);font-size:12px}
+.shootctl{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;align-items:center;margin:8px 0}
+.tippad{display:flex;flex-direction:column;align-items:center;gap:4px;touch-action:none}
+.tippad svg{width:96px;height:96px;cursor:crosshair}
+.tippad small{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .modes button{font-size:15px;padding:9px 14px}
 .quick{flex-direction:column;align-items:flex-start;gap:2px;min-height:66px}
 .quick .hint{color:var(--muted);font-size:14px}
@@ -365,7 +382,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     </div>
     <a class="livelink" href="ar.html" id="livelink" hidden>Live AR ›</a>
     <div class="hright">
-      <div class="gradebadge" id="badge" hidden role="button" tabindex="0" aria-label="Your grade: open progress"><b id="badgeg"></b><span class="bbar"><i id="badgefill"></i></span></div>
+      <div class="gradebadge" id="badge" hidden role="button" tabindex="0" aria-label="Your grade: open progress"><small id="badgetrack">Read</small><b id="badgeg"></b><span class="bbar"><i id="badgefill"></i></span></div>
       <button class="cog helpbtn" id="help" aria-label="Tutorial" title="Tutorial">?</button>
       <button class="cog" id="cog" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M10.3 2.8h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9-2.6-.5v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8z"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
     </div>
@@ -386,6 +403,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="view-stand" data-set="view" data-val="stand">Standing</button>
           <button id="view-down" data-set="view" data-val="down">Down on the ball</button>
         </div>
+      </div>
+      <div class="opt optrange">Your height <span id="heightval"></span>
+        <input type="range" id="heightrange" min="150" max="200" step="1" aria-label="Your height, cm">
+      </div>
+      <div class="opt optrange">Standing back from the cue ball <span id="backval"></span>
+        <input type="range" id="backrange" min="12" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
       </div>
       <div class="opt">Table
         <div class="seg" role="group" aria-label="Table size">
@@ -417,7 +440,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
 
   <div class="menu" id="prog" hidden>
     <div class="menucard progcard" role="dialog" aria-label="Progress">
-      <div class="menuhead"><span>Progress</span><button class="menuclose" id="progclose" aria-label="Close">✕</button></div>
+      <div class="menuhead"><span id="proghead">Progress</span><button class="menuclose" id="progclose" aria-label="Close">✕</button></div>
       <ol class="ladder" id="ladder"></ol>
     </div>
   </div>
@@ -462,6 +485,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         </div>
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
         <div class="speedchip" id="speedchip" hidden></div>
+        <div class="routinechip" id="routinechip" hidden></div>
+        <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
       </div>
@@ -470,8 +495,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
 
     <div class="panel">
       <div class="seg modes" role="group" aria-label="Mode">
-        <button id="task-sess" data-set="task" data-val="sess">Freeplay</button>
+        <button id="task-sess">Sessions</button>
         <button id="task-flash" data-set="task" data-val="flash">Flash ⚡️<span class="lock" id="flashlock" aria-label="locked until your baseline" hidden> 🔒</span></button>
+        <button id="task-free">Free play<span class="lock" id="freelock" hidden> 🔒</span></button>
+      </div>
+      <div class="seg trackseg" id="trackseg" role="group" aria-label="Which ladder" hidden>
+        <button id="track-read">Read</button><button id="track-shoot">Shoot</button>
       </div>
       <div class="coach" id="coach" hidden aria-live="polite">
         <small class="coachstep" id="coachstep"></small>
@@ -490,6 +519,13 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <button id="nudge-l" aria-label="Move ghost ball left">◀ Left</button>
         <button id="nudge-r" aria-label="Move ghost ball right">Right ▶</button>
       </div>
+      <div class="shootctl" id="shootctl" hidden>
+        <div class="tippad" id="tippad" hidden><small>Tip</small>
+          <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".1" stroke="#1b6fd1" stroke-opacity=".5" stroke-width=".02" stroke-dasharray=".06 .05"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
+          <button class="link" id="tipcentre">Centre</button>
+        </div>
+        <div class="freebtns" id="freebtns" hidden><button class="sumdone" id="freereset">Reset balls</button><button class="sumdone" id="freenew">New layout</button><small>Drag a ball to move it · tap a pocket to aim for it</small></div>
+      </div>
       <div class="quick" id="quick" aria-live="polite"></div>
       <button class="next" id="next" disabled>Next shot <kbd class="key" aria-hidden="true">Enter</kbd></button>
       <div class="tabs" role="tablist" aria-label="Details">
@@ -500,7 +536,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="tabpanel" role="tabpanel" id="tab-stats" hidden>
       <div class="stathead">
         <div class="seg statmode" role="group" aria-label="Which mode's stats">
-          <button data-stat="sess">Freeplay</button>
+          <button data-stat="sess">Read</button>
           <button data-stat="flash">Flash ⚡️</button>
         </div>
         <div class="seg subtabs" role="tablist" aria-label="Stats sections">
@@ -798,7 +834,7 @@ function generate(){
 // The ladder: aids fade away and go (and stay yours as options), then any angle, then speed & throw.
 const BASE_LOCKED = ['view','table','len','cam','ghost','line','full'];   // can't be changed during the baseline
 const BASE_STD = {table:'9', len:'both', cam:'line', ghost:'0', line:'0', full:'1'};   // the view is set per half: standing, then down
-const GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S'];
+const GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A'];   // the Read ladder (Shoot has its own: SHOOT_GRADES)
 const GRADE_FROM = [0,30,35,40,45,50,55,60,66,72,78,84];   // baseline % for each starting grade (F … A; A+ and S are earned)
 // Each aid: forced on, then fading away (after a delay, in ms), then gone for good and yours to switch on as practice.
 const AIDS = {
@@ -809,9 +845,9 @@ const AIDS = {
 const ANY_AT = 8;                                            // B: cuts at any angle (the right call always pockets)
 const PHYS_AT = 99;                                          // thick / center / thin as part of the call: retired (too fine a judgement); B+ gives it as feedback instead
 const BETWEEN_AT = 9;                                        // B+: cuts between fractions; you call the nearest, the result says which way to nudge
-const THROW_AT = 10;                                         // A-: every shot is soft stun, and the object ball throws
+const THROW_AT = 99;                                         // throw is taught in the Shoot ladder now; Read deals rolling shots
 const SHOT_SPEED = 'medium';   // pocket speed: throw as for a medium-soft hit                                  // one speed for every shot, at every grade (slow and medium come back with a rolling cue-ball path)
-const FAST_FLASH_AT = 11;                                    // A: 0.75 s Flash
+const FAST_FLASH_AT = 10;                                    // A-: 0.75 s Flash
 const LEAN_AT = 7;                                           // the weak-spot lean starts once you read unaided (B-)
 const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
 const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
@@ -834,6 +870,7 @@ const practiceAid = () => false;   // aids aren't switchable any more, so no sho
 // how visible an aid is right now, 0..1 (fading aids fade out 500 ms after their delay)
 function aidAlpha(key){
   if(tut.on) return tutAid(key);
+  if(isShooting()) return key === 'stance' ? 0 : shootAid(key) ? 1 : 0;
   const m = aidMode(key);
   if(m==='off') return 0;
   if(m==='on') return 1;
@@ -842,7 +879,7 @@ function aidAlpha(key){
 }
 const stanceAim = () => aidAlpha('stance') > 0;
 const physOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= PHYS_AT;
-const throwNow = () => tut.on ? tut.lesson === 'throw' : adaptiveOn() && level()!==null && level() >= THROW_AT;
+const throwNow = () => tut.on ? tut.lesson === 'throw' : !isShooting() && adaptiveOn() && level()!==null && level() >= THROW_AT;
 const anyOn = () => !tut.on && adaptiveOn() && level()!==null && level() >= ANY_AT;
 const fastFlashLocked = () => level()===null || level() < FAST_FLASH_AT;
 const AID_SET = {ghost:['ghost','0'], line:['line','0'], stance:['cam','line']};
@@ -859,64 +896,350 @@ function enforceLocks(){
 const LADDER_UP = {1:'Guide line fades after 1.5 s', 2:'Guide line fades after 0.75 s', 3:'Guide line gone',
   4:'👻 Ghost ball fades after 1.5 s', 5:'👻 Ghost ball fades after 0.75 s', 6:'Ghost ball gone',
   7:'🎯 Ball line: read it from behind the cue ball', 8:'📐 Any angle', 9:'↔️ Between fractions',
-  10:'🌀 Throw', 11:'⚡️ 0.75 s Flash unlocked', 13:'🏆 Top grade'};
+  10:'⚡️ 0.75 s Flash unlocked', 11:'🎱 Shoot and Free play unlocked'};
 const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide line fades after 1.5 s', 'Guide line fades after 0.75 s', 'Guide line gone',
   'Ghost ball fades after 1.5 s', 'Ghost ball fades after 0.75 s', 'Ghost ball gone', 'Ball line: read it from behind the cue ball',
-  'Any angle', 'Between fractions: call the nearest', 'Throw: soft stun shots', '0.75 s Flash', 'Harder dealing', 'Top grade'];
+  'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 133;   // one per commit to main
+const BUILD = 135;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
 function setGradeForTesting(i){
-  if(settings.tutSeen){ for(const k in LESSONS) if(LESSONS[k].at > i) delete settings.tutSeen[k]; saveSettings(); }   // lessons above the picked grade play again when you reach them
+  if(settings.tutSeen){ const tr = isShooting() ? 'shoot' : 'read'; for(const k in LESSONS) if((LESSONS[k].track || 'read') === tr && LESSONS[k].at > i) delete settings.tutSeen[k]; saveSettings(); }   // lessons above the picked grade play again when you reach them
   if(!hasBaseline()){   // #dev skips the baseline: record a stand-in so everything that needs one opens up
     const p0 = GRADE_FROM[Math.min(i, GRADE_FROM.length-1)];
     stats.sessions = (stats.sessions||[]).concat({id:'dev', task:'sess', size:100, n:100, right:p0, made:p0, start:Date.now(), end:Date.now(), base:1, dev:1, stand:p0, down:p0, grade:i});
   }
+  if(isShooting()){ stats.shoot = {g: i, best: i, pts: 0, v: 1}; save(); showSessIdle(); renderBadge(true); renderProgress(); if(!answered) deal(); return; }
   aidsOffBelow(-1, i);   // testing: every aid you're past starts off
   stats.level = {g: i, best: i, pts: 0, v: 2}; save(); showSessIdle();
   enforceLocks(); syncPressed(); renderBadge(true); renderProgress(); renderStats();
   if(!answered) deal();
 }
 function renderProgress(){
-  const g = level(), best = bestLevel(), pts = stats.level ? stats.level.pts : 0;
-  $('ladder').innerHTML = GRADES.map((G, i)=>{
+  const sh = isShooting(), L = sh ? ensureShootLevel() : stats.level, GR = sh ? SHOOT_GRADES : GRADES, TX = sh ? SHOOT_TEXT : LADDER_TEXT;
+  const g = L ? L.g : 0, best = L ? Math.max(L.best ?? 0, L.g) : 0, pts = L ? L.pts : 0;
+  $('proghead').textContent = sh ? 'Shoot ladder' : 'Read ladder';
+  $('ladder').innerHTML = GR.map((G, i)=>{
     const cls = i===g ? 'here' : i <= best ? 'done' : '';
-    const bar = i===g ? (i < GRADES.length-1
-      ? `<span class="here-bar"><i class="${pts<0?'neg':''}" style="width:${Math.min(100, Math.abs(pts)/PTS_UP*100)}%"></i></span><small>${pts >= 0 ? `${pts} of ${PTS_UP} to ${GRADES[i+1]}` : `${-pts} of ${PTS_UP} toward dropping to ${GRADES[i-1] || G}`}</small>`
+    const bar = i===g ? (i < GR.length-1
+      ? `<span class="here-bar"><i class="${pts<0?'neg':''}" style="width:${Math.min(100, Math.abs(pts)/PTS_UP*100)}%"></i></span><small>${pts >= 0 ? `${pts} of ${PTS_UP} to ${GR[i+1]}` : `${-pts} of ${PTS_UP} toward dropping to ${GR[i-1] || G}`}</small>`
       : '<small>You made it.</small>') : '';
-    return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${LADDER_TEXT[i]}${bar}</span></li>`;
+    return `<li class="${cls}${DEV ? ' dev' : ''}" data-g="${i}"><span class="node">${G}</span><span class="what">${TX[i]}${bar}</span></li>`;
   }).reverse().join('') + (DEV ? '<li class="devnote"><span></span><small>Testing: tap a grade to jump there.</small></li>' : '');
 }
-const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 10:'No more throw', 11:'🔒 0.75 s Flash'};
+const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain fraction pots', 10:'🔒 0.75 s Flash'};
+// ==================== the Shoot half ====================
+// Cut Trainer: the Shoot half. You aim and strike the cue ball yourself; the engine plays it out.
+
+// ---------- the Shoot ladder ----------
+const SHOOT_GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S-','S','S+'];
+const SH = {noPath:1, noLine:2, noGhost:3, down:4, speed:7, path:8, stun:9, follow:10, draw:11, throw:12, cushion:13, english:14, all:15};
+const SHOOT_TEXT = [
+  'Aim with the ghost ball, guide line and the object ball’s path', 'Object-ball path gone', 'Guide line gone', 'Ghost ball gone: aim from your own read',
+  'Down on the shot: 5 s standing', 'Down on the shot: 4 s standing', 'Down on the shot: 3 s standing',
+  'Speed: you set it', 'Cue ball path: land it in the zone', 'Stun: stop it, or send it along the tangent line',
+  'Follow', 'Draw', 'Throw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english'];
+const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone', 3:'👻 Ghost ball gone', 4:'🧍 Down on the shot', 5:'Down on the shot: 4 s', 6:'Down on the shot: 3 s',
+  7:'🎚️ Speed', 8:'🎯 Cue ball path', 9:'⏹️ Stun', 10:'⤴️ Follow', 11:'⤵️ Draw', 12:'🌀 Throw', 13:'↩️ Off a cushion', 14:'🌪️ English', 15:'🏆 Everything'};
+const SHOOT_DOWN = {3:'Ghost ball back', 4:'Standing, untimed', 7:'Speed set for you', 8:'No more zones', 10:'Tip back to centre', 14:'No more english'};
+const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
+const shootUnlocked = () => DEV || !!(stats.level && Math.max(stats.level.g, stats.level.best ?? 0) >= READ_TOP);
+const isShoot = () => settings.task === 'shoot';
+const isFree = () => settings.task === 'free';
+const isShooting = () => isShoot() || isFree();
+function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
+const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : (stats.shoot ? stats.shoot.g : 0);
+const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : g === SH.down + 1 ? 4 : 3;
+// what you control at each step (Free play: everything you've unlocked)
+const ctrl = () => {
+  const g = shootLevel();
+  return {speed: g >= SH.speed, up: g >= SH.follow, down: g >= SH.draw, side: g >= SH.english};
+};
+// the aids while you aim (the right ghost ball, the guide line to it, the object ball's path to the pocket)
+function shootAid(k){
+  if(isFree()) return false;
+  const g = shootLevel();
+  return k === 'path' ? g < SH.noPath : k === 'line' ? g < SH.noLine : k === 'ghost' ? g < SH.noGhost : false;
+}
+
+// ---------- speed ----------
+// Speed is set in diamonds: how far a rolling cue ball struck that hard would roll (a diamond is an eighth of the table's length).
+const diamond = () => Math.max(W, H)/8;
+const speedFromDiamonds = d => Math.sqrt(2*PE.C.rollDecel*d*diamond());
+const diamondsFromSpeed = V => V*V/(2*PE.C.rollDecel*diamond());
+const SPEED_MIN = 0.5, SPEED_MAX = 48;
+function speedSetting(){ const d = +settings.shotSpeed; return d >= SPEED_MIN && d <= SPEED_MAX ? d : 8; }
+const fmtD = d => d < 10 ? (Math.round(d*2)/2).toString().replace('.5', '½').replace(/^0½$/, '½') : String(Math.round(d));
+
+// ---------- the stroke ----------
+// Before speed is yours it's the shot's ideal pocket speed; before spin is yours the tip is set for you.
+function shotStroke(s){
+  const c = ctrl(), g = shootLevel(), ideal = strikeOf(s);
+  const V = c.speed ? speedFromDiamonds(speedSetting()) : ideal.V;
+  let tip = g < SH.path ? [0, ideal.b] : [0, 0];
+  if(c.up || c.side){ const t = settings.shotTip || [0, 0]; tip = [c.side ? t[0] : 0, Math.max(c.down ? -0.6 : 0, Math.min(c.up ? 0.6 : 0, t[1]))]; }
+  return {V, tip};
+}
+// Play the shot from the cue ball along dir with a stroke: the engine runs it. Squirt is in the engine's strike.
+function playAim(s, dir, stroke, record){
+  const cue = {id:'c', p:[...s.cb]}; PE.strike(cue, dir, stroke.V, stroke.tip);
+  const sim = PE.simulate(engineTable(), [cue, {id:'o', p:[...s.ob]}], record ? {record: 3, orient: true, tMax: 16} : {tMax: 16});
+  const into = id => sim.events.find(e=>e.type==='pocket' && e.ids[0]===id) || null;
+  const obIn = into('o'), cbIn = into('c'), made = !!obIn && obIn.pocket === POCKETS.indexOf(s.P);
+  const hit = sim.events.find(e=>e.type==='ball');
+  const cEnd = sim.balls.find(b=>b.id==='c'), oEnd = sim.balls.find(b=>b.id==='o');
+  const zoneMiss = s.zone && !cbIn ? Math.max(0, len(sub(cEnd.p, s.zone.c)) - s.zone.r) : null;
+  return {sim, made, scratch: !!cbIn, obIn, cbIn, hit: !!hit, cueEnd: cEnd.p, obEnd: oEnd.p, inZone: zoneMiss === 0, zoneMiss,
+    cushionAfter: !!hit && sim.events.some(e=>e.ids[0]==='c' && (e.type==='cushion' || e.type==='jaw') && e.t > hit.t)};
+}
+// the aim straight at the right contact (no allowance for throw or squirt): the dealer's reference
+const idealDir = s => norm(sub(s.gb, s.cb));
+// the aim that pots it with this stroke (allowing for its throw and squirt): searched outward from the ideal line
+function aimFor(s, stroke){
+  const d0 = idealDir(s);
+  for(let k=0; k<=40; k++){
+    const off = (k % 2 ? 1 : -1)*Math.ceil(k/2)*0.1*RAD, d = rot(d0, off);
+    if(playAim(s, d, stroke, false).made) return d;
+  }
+  return d0;
+}
+
+// ---------- dealing ----------
+const STEP_STROKES = {   // the kind of stroke a step's zones are made from (the player can use any stroke they have)
+  [SH.path]:   s => ({tip:[0,0], k:[1.1, 2.4]}),
+  [SH.stun]:   s => ({tip:[0,0], stun:true}),
+  [SH.follow]: s => ({tip:[0, rnd(.3,.55)], k:[1.1, 2.2]}),
+  [SH.draw]:   s => ({tip:[0, -rnd(.35,.6)], k:[1.6, 3.2]}),
+  [SH.cushion]:s => ({tip:[0, rnd(-.2,.45)], k:[1.6, 3.2], cushion:true}),
+  [SH.english]:s => ({tip:[(Math.random()<.5?-1:1)*rnd(.3,.5), rnd(-.2,.35)], k:[1.6, 3.2], cushion:true}),
+};
+function zoneStep(g){ if(g < SH.path || g === SH.throw) return null; if(g >= SH.all) return pick([SH.path, SH.stun, SH.follow, SH.draw, SH.cushion, SH.english]); return g === SH.cushion ? SH.cushion : g >= SH.english ? SH.english : g; }
+// Deal a Shoot shot: any angle (the Read ladder's dealer), plus a target zone from a stroke that really gets there.
+function shootDeal(){
+  const g = shootLevel(), step = isFree() ? null : zoneStep(g);
+  let best = null;
+  for(let tries = 0; tries < 40; tries++){
+    const s = generate();
+    if(!s) continue;
+    best = best || s;
+    if(diamondsFromSpeed(strikeOf(s).V) > 24) continue;   // no shots that need a near-break stroke just to reach the pocket
+    if(g === SH.throw && !isFree()){   // throw: cut shots where the plain aim, played soft with stun, misses: throw decides it
+      if(s.theta < 12 || s.theta > 55 || s.L < 18) continue;
+      const soft = {V: strikeOf(s).V*1.05, tip:[0, -.35]}, r = playAim(s, idealDir(s), soft, false);
+      if(r.made) continue;
+      return finishDeal(s);
+    }
+    if(!step) return finishDeal(s);
+    const spec = STEP_STROKES[step](s), V0 = strikeOf(s).V, d1 = len(sub(s.gb, s.cb));
+    let V = V0*rnd(...(spec.k || [1, 1]));
+    if(spec.stun){ const ug = PE.C.muSlide*PE.G; V = Math.max(V0, Math.sqrt(d1*49*ug/12))*rnd(1.05, 1.35); }
+    const r = playAim(s, idealDir(s), {V, tip: spec.tip}, false);
+    if(!r.made || r.scratch || !r.hit) continue;
+    if(spec.cushion && !r.cushionAfter) continue;
+    const c = r.cueEnd, zr = g >= SH.cushion ? 5 : 6;
+    if(c[0] < 3 || c[0] > W-3 || c[1] < 3 || c[1] > H-3) continue;
+    if(POCKETS.some(P=>len(sub(c, P.c)) < 7)) continue;
+    if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
+    s.zone = {c, r: zr, step};
+    return finishDeal(s);
+  }
+  return finishDeal(best || generate());
+}
+function finishDeal(s){
+  s.place = add(s.ob, mul(norm(sub(s.cb, s.ob)), 2*R));   // aim starts straight at the object ball
+  s.cam = {phase: 'stand', k: 0};
+  return s;
+}
+
+// ---------- the routine: read from the ball line, step behind your aim line, get down on it ----------
+let routineRaf = 0;
+function startRoutine(){
+  cancelAnimationFrame(routineRaf);
+  const s = shot, T = standTime(shootLevel());
+  if(!s || !isShoot() || tut.on || !T){ if(s) s.cam = {phase:'stand', k:0}; renderRoutineChip(); return; }
+  s.cam = {phase:'stand', k:0, t0: performance.now(), T};
+  const tick = now => {
+    if(shot !== s || answered || !isShoot() || tut.on){ renderRoutineChip(); return; }
+    const c = s.cam, el = (now - c.t0)/1000;
+    if(el < T){ c.phase = 'stand'; c.k = 0; c.left = T - el; }
+    else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
+    else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
+    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); return; }
+    renderRoutineChip(); draw(false);
+    routineRaf = requestAnimationFrame(tick);
+  };
+  routineRaf = requestAnimationFrame(tick);
+}
+const ease = u => u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
+function renderRoutineChip(){
+  const el = $('routinechip'); if(!el) return;
+  const c = shot && shot.cam;
+  if(!isShoot() || tut.on || answered || !c || !c.T || c.phase !== 'stand'){ el.hidden = true; return; }
+  el.hidden = false; el.textContent = `Down in ${Math.ceil(c.left)}`;
+}
+// The Shoot camera: standing on the ball line, standing behind your aim line, or down on your aim line, blended by the routine.
+function shootCam(s, view){
+  const aim = norm(sub(s.place || s.gb, s.cb)), d = norm(sub(s.ob, s.cb));
+  const stand = camAlong(s, d, VIEWS.stand), standAim = camAlong(s, aim, VIEWS.stand), down = camAlong(s, aim, VIEWS.down);
+  const c = s.cam || {phase:'stand', k:0};
+  const mix = (A, B, k) => camFrom(A.E.map((x, i)=>x + (B.E[i]-x)*k), norm3(A.f.map((x, i)=>x + (B.f[i]-x)*k)), A.hfov + (B.hfov - A.hfov)*k);
+  if(c.phase === 'step') return mix(stand, standAim, c.k);
+  if(c.phase === 'down') return mix(standAim, down, c.k);
+  return view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
+}
+// a camera behind the cue ball looking along dir, tilted to keep the cue ball (and, standing, the pocket) in frame
+function camAlong(s, dir, c){
+  const eye = sub(s.cb, mul(dir, c.back)), E = [eye[0], eye[1], c.h];
+  const hd = P=>Math.max(0.1, (P[0]-E[0])*dir[0] + (P[1]-E[1])*dir[1]);
+  const aCB = Math.atan2(R - c.h, hd(s.cb)), aP = Math.atan2(1.6 - c.h, hd(s.P.c));
+  const vHalf = Math.atan((VH/2)/((VW/2)/Math.tan(c.hfov/2*RAD))), mg = 5*RAD;
+  let pr = c.pitch*RAD;
+  if(c === VIEWS.stand && aP > pr + vHalf - mg) pr = aP - vHalf + mg;
+  if(aCB < pr - vHalf + mg) pr = aCB + vHalf - mg;
+  return camFrom(E, norm3([dir[0]*Math.cos(pr), dir[1]*Math.cos(pr), Math.sin(pr)]), c.hfov);
+}
+
+// ---------- controls: speed bar and tip pad ----------
+function renderShootControls(){
+  const box = $('shootctl'); if(!box) return;
+  const on = isShooting() && !tut.on, c = ctrl();
+  box.hidden = !on;
+  if(!on) return;
+  $('speedbar').hidden = !c.speed;
+  $('freebtns').hidden = !isFree();
+  $('tippad').hidden = !(c.up || c.side);
+  if(c.speed){
+    const d = speedSetting(), f = Math.log(d/SPEED_MIN)/Math.log(SPEED_MAX/SPEED_MIN);
+    $('speedfill').style.height = (f*100).toFixed(1) + '%';
+    $('speedval').textContent = fmtD(d) + ' ◆';
+  }
+  if(c.up || c.side){
+    const t = shotStroke(shot || {}).tip || [0,0];
+    $('tipdot').setAttribute('cx', (t[0]).toFixed(2)); $('tipdot').setAttribute('cy', (-t[1]).toFixed(2));
+    $('tiplimit').setAttribute('d', tipLimitPath(c));
+  }
+}
+function tipLimitPath(c){   // the part of the cue ball you're allowed to strike, outlined
+  const x0 = c.side ? -.6 : -.06, x1 = c.side ? .6 : .06, y0 = c.up ? -.6 : 0, y1 = c.down ? .6 : 0;
+  return `M${x0} ${y0 - .02}H${x1}V${y1 + .02}H${x0}Z`;
+}
+function wireShootControls(){
+  const bar = $('speedbar'), pad = $('tippad');
+  const setSpeedFrom = ev => {
+    const r = $('speedtrack').getBoundingClientRect(), f = Math.max(0, Math.min(1, (r.bottom - ev.clientY)/r.height));
+    const d = SPEED_MIN*Math.pow(SPEED_MAX/SPEED_MIN, f);
+    settings.shotSpeed = Math.round(d*4)/4; saveSettings(); renderShootControls();
+  };
+  let sDrag = false;
+  bar.addEventListener('pointerdown', ev=>{ if(answered) return; sDrag = true; try{ bar.setPointerCapture(ev.pointerId); }catch(e){} setSpeedFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
+  bar.addEventListener('pointermove', ev=>{ if(sDrag) setSpeedFrom(ev); });
+  ['pointerup','pointercancel'].forEach(t=>bar.addEventListener(t, ()=>{ sDrag = false; }));
+  const setTipFrom = ev => {
+    const svg = $('tipsvg'), pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    const q = pt.matrixTransform(svg.getScreenCTM().inverse()), c = ctrl();
+    let x = c.side ? q.x : 0, y = -q.y;
+    y = Math.max(c.down ? -.6 : 0, Math.min(c.up ? .6 : 0, y)); x = Math.max(-.6, Math.min(.6, x));
+    const l = Math.hypot(x, y); if(l > .6){ x *= .6/l; y *= .6/l; }
+    settings.shotTip = [Math.round(x*20)/20, Math.round(y*20)/20]; saveSettings(); renderShootControls();
+  };
+  let tDrag = false;
+  pad.addEventListener('pointerdown', ev=>{ if(answered) return; tDrag = true; try{ pad.setPointerCapture(ev.pointerId); }catch(e){} setTipFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
+  pad.addEventListener('pointermove', ev=>{ if(tDrag) setTipFrom(ev); });
+  ['pointerup','pointercancel'].forEach(t=>pad.addEventListener(t, ()=>{ tDrag = false; }));
+  $('tipcentre').addEventListener('click', ()=>{ settings.shotTip = [0, 0]; saveSettings(); renderShootControls(); });
+  $('freereset').addEventListener('click', ()=>{ if(anim) finishAnim(); freeReset(); $('quick').innerHTML = ''; $('result').innerHTML = ''; tableBox.classList.remove('tappable'); });
+  $('freenew').addEventListener('click', ()=>{ if(anim) finishAnim(); deal(); });
+}
+
+// ---------- taking the shot ----------
+function takeShot(){
+  if(answered || !shot || !isShooting() || anim) return;
+  const s = shot, dir = norm(sub(s.place, s.cb)), stroke = shotStroke(s);
+  s.tip = stroke.tip;
+  answered = true; cancelAnimationFrame(routineRaf); renderRoutineChip();
+  const run = playAim(s, dir, stroke, true);
+  const g = shootLevel(), idealV = strikeOf(s).V, ratio = stroke.V/idealV;
+  // the verdict: it drops (in the pocket you were set), no scratch, in the zone if there is one, and from Speed on not
+  // much harder than it needs (a drop that misses the zone or is overhit is a partial: no points either way)
+  const clean = run.made && !run.scratch;
+  const speedOk = !ctrl().speed || ratio <= 2.2 || !!s.zone;
+  const full = clean && (s.zone ? run.inZone : true) && speedOk;
+  const partial = clean && !full;
+  s.pick = {made: run.made, far: !run.made, g2: s.place};
+  if(isShoot()){
+    logEntry({t:'shoot', m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
+    if(!partial){
+      const from = shootLevel(); stats.shoot.bestBefore = Math.max(stats.shoot.best ?? 0, stats.shoot.g);
+      const d = levelPoint(full);
+      if(d) setTimeout(()=>showLevel(d, from), 350); else renderBadge();
+    } else renderBadge();
+    if(full){ const st = curStreak(); if(st >= STREAK_HOT) playSound('streak', st); }
+  }
+  // what to tell you
+  const bits = [];
+  if(run.scratch) bits.push('Scratch: the cue ball went in');
+  else if(!run.hit) bits.push('Missed the object ball');
+  else if(!run.made) bits.push(run.obIn ? 'Wrong pocket' : 'Missed the pocket');
+  if(s.zone && run.made && !run.scratch) bits.push(run.inZone ? 'In the zone' : `Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
+  if(ctrl().speed) bits.push(`Speed ${fmtD(diamondsFromSpeed(stroke.V))} ◆ <small>ideal ${fmtD(diamondsFromSpeed(idealV))} ◆</small>`);
+  const head = full ? 'Pocketed' : partial ? 'Pocketed' : 'Missed';
+  $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>`;
+  $('result').innerHTML = `<div class="resultpair">${tipSVG(s)}</div>`;
+  if(isShoot()) sessionTick(full, run.made);
+  animateShot({made: run.made}, ()=>{ draw(true); }, run.made ? '#ffd34d' : MISS, run);
+  finishRound();
+}
+// Free play: put the layout back, or a new one
+let freeLayout = null;
+function freeReset(){ if(!freeLayout) return; shot = unpackShot(freeLayout); shot.t0 = performance.now(); answered = false; shot.anim = shot.final = shot.pick = null; draw(false); updateControls(); }
+
+// ---------- Free play: move the balls ----------
+// rebuild everything a shot derives from where the balls are and which pocket it's going to
+function rebuildShot(s){
+  const P = s.P, uC = norm(sub(P.t, s.ob));
+  s.T = P.t; s.uC = uC; s.u = uC; s.L = len(sub(P.t, s.ob)); s.cheat = 0;
+  s.gb = sub(s.ob, mul(uC, 2*R));
+  const v = norm(sub(s.gb, s.cb)); s.v = v; s.n = uC;
+  const cr = v[0]*uC[1] - v[1]*uC[0];
+  s.sign = cr >= 0 ? -1 : 1;
+  s.theta = Math.acos(Math.max(-1, Math.min(1, dot(v, uC))))/RAD; s.pathDeg = s.theta;
+  s.answer = nearestRef(s.theta); s.tol = pocketTol(P, uC); s.strk = null; s.zone = null;
+  s.place = add(s.ob, mul(norm(sub(s.cb, s.ob)), 2*R));
+}
+
+// the ladder you're playing: Shoot sessions climb the Shoot ladder, everything else the Read ladder
+const trk = () => isShoot() ? ensureShootLevel() : stats.level;
+const trkGrades = () => isShoot() ? SHOOT_GRADES : GRADES;
 function levelPoint(ok){   // returns +1 / -1 when the grade changes
-  const L = stats.level;
+  const L = trk(), G = trkGrades();
   L.pts += ok ? PT_RIGHT : PT_WRONG;
-  if(L.pts >= PTS_UP && L.g < GRADES.length-1){ L.g++; L.pts = 0; L.best = Math.max(L.best ?? 0, L.g); return 1; }
+  if(L.pts >= PTS_UP && L.g < G.length-1){ L.g++; L.pts = 0; L.best = Math.max(L.best ?? 0, L.g); return 1; }
   if(L.pts <= -PTS_UP && L.g > 0){ L.g--; L.pts = 0; return -1; }
   L.pts = Math.max(-PTS_UP, Math.min(PTS_UP, L.pts));
   return 0;
 }
 function renderBadge(pop){
-  const g = level(), el = $('badge');
-  el.hidden = g===null; if(g===null) return;
-  const pts = stats.level.pts;
-  $('badgeg').textContent = GRADES[g];
+  const L = isShooting() ? ensureShootLevel() : stats.level, G = isShooting() ? SHOOT_GRADES : GRADES, el = $('badge');
+  el.hidden = !L; if(!L) return;
+  const g = L.g, pts = L.pts;
+  $('badgeg').textContent = G[g];
+  $('badgetrack').textContent = isShooting() ? 'Shoot' : 'Read';
   const f = $('badgefill'); f.style.width = (Math.min(1, Math.abs(pts)/PTS_UP)*100) + '%'; f.classList.toggle('neg', pts < 0);
-  el.title = `Grade ${GRADES[g]}` + (g < GRADES.length-1 ? ` · ${Math.max(0,pts)} of ${PTS_UP} to ${GRADES[g+1]}` : '');
+  el.title = `${isShooting() ? 'Shoot' : 'Read'} grade ${G[g]}` + (g < G.length-1 ? ` · ${Math.max(0,pts)} of ${PTS_UP} to ${G[g+1]}` : '');
   if(pop){ el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
 }
 let lvlTimer = 0;
 function showLevel(d, from){
-  const to = level(), notes = [];
-  if(d > 0) aidsOffBelow(stats.level.bestBefore ?? from, to);
-  if(d > 0){ const n = LADDER_UP[to]; if(n && !(to <= 7 && stats.level.bestBefore >= to)) notes.push(n); }   // aid steps only the first time
-  else if(LADDER_DOWN[from]) notes.push(LADDER_DOWN[from]);
+  const L = trk(), to = L.g, notes = [], shootT = isShoot();
+  if(d > 0 && !shootT) aidsOffBelow(L.bestBefore ?? from, to);
+  if(d > 0){ const n = (shootT ? SHOOT_UP : LADDER_UP)[to]; if(n && !(!shootT && to <= 7 && L.bestBefore >= to)) notes.push(n); }   // aid steps only the first time
+  else if((shootT ? SHOOT_DOWN : LADDER_DOWN)[from]) notes.push((shootT ? SHOOT_DOWN : LADDER_DOWN)[from]);
   enforceLocks(); syncPressed(); renderBadge(true);
   $('lvlhead').textContent = d > 0 ? 'Level up' : 'Down a grade';
-  $('lvlgrade').textContent = GRADES[to];
+  $('lvlgrade').textContent = trkGrades()[to];
   $('lvlnote').textContent = notes.join(' · ');
   const c = $('lvlcard'); c.classList.toggle('down', d < 0); c.hidden = false; c.classList.remove('show'); void c.offsetWidth; c.classList.add('show');
   clearTimeout(lvlTimer); lvlTimer = setTimeout(()=>{ c.hidden = true; }, d > 0 ? 2800 : 2000);
@@ -1084,7 +1407,14 @@ function camFrom(E, f, hfov){
   const focal = (VW/2)/Math.tan(hfov/2*RAD);
   const toCam = P=>{const q=[P[0]-E[0],P[1]-E[1],P[2]-E[2]];return [dot3(q,right),dot3(q,up),dot3(q,f)];};
   const proj = c=>[VW/2 + focal*c[0]/c[2], VH/2 - focal*c[1]/c[2]];
-  return {E, f, hfov, toCam, proj, focal, unproject:()=>null};
+  const unproject = (px, py, z)=>{
+    const x=(px-VW/2)/focal, y=-(py-VH/2)/focal;
+    const dir=[right[0]*x+up[0]*y+f[0], right[1]*x+up[1]*y+f[1], right[2]*x+up[2]*y+f[2]];
+    if(Math.abs(dir[2])<1e-6) return null;
+    const t=(z-E[2])/dir[2];
+    return t>0 ? [E[0]+dir[0]*t, E[1]+dir[1]*t] : null;
+  };
+  return {E, f, hfov, toCam, proj, focal, unproject};
 }
 // ---------- rotate around the object ball (Normal mode) ----------
 // Dragging swings the eye around a vertical axis through the object ball; the object ball stays put on screen.
@@ -1101,6 +1431,7 @@ function walkCam(s, view){
   return camFrom(E, norm3([fh[0]*c1, fh[1]*c1, Math.sin(p1)]), base.hfov);
 }
 function makeCam(s, view){
+  if(isShooting() && !tut.on && view !== 'top') return shootCam(s, view);
   const c0 = VIEWS[view];
   if(tut.on && tut.zb > 0){   // tutorial close-up, blended with the game view while the camera moves
     // eye low on the cue ball's path, a little short of the ghost ball, so the overlap reads side by side
@@ -1283,6 +1614,12 @@ function perspBack(cam, s, reveal, segs, ring){
 }
 function perspDyn(cam, s, reveal){
   let o = '';
+  // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
+  if(s.zone) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  if(isShooting() && !reveal && !s.anim && shootAid('path')){
+    const pe = pocketEdge(s.ob, s.P, s.T);
+    o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
+  }
   // the correct path to the pocket draws itself from contact on, as if the object ball were rolling along it
   if(reveal || (s.anim && s.anim.run > 0)){
     const pe = pocketEdge(s.ob, s.P, s.T), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
@@ -1292,8 +1629,8 @@ function perspDyn(cam, s, reveal){
   if(reveal){
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
-      const into = dot(sub(s.P.t, s.ob), pk.u2);   // lines end at the cushion, or in the pocket if it drops
-      const pts = s.final && s.final.obPath ? s.final.obPath : stop ? [s.ob, stop] : pk.made ? [s.ob, add(s.ob, mul(pk.u2, into))] : [s.ob, rayToCushion(s.ob, pk.u2)];   // the path it really ran   // a miss: the whole path it ran, cushions and all
+      const into = pk.u2 ? dot(sub(s.P.t, s.ob), pk.u2) : 0;   // lines end at the cushion, or in the pocket if it drops
+      const pts = s.final && s.final.obPath ? s.final.obPath : stop ? [s.ob, stop] : !pk.u2 ? [s.ob] : pk.made ? [s.ob, add(s.ob, mul(pk.u2, into))] : [s.ob, rayToCushion(s.ob, pk.u2)];   // the path it really ran   // a miss: the whole path it ran, cushions and all
       o += dashedLine(cam, pts, col, 1, '3 4');
       const gc = cam.toCam([pk.g2[0],pk.g2[1],R]);
       if(gc[2] > NEAR){ const [gx,gy] = cam.proj(gc); o += `<circle cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" r="${(cam.focal*R/gc[2]).toFixed(1)}" fill="none" stroke="${col}" stroke-width="1.125" stroke-dasharray="4 3"/>`; }
@@ -1515,12 +1852,12 @@ function overlapSVG(s){
 }
 
 // ---------- modes ----------
-const MODE_LABEL = {call:'Freeplay', sess:'Freeplay', flash:'Flash', place:'Ghost ball'};
+const MODE_LABEL = {call:'Sessions', sess:'Read', shoot:'Shoot', free:'Free play', flash:'Flash', place:'Ghost ball'};
 const taskOf = e => e.t || 'call';
-const sessTask = t => t==='sess' || t==='flash';   // both modes are played as 50- or 100-shot sessions
-const isPlace = () => settings.task==='place';
+const sessTask = t => t==='sess' || t==='flash' || t==='shoot';   // played as 50- or 100-shot sessions (Free play isn't)
+const isPlace = () => settings.task==='place' || isShooting();   // you place the ghost ball / aim yourself
 const viaAlt = e => !!e.aa && e.p===e.aa && e.pm===e.aam;
-function success(e){ return taskOf(e)==='place' ? !!e.m : (e.p===e.a && (!e.am || e.pm===e.am)) || viaAlt(e); }
+function success(e){ return taskOf(e)==='shoot' ? e.ok===1 : taskOf(e)==='place' ? !!e.m : (e.p===e.a && (!e.am || e.pm===e.am)) || viaAlt(e); }
 function lean(e){          // +1 too thin (overcut), -1 too full (undercut), 0 right
   if(taskOf(e)==='place') return e.m ? 0 : (e.e>0 ? 1 : -1);
   if(success(e)) return 0;
@@ -1548,8 +1885,8 @@ function endFlash(){ clearTimeout(flashTimer); $('cover').hidden = true; $('flas
 
 // ---------- round ----------
 const PLACEHOLDER = `How full do you hit the object ball?`;
-const PLACE_HINT = `Tap or drag around the object ball to set the ghost ball. Fine-tune with the arrows, then Shoot. Keys <kbd>←</kbd> <kbd>→</kbd> nudge, <kbd>Enter</kbd> shoots.`;
-const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?'};
+const PLACE_HINT = `Drag around the object ball to aim. Fine-tune with the arrows, then Shoot. Keys <kbd>←</kbd> <kbd>→</kbd> nudge, <kbd>Enter</kbd> shoots.`;
+const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?', shoot:'Aim it, then shoot.', free:'Set it up, aim it, shoot.'};
 const tableBox = document.querySelector('.table-box');
 
 function packShot(s){
@@ -1566,7 +1903,11 @@ function unpackShot(o){
 function deal(){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   // a new element is explained the first time you reach the grade that brings it in
-  if(!tut.on && settings.task === 'sess'){ const k = Object.keys(LESSONS).find(k=>k !== 'intro' && LESSONS[k].at <= (level() ?? -1) && !(settings.tutSeen || {})[k]); if(k) return startTut(k); }
+  if(!tut.on && (settings.task === 'sess' || settings.task === 'shoot')){
+    const tr = settings.task === 'shoot' ? 'shoot' : 'read', g = tr === 'shoot' ? ensureShootLevel().g : (level() ?? -1);
+    const k = Object.keys(LESSONS).find(k=>k !== 'intro' && (LESSONS[k].track || 'read') === tr && LESSONS[k].at <= g && !(settings.tutSeen || {})[k]);
+    if(k) return startTut(k);
+  }
   walk = null; walkDrag = null;
   if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
   syncRefs();
@@ -1576,12 +1917,14 @@ function deal(){
   if(kept){ shot = kept; shot.t0 = performance.now() - Math.max(0, Date.now() - act.pending.seenAt); }
   else {
     if(curTable !== settings.table) setTable(settings.table, settings.pockets);
-    shot = dealShot(); shot.t0 = performance.now();
+    shot = isShooting() ? shootDeal() : dealShot(); shot.t0 = performance.now();
     if(act){ act.pending = packShot(shot); save(); }
   }
   scheduleFades();
   answered = false;
+  if(isFree()) freeLayout = packShot(shot);
   draw(false);
+  if(isShoot()) startRoutine(); else { cancelAnimationFrame(routineRaf); renderRoutineChip(); }
   document.querySelectorAll('#answers button, #mods button').forEach(b=>{b.disabled=false;b.className='';});
   pend = {f:null, m:null};
   $('mods').hidden = !shot.phys;
@@ -1615,7 +1958,7 @@ function showSessIdle(){
   $('sessidlecover').hidden = !idle;
   document.querySelectorAll('#answers button, #mods button').forEach(b=>b.disabled = idle || answered);
   if(idle){
-    $('sessidlehead').textContent = t==='flash' ? 'Flash ⚡️' : 'Freeplay';
+    $('sessidlehead').textContent = t==='flash' ? 'Flash ⚡️' : t==='shoot' ? 'Shoot' : 'Read';
     $('flashpick').hidden = t!=='flash';
     const needBase = t==='sess' && !hasBaseline();
     $('basestart').textContent = DEV ? 'Pick a grade' : 'Baseline · 100 shots';
@@ -1637,6 +1980,7 @@ function startFlashMode(){
 }
 function updateControls(){
   const place = isPlace(), nb = $('next');
+  renderShootControls();
   $('answers').hidden = place;
   $('nudge').hidden = !place || answered;
   $('nudge').querySelectorAll('button').forEach(b=>b.disabled = !shot || !shot.place);
@@ -1918,7 +2262,7 @@ function renderSessionHistory(){
 
 // With speed & throw a call has two parts, fraction and thick / center / thin, picked in either order.
 let pend = {f:null, m:null};
-const canCall = () => !answered && shot && !isPlace() && $('sessidlecover').hidden && $('endcover').hidden;
+const canCall = () => !answered && shot && !isPlace() && !isShooting() && $('sessidlecover').hidden && $('endcover').hidden;
 function markPend(){
   document.querySelectorAll('#answers button').forEach(b=>b.classList.toggle('sel', b.dataset.id===pend.f));
   document.querySelectorAll('#mods button').forEach(b=>b.classList.toggle('sel', b.dataset.mod===pend.m));
@@ -2028,13 +2372,13 @@ function pocketSpeedFor(d){
   return Math.sqrt(va*va + 2*MU_G*d);                                    // so close it arrives still sliding
 }
 function railVol(vn){ return Math.max(.2, Math.min(1, vn/40)); }
-function animateShot(oc, done, obCol){
+function animateShot(oc, done, obCol, pre){
   const s = shot, cb0 = s.cb;
   // the shot, played out by the engine with both balls' paths kept: what you see is exactly what was judged
-  const run = outcome(s, oc.phiC ?? s.theta, true), sim = run.sim, Pc = sim.paths.c, Po = sim.paths.o;
+  const run = pre || outcome(s, oc.phiC ?? s.theta, true), sim = run.sim, Pc = sim.paths.c, Po = sim.paths.o;
   const hit = sim.events.find(e=>e.type==='ball'), T1 = hit ? hit.t : Pc[Pc.length-1].t;
   // the right call played out: the yellow line grows along it, and on a miss a see-through object ball rolls it
-  const isRight = Math.abs((oc.phiC ?? s.theta) - s.theta) < 1e-9;
+  const isRight = !!pre || Math.abs((oc.phiC ?? s.theta) - s.theta) < 1e-9;   // (a shot you aimed yourself has no see-through copy)
   const right = isRight ? run : outcome(s, s.theta, true), Pr = right.sim.paths.o;
   const rHit = right.sim.events.find(e=>e.type==='ball'), rT1 = rHit ? rHit.t : T1;
   const lastT = P => P[P.length-1].t;
@@ -2150,13 +2494,40 @@ function nudge(dir){             // dir +1 = right, -1 = left, as seen from behi
 let dragging = false;
 svgEl.addEventListener('pointerdown', ev=>{
   if(!isPlace() || answered || !shot) return;
+  if(isShooting()){
+    const hitAt = screenNear(ev);
+    if(isFree()){
+      if(hitAt.cb < 1.4){ freeDrag = 'cb'; dragging = true; try{ svgEl.setPointerCapture(ev.pointerId); }catch(e){} ev.preventDefault(); return; }
+      if(hitAt.ob < 1.0){ freeDrag = 'ob'; dragging = true; try{ svgEl.setPointerCapture(ev.pointerId); }catch(e){} ev.preventDefault(); return; }
+      if(hitAt.pocket){ shot.P = hitAt.pocket; rebuildShot(shot); freeLayout = packShot(shot); draw(false); return; }
+    }
+    if(hitAt.ob > 5) return;   // away from the object ball: that's looking around, not aiming
+  }
+  freeDrag = null;
   dragging = true;
   try{ svgEl.setPointerCapture(ev.pointerId); }catch(e){}
   placeAt(worldFromEvent(ev));
   ev.preventDefault();
 });
-svgEl.addEventListener('pointermove', ev=>{ if(dragging) placeAt(worldFromEvent(ev)); });
-['pointerup','pointercancel'].forEach(t=>svgEl.addEventListener(t, ()=>{ dragging = false; }));
+svgEl.addEventListener('pointermove', ev=>{
+  if(!dragging) return;
+  if(freeDrag){ const p = worldFromEvent(ev); if(!p) return; const q = [Math.max(R, Math.min(W-R, p[0])), Math.max(R, Math.min(H-R, p[1]))];
+    const other = freeDrag === 'cb' ? shot.ob : shot.cb; if(len(sub(q, other)) < 2*R + .05) return;
+    shot[freeDrag] = q; rebuildShot(shot); freeLayout = packShot(shot); draw(false); return; }
+  placeAt(worldFromEvent(ev));
+});
+let freeDrag = null;
+// how close a pointer is to each ball, in ball radii on screen, and which pocket it's on (if any)
+function screenNear(ev){
+  const pt = svgEl.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+  const q = pt.matrixTransform(svgEl.getScreenCTM().inverse()), cam = lastCam, out = {cb: 99, ob: 99, pocket: null};
+  if(!cam || settings.view === 'top') return out;
+  const d = P3 => { const c = cam.toCam(P3); if(c[2] < NEAR) return 99; const [x, y] = cam.proj(c); return Math.hypot(x - q.x, y - q.y)/(cam.focal*R/c[2]); };
+  out.cb = d([shot.cb[0], shot.cb[1], R]); out.ob = d([shot.ob[0], shot.ob[1], R]);
+  for(const P of POCKETS){ const E = engineTable().pockets[POCKETS.indexOf(P)]; if(d([E.hole[0], E.hole[1], 1.6]) < E.holeR/R*1.2) out.pocket = P; }
+  return out;
+}
+['pointerup','pointercancel'].forEach(t=>svgEl.addEventListener(t, ()=>{ dragging = false; freeDrag = null; }));
 
 function outcomeFromGhost(s, g){
   const v2 = norm(sub(g, s.cb)), n2 = norm(sub(s.ob, g));
@@ -2362,6 +2733,11 @@ function syncPressed(){
   const lockFlash = !hasBaseline();   // Flash opens once there's a baseline
   $('task-flash').disabled = lockFlash; $('flashlock').hidden = !lockFlash;
   document.querySelectorAll('[data-set]').forEach(b=>b.setAttribute('aria-pressed', settings[b.dataset.set]===b.dataset.val));
+  $('task-sess').setAttribute('aria-pressed', settings.task==='sess' || settings.task==='shoot');
+  $('task-free').setAttribute('aria-pressed', settings.task==='free');
+  const su = shootUnlocked(); $('task-free').disabled = !su; $('freelock').hidden = su; $('task-free').title = su ? '' : 'Opens when you finish the Read ladder';
+  $('trackseg').hidden = !su || !(settings.task==='sess' || settings.task==='shoot');
+  $('track-read').setAttribute('aria-pressed', settings.task==='sess'); $('track-shoot').setAttribute('aria-pressed', settings.task==='shoot');
   document.querySelectorAll('[data-set]').forEach(b=>{ if(BASE_LOCKED.includes(b.dataset.set)) b.disabled = baseRun(); });
   $('flash-750').disabled = fastFlashLocked(); $('fastlock').hidden = !fastFlashLocked();
   $('flash-750').title = fastFlashLocked() ? `Unlocks at ${GRADES[FAST_FLASH_AT]}` : '';
@@ -2374,7 +2750,7 @@ function applySetting(key, val){
   if(tut.on && key==='task') return;
   if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && aidMode('ghost')!=='optional') || (key==='line' && aidMode('line')!=='optional') || (key==='cam' && aidMode('stance')!=='optional') || (key==='walk' && baseRun()) || (key==='flash' && val==='750' && fastFlashLocked())) return;
   settings[key] = val; saveSettings(); syncPressed();
-  if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; }
+  if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='view' || key==='cam'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
@@ -2382,6 +2758,10 @@ function applySetting(key, val){
   renderStats();
 }
 document.querySelectorAll('[data-set]').forEach(b=>b.addEventListener('click', ()=>applySetting(b.dataset.set, b.dataset.val)));
+$('task-sess').addEventListener('click', ()=>applySetting('task', settings.track === 'shoot' && shootUnlocked() ? 'shoot' : 'sess'));
+$('task-free').addEventListener('click', ()=>{ if(shootUnlocked()) applySetting('task', 'free'); });
+$('track-read').addEventListener('click', ()=>{ settings.track = 'read'; applySetting('task', 'sess'); });
+$('track-shoot').addEventListener('click', ()=>{ if(!shootUnlocked()) return; settings.track = 'shoot'; applySetting('task', 'shoot'); });
 
 function syncRefs(){
   if($('answers').children.length) return;
@@ -2405,11 +2785,12 @@ function nextShot(){
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
   if($('sesscover').hidden) deal();
 }
-$('next').addEventListener('click', ()=>{ if(isPlace() && !answered) shoot(); else nextShot(); });
+$('next').addEventListener('click', ()=>{ if(isPlace() && !answered) (isShooting() ? takeShot() : shoot()); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
-function walkOn(){ return (settings.task==='call' || settings.task==='sess') && !baseRun(); }   // always on, except during the baseline
+function walkOn(){ return ['call','sess','shoot','free'].includes(settings.task) && !baseRun(); }   // always on, except during the baseline
 function walkRedraw(){ if(walkRaf || anim) return; walkRaf = requestAnimationFrame(()=>{ walkRaf = 0; if(shot) draw(answered); }); }   // while a shot runs, its own frames redraw
 svgEl.addEventListener('pointerdown', ev=>{
+  if(dragging) return;   // aiming or moving a ball, not looking around
   if(!walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
   // a drag across the full width of the table swings you half way round the object ball
   walkDrag = {x: ev.clientX, y: ev.clientY, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth), kv: (12*RAD) / Math.max(150, svgEl.clientHeight*0.45)};
@@ -2525,24 +2906,98 @@ const BSTEPS = [
 // A-: throw
 const TSTEPS_THROW = [
   {deg:30, mustMiss:'look', aids:{stance:1, ghost:1, line:1}, next:true,
-   text:'You’re at <b>A-</b>. From here every shot is played <b>soft, with stun</b>: the cue ball is struck a little below centre, so it arrives sliding, with no spin.'},
+   text:'Here the cue ball is struck <b>soft, with stun</b>: a little below centre, so it arrives sliding, with no spin.'},
   {aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
    text:'As the balls touch, friction drags the object ball a little along the cue ball’s path. That’s <b>throw</b>: the object ball goes <b>fuller</b> than the ghost ball says.'},
   {aids:{stance:1, ghost:1}, demo:'look', next:true,
-   text:'Hit it exactly as it looks, and throw carries it fuller. Watch it miss.'},
+   text:'Aim exactly at the ghost ball, and throw carries it fuller. Watch it miss.'},
   {aids:{stance:1, ghost:1}, demo:'right', next:true,
-   text:'Take a touch less ball to allow for the throw, and it drops. After contact the stunned cue ball goes straight out along the tangent line.'},
+   text:'Aim a touch thinner to allow for the throw, and it drops.'},
   {finish:true, aids:{},
-   text:'Throw is biggest on <b>soft stun</b> shots and around a <b>half-ball</b> hit, and there’s none on a full hit. Sometimes it’s enough to change the call: a cut that looks <b>¾</b> can need <b>½</b>.'},
+   text:'Throw is biggest <b>soft</b>, with <b>stun</b>, around a <b>half-ball</b> hit; top or back spin and pace cut it right down. From here it decides some shots: allow for it with the stroke you choose.'},
+];
+// ---------- Shoot lessons ----------
+const SL_SHOOT = [
+  {deg:30, aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
+   text:'Now you take the shot. <b>Drag around the object ball</b> to aim: the white ring is where your cue ball will be when it hits. Fine-tune with ◀ ▶, then <b>Shoot</b>.'},
+  {aids:{ghost:1, line:1}, next:true,
+   text:'To start you get three aids: the <b>ghost ball</b> shows the right contact, the <b>guide line</b> runs to it, and the <b>yellow line</b> is the object ball’s path to the pocket. Line your ring up with the ghost ball.'},
+  {finish:true, aids:{},
+   text:'They go one at a time as you climb: the path first, then the guide line, then the ghost ball. After that it’s your read.'},
+];
+const SL_DOWN = [
+  {deg:30, aids:{}, next:true,
+   text:'From here every shot is a routine. You start <b>standing on the ball line</b> for a few seconds: read the layout, and drag a rough aim.'},
+  {finish:true, aids:{},
+   text:'Then you <b>step behind your aim line</b> and <b>get down on it</b>. Fine-tune from there and shoot. Five seconds standing to start, then four, then three for good.'},
+];
+const SL_SPEED = [
+  {deg:30, aids:{}, next:true,
+   text:'<b>Speed</b> is yours now: the bar on the right of the table, in <b>diamonds</b>, how far a rolling cue ball hit that hard would travel.'},
+  {aids:{}, play:{k:.45, tip:[0,.4]}, next:true, text:'Too soft and it dies short. Watch.'},
+  {aids:{}, play:{k:1, tip:[0,.4]}, next:true, text:'<b>Pocket speed</b>: just enough, and it drops.'},
+  {aids:{}, play:{k:3.2, tip:[0,.4]}, next:true, text:'Much harder still goes, but the pocket gets less forgiving and the cue ball runs wild.'},
+  {finish:true, aids:{}, text:'Full points from pocket speed up to about double. Harder than that scores nothing, either way. Your speed stays where you left it.'},
+];
+const SL_PATH = [
+  {deg:30, aids:{}, play:{k:1.2, tip:[0,0]}, next:true,
+   text:'Now the cue ball has somewhere to be: land it in the <b>green zone</b>. The tip is at centre. Watch where a centre-ball hit goes.'},
+  {aids:{}, play:{k:2.4, tip:[0,0]}, next:true, text:'Same aim, more pace: a different place. Speed is your first tool for position.'},
+  {finish:true, aids:{}, text:'Pot it and stop in the zone for full points. Potting it but missing the zone scores nothing either way.'},
+];
+const SL_STUN = [
+  {deg:30, aids:{}, play:{k:2.6, tip:[0,0], stun:true}, next:true,
+   text:'<b>Stun</b>: hit centre, or a little below, firmly enough that the cue ball is still sliding when it arrives. With no spin it leaves along the <b>tangent line</b>, at right angles to the object ball.'},
+  {deg:0, aids:{}, play:{k:2.6, tip:[0,0], stun:true}, next:true, text:'Straight in, the same stroke is a <b>stop shot</b>: the cue ball stays where it hit.'},
+  {finish:true, aids:{}, text:'The farther the cue ball travels, the lower or harder you have to hit it for the backspin to last.'},
+];
+const SL_FOLLOW = [
+  {deg:30, aids:{}, play:{k:1.6, tip:[0,.5]}, next:true,
+   text:'<b>Follow</b>: strike above centre with the <b>tip pad</b>. The topspin bends the cue ball forward off the tangent line after contact.'},
+  {deg:0, aids:{}, play:{k:1.6, tip:[0,.5]}, next:true, text:'Straight in, it rolls on through after the object ball.'},
+  {finish:true, aids:{}, text:'More top, or more pace, carries it further forward.'},
+];
+const SL_DRAW = [
+  {deg:30, aids:{}, play:{k:2.8, tip:[0,-.55]}, next:true,
+   text:'<b>Draw</b>: strike below centre. The backspin pulls the cue ball back off the tangent line after contact.'},
+  {deg:0, aids:{}, play:{k:2.8, tip:[0,-.55]}, next:true, text:'Straight in, it comes back toward you.'},
+  {finish:true, aids:{}, text:'Draw needs pace: the backspin wears off on the way, so a soft or long draw shot just stuns.'},
+];
+const SL_CUSHION = [
+  {deg:35, aids:{}, play:{k:2.6, tip:[0,.2]}, next:true,
+   text:'Off a cushion: the cue ball comes off at about the angle it went in, a little wider when it’s rolling. Picture that line to find where it ends up.'},
+  {finish:true, aids:{}, text:'These zones need the cue ball to use a cushion. Speed and spin change how far it travels after.'},
+];
+const SL_ENGLISH = [
+  {deg:35, aids:{}, play:{k:2.6, tip:[.45,0]}, next:true,
+   text:'<b>English</b>: strike left or right of centre on the tip pad. Off a cushion it widens or narrows the angle.'},
+  {aids:{}, play:{k:2.6, tip:[-.45,0]}, next:true, text:'The other side, the other way.'},
+  {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off your aim (<b>squirt</b>), and throws the object ball a little. Aim a hair to the other side of it.'},
+];
+const SL_ALL = [
+  {deg:30, aids:{}, finish:true, text:'Everything is yours: speed, top, back and side. Each zone can be reached more than one way: pick the stroke, then aim for what it does.'},
 ];
 const LESSONS = {
   intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
   nudge: {name:'Between fractions', at:BETWEEN_AT, steps:BSTEPS},
-  throw: {name:'Throw', at:THROW_AT, steps:TSTEPS_THROW},
+  shoot:   {name:'Shooting', at:0, track:'shoot', steps:SL_SHOOT},
+  down:    {name:'Down on the shot', at:SH.down, track:'shoot', steps:SL_DOWN},
+  speed:   {name:'Speed', at:SH.speed, track:'shoot', steps:SL_SPEED},
+  path:    {name:'Cue ball path', at:SH.path, track:'shoot', steps:SL_PATH},
+  stun:    {name:'Stun', at:SH.stun, track:'shoot', steps:SL_STUN},
+  follow:  {name:'Follow', at:SH.follow, track:'shoot', steps:SL_FOLLOW},
+  draw:    {name:'Draw', at:SH.draw, track:'shoot', steps:SL_DRAW},
+  throw:   {name:'Throw', at:SH.throw, track:'shoot', steps:TSTEPS_THROW},
+  cushion: {name:'Off a cushion', at:SH.cushion, track:'shoot', steps:SL_CUSHION},
+  english: {name:'English', at:SH.english, track:'shoot', steps:SL_ENGLISH},
+  all:     {name:'Everything', at:SH.all, track:'shoot', steps:SL_ALL},
 };
 const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
 const tstep = () => tsteps()[tut.i];
-const lessonsOpen = () => Object.entries(LESSONS).filter(([, L])=>L.at <= Math.max(level() ?? 0, (stats.level && stats.level.best) ?? 0));
+const lessonsOpen = () => Object.entries(LESSONS).filter(([, L])=>{
+  if(L.track === 'shoot') return shootUnlocked() && L.at <= (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0);
+  return L.at <= Math.max(level() ?? 0, (stats.level && stats.level.best) ?? 0);
+});
 function openTutMenu(v){
   $('tutmenu').hidden = !v;
   if(v) $('tutlist').innerHTML = lessonsOpen().map(([k, L])=>`<button data-lesson="${k}">${L.name}<small>${L.at ? GRADES[L.at] : 'Start'}</small></button>`).join('');
@@ -2597,6 +3052,17 @@ function runStep(){
   if(st.shot) tutShot(st.shot);
   if(st.deg != null) tutShotDeg(st.deg, st.mustMiss);
   freshCall();
+  if(st.play) setTimeout(()=>{   // the coach plays a stroke for you: aimed at the right contact, at a share of pocket speed
+    if(!tut.on || tstep() !== st || answered) return;
+    const p = st.play, ideal = strikeOf(shot), d1 = len(sub(shot.gb, shot.cb));
+    let V = ideal.V*p.k;
+    if(p.stun){ const ug = PE.C.muSlide*PE.G; V = Math.max(V, Math.sqrt(d1*49*ug/12)*1.15); }
+    const tip = p.stun ? [0, Math.min(0, PE.strikeFor(Math.sqrt(Math.max(1, V*V - 2*PE.C.muSlide*PE.G*d1)), 0, d1).b)] : p.tip;
+    shot.tip = tip;
+    const run = playAim(shot, aimFor(shot, {V, tip}), {V, tip}, true);
+    answered = true; shot.pick = {made: run.made, far: !run.made, g2: shot.gb};
+    animateShot({made: run.made}, ()=>{ draw(true); }, run.made ? '#ffd34d' : MISS, run);
+  }, 700);
   if(st.demo != null) setTimeout(()=>{   // the coach plays the hit for you
     if(!tut.on || tstep() !== st || answered) return;
     const oc = outcome(shot, st.demo === 'right' ? shot.theta : st.demo === 'look' ? shot.pathDeg : st.demo);
@@ -2615,6 +3081,7 @@ function runStep(){
 function startTut(lesson){
   endFlash(); $('sesscover').hidden = true; $('endcover').hidden = true; $('startcover').hidden = true;
   tut.on = true; tut.i = 0; tut.lesson = LESSONS[lesson] ? lesson : 'intro';
+  cancelAnimationFrame(routineRaf); renderRoutineChip(); renderShootControls();
   $('coach').hidden = false; $('question').hidden = true; $('sessrow').hidden = true;
   showSessIdle(); runStep();
   $('coach').scrollIntoView({block:'nearest'});
@@ -2746,7 +3213,7 @@ document.addEventListener('keydown', e=>{
   if(!isPlace() && k>=1 && k<=REFS.length && !answered){ pickFrac(REFS[k-1].id); e.preventDefault(); }
   else if(shot && shot.phys && !answered && ['ArrowLeft','ArrowDown','ArrowRight'].includes(e.key)){ pickMod({ArrowLeft:'thick', ArrowDown:'center', ArrowRight:'thin'}[e.key]); e.preventDefault(); }
   else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1); e.preventDefault(); }
-  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(isPlace() && shot && shot.place){ shoot(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
 if(!['stand','down'].includes(settings.view)) settings.view='stand';
@@ -2759,12 +3226,28 @@ if(!['0','1'].includes(settings.walk)) settings.walk='1';
 if(!settings.sv5){ settings.walk = '1'; settings.sv5 = 1; }   // looking around used to lock at A-: give it back
 if(hasBaseline() && !stats.level){ const b = baselines()[0], g0 = gradeFor(pct(b.right, b.n)); stats.level = {g: g0, best: g0, pts: 0, v: 2}; save(); }   // baselines played before grades existed
 if(!stats.level){ stats.level = {g: 0, best: 0, pts: 0, v: 2}; save(); }   // no baseline any more: everyone starts at F
+if(stats.level.g > GRADES.length-1 || (stats.level.best ?? 0) > GRADES.length-1){ stats.level.g = Math.min(stats.level.g, GRADES.length-1); stats.level.best = Math.min(stats.level.best ?? 0, GRADES.length-1); save(); }   // the Read ladder now ends at A
 if(stats.level && !stats.level.v){   // grades gained F at the bottom and S at the top: shift everything up one
   stats.level.g += 1; stats.level.best = stats.level.g; stats.level.v = 2;
   (stats.sessions||[]).forEach(x=>{ if(x.grade!=null) x.grade += 1; if(x.g0!=null) x.g0 += 1; });
   save();
 }
 enforceLocks(); renderBadge();
+wireShootControls();
+// where you stand: your eyes over the table from your height, and how far back from the cue ball (a common default: 175 cm, 30")
+const BED = 29.5;   // the cloth's height above the floor, inches
+function applyStance(){
+  const hc = +settings.heightCm >= 150 && +settings.heightCm <= 200 ? +settings.heightCm : 175;
+  const back = +settings.standBack >= 12 && +settings.standBack <= 48 ? +settings.standBack : 30;
+  // reading a shot you lean in a little: eyes about 0.86 of your height off the floor
+  VIEWS.stand.h = Math.max(14, hc/2.54*0.86 - BED); VIEWS.stand.back = back;
+  const ft = Math.floor(hc/2.54/12), inch = Math.round(hc/2.54 - ft*12);
+  $('heightval').textContent = `${ft}′${inch}″ · ${hc} cm`; $('backval').textContent = `${back}″`;
+  $('heightrange').value = hc; $('backrange').value = back;
+}
+applyStance();
+$('heightrange').addEventListener('input', e=>{ settings.heightCm = +e.target.value; saveSettings(); applyStance(); pcache.key = null; if(shot) draw(answered); });
+$('backrange').addEventListener('input', e=>{ settings.standBack = +e.target.value; saveSettings(); applyStance(); pcache.key = null; if(shot) draw(answered); });
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 settings.throw='0';   // throw option removed
@@ -2773,7 +3256,7 @@ settings.pockets = 'std';   // pockets fixed at 4.5″: with reference cuts only
 setTable(settings.table, settings.pockets);
 if(!settings.sv){ settings.full='1'; settings.sv=2; }   // full-ball shots are now on by default
 if(settings.task==='call') settings.task = 'sess';   // Freeplay and Sessions merged: Freeplay is now played in sessions
-if(!['sess','flash'].includes(settings.task) || (settings.task==='flash' && !hasBaseline())) settings.task = 'sess';
+if(!['sess','flash','shoot','free'].includes(settings.task) || (['shoot','free'].includes(settings.task) && !shootUnlocked())) settings.task = 'sess';
 if(!settings.sv4){ stats.log.forEach(e=>{ if((e.t||'call')==='call') e.t = 'sess'; }); settings.sv4 = 1; save(); }   // old Freeplay shots join the new Freeplay
 if(stats.log.some(e=>e.t==='aim' || e.t==='tt')){ stats.log = stats.log.filter(e=>e.t!=='aim' && e.t!=='tt'); save(); }   // Aim and Thick/Thin were tried and dropped
 // one-time move: sessions played before Sessions became its own mode now belong to it
