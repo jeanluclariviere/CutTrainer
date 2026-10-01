@@ -902,7 +902,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 136;   // one per commit to main
+const BUILD = 137;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -971,7 +971,12 @@ const diamond = () => Math.max(W, H)/8;
 const speedFromDiamonds = d => Math.sqrt(2*PE.C.rollDecel*d*diamond());
 const diamondsFromSpeed = V => V*V/(2*PE.C.rollDecel*diamond());
 const SPEED_MIN = 0.5, SPEED_MAX = 48;
-function speedSetting(){ const d = +settings.shotSpeed; return d >= SPEED_MIN && d <= SPEED_MAX ? d : 8; }
+// ten whole-number speeds (keys 1–9, 0 for 10): each is how many diamonds a rolling cue ball hit that hard would travel
+const SPEED_LEVELS = [1, 2, 3, 4, 6, 8, 11, 15, 20, 28];
+const speedLevel = () => { const n = +settings.speedLevel; return n >= 1 && n <= 10 ? Math.round(n) : 5; };
+function speedSetting(){ return SPEED_LEVELS[speedLevel() - 1]; }
+const levelForSpeed = V => { const d = diamondsFromSpeed(V); let best = 1; SPEED_LEVELS.forEach((x, i)=>{ if(Math.abs(Math.log(x/d)) < Math.abs(Math.log(SPEED_LEVELS[best-1]/d))) best = i + 1; }); return best; };
+function setSpeedLevel(n){ settings.speedLevel = Math.max(1, Math.min(10, n)); saveSettings(); renderShootControls(); }
 const fmtD = d => d < 10 ? (Math.round(d*2)/2).toString().replace('.5', '½').replace(/^0½$/, '½') : String(Math.round(d));
 
 // ---------- the stroke ----------
@@ -1112,9 +1117,9 @@ function renderShootControls(){
   $('freebtns').hidden = !isFree();
   $('tippad').hidden = !(c.up || c.side);
   if(c.speed){
-    const d = speedSetting(), f = Math.log(d/SPEED_MIN)/Math.log(SPEED_MAX/SPEED_MIN);
+    const n = speedLevel(), f = n/10;
     $('speedfill').style.height = (f*100).toFixed(1) + '%';
-    $('speedval').textContent = fmtD(d) + ' ◆';
+    $('speedval').textContent = String(n);
   }
   if(c.up || c.side){
     const t = shotStroke(shot || {}).tip || [0,0];
@@ -1130,8 +1135,7 @@ function wireShootControls(){
   const bar = $('speedbar'), pad = $('tippad');
   const setSpeedFrom = ev => {
     const r = $('speedtrack').getBoundingClientRect(), f = Math.max(0, Math.min(1, (r.bottom - ev.clientY)/r.height));
-    const d = SPEED_MIN*Math.pow(SPEED_MAX/SPEED_MIN, f);
-    settings.shotSpeed = Math.round(d*4)/4; saveSettings(); renderShootControls();
+    setSpeedLevel(Math.max(1, Math.ceil(f*10)));
   };
   let sDrag = false;
   bar.addEventListener('pointerdown', ev=>{ if(answered) return; sDrag = true; try{ bar.setPointerCapture(ev.pointerId); }catch(e){} setSpeedFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
@@ -1185,7 +1189,7 @@ function takeShot(){
   else if(!run.hit) bits.push('Missed the object ball');
   else if(!run.made) bits.push(run.obIn ? 'Wrong pocket' : 'Missed the pocket');
   if(s.zone && run.made && !run.scratch) bits.push(run.inZone ? 'In the zone' : `Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
-  if(ctrl().speed) bits.push(`Speed ${fmtD(diamondsFromSpeed(stroke.V))} ◆ <small>ideal ${fmtD(diamondsFromSpeed(idealV))} ◆</small>`);
+  if(ctrl().speed) bits.push(`Speed ${speedLevel()} <small>· ideal ${levelForSpeed(idealV)}</small>`);
   const head = full ? 'Pocketed' : partial ? 'Pocketed' : 'Missed';
   $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>`;
   $('result').innerHTML = `<div class="resultpair">${tipSVG(s)}</div>`;
@@ -1886,7 +1890,7 @@ function endFlash(){ clearTimeout(flashTimer); $('cover').hidden = true; $('flas
 
 // ---------- round ----------
 const PLACEHOLDER = `How full do you hit the object ball?`;
-const PLACE_HINT = `Drag around the object ball to aim. Fine-tune with the arrows, then Shoot. Keys <kbd>←</kbd> <kbd>→</kbd> nudge, <kbd>Enter</kbd> shoots.`;
+const PLACE_HINT = `Aim with <kbd>←</kbd> <kbd>→</kbd> (hold <kbd>Shift</kbd> for bigger steps), or drag around the object ball. Speed: <kbd>1</kbd>–<kbd>0</kbd> or <kbd>↑</kbd> <kbd>↓</kbd>. <kbd>Enter</kbd> shoots.`;
 const QUESTION = {sess:'How full do you hit the object ball?', call:'How full do you hit the object ball?', flash:'How full do you hit the object ball?', place:'Where does the ghost ball go?', shoot:'Aim it, then shoot.', free:'Set it up, aim it, shoot.'};
 const tableBox = document.querySelector('.table-box');
 
@@ -2482,12 +2486,12 @@ function clampGhost(dir){
   if(Math.abs(ang) > lim) ang = Math.sign(ang)*lim;
   return add(shot.ob, mul(rot(toCB, ang), 2*R));
 }
-function nudge(dir){             // dir +1 = right, -1 = left, as seen from behind the cue ball
+function nudge(dir, mult){       // dir +1 = right, -1 = left, as seen from behind the cue ball; a fine step, mult for bigger ones
   if(!shot || !shot.place || answered) return;
   const w = norm(sub(shot.ob, shot.cb)), right = [-w[1], w[0]];
   const a = sub(shot.place, shot.ob);
   for(const sg of [1,-1]){
-    const cand = clampGhost(norm(rot(a, sg*0.008)));
+    const cand = clampGhost(norm(rot(a, sg*0.0035*(mult || 1))));
     if(Math.sign(dot(sub(cand, shot.place), right)) === dir){ shot.place = cand; break; }
   }
   draw(false);
@@ -2920,7 +2924,7 @@ const TSTEPS_THROW = [
 // ---------- Shoot lessons ----------
 const SL_SHOOT = [
   {deg:30, aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
-   text:'Now you take the shot. <b>Drag around the object ball</b> to aim: the white ring is where your cue ball will be when it hits. Fine-tune with ◀ ▶, then <b>Shoot</b>.'},
+   text:'Now you take the shot. Aim with <b>← →</b> or ◀ ▶ (hold Shift for bigger steps), or drag around the object ball: the white ring is where your cue ball will be when it hits. Then <b>Shoot</b>.'},
   {aids:{ghost:1, line:1}, next:true,
    text:'To start you get three aids: the <b>ghost ball</b> shows the right contact, the <b>guide line</b> runs to it, and the <b>yellow line</b> is the object ball’s path to the pocket. Line your ring up with the ghost ball.'},
   {finish:true, aids:{},
@@ -2934,7 +2938,7 @@ const SL_DOWN = [
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
-   text:'<b>Speed</b> is yours now: the bar on the right of the table, in <b>diamonds</b>, how far a rolling cue ball hit that hard would travel.'},
+   text:'<b>Speed</b> is yours now, from <b>1</b> to <b>10</b>: the keys 1–9 and 0, <b>↑ ↓</b>, or the bar on the right of the table. Each step up rolls the cue ball about a third farther.'},
   {aids:{}, play:{k:.45, tip:[0,.4]}, next:true, text:'Too soft and it dies short. Watch.'},
   {aids:{}, play:{k:1, tip:[0,.4]}, next:true, text:'<b>Pocket speed</b>: just enough, and it drops.'},
   {aids:{}, play:{k:3.2, tip:[0,.4]}, next:true, text:'Much harder still goes, but the pocket gets less forgiving and the cue ball runs wild.'},
@@ -3213,7 +3217,9 @@ document.addEventListener('keydown', e=>{
   if(tut.on && !tstep().ask) return;
   if(!isPlace() && k>=1 && k<=REFS.length && !answered){ pickFrac(REFS[k-1].id); e.preventDefault(); }
   else if(shot && shot.phys && !answered && ['ArrowLeft','ArrowDown','ArrowRight'].includes(e.key)){ pickMod({ArrowLeft:'thick', ArrowDown:'center', ArrowRight:'thin'}[e.key]); e.preventDefault(); }
-  else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1); e.preventDefault(); }
+  else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1, e.shiftKey ? 6 : 1); e.preventDefault(); }
+  else if(isShooting() && !answered && ctrl().speed && (e.key==='ArrowUp' || e.key==='ArrowDown')){ setSpeedLevel(speedLevel() + (e.key==='ArrowUp' ? 1 : -1)); e.preventDefault(); }
+  else if(isShooting() && !answered && ctrl().speed && /^[0-9]$/.test(e.key)){ setSpeedLevel(e.key === '0' ? 10 : +e.key); e.preventDefault(); }
   else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
