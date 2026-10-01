@@ -906,7 +906,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 154;   // one per commit to main
+const BUILD = 155;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1079,6 +1079,7 @@ function finishDeal(s){
 
 // ---------- the routine: read from the ball line, step behind your aim line, get down on it ----------
 let routineRaf = 0;
+const SETTLE_MS = 700;   // a call made standing: a moment settled down on the shot before it goes
 function startRoutine(){
   cancelAnimationFrame(routineRaf);
   const s = shot, T = standTime(shootLevel());
@@ -1090,7 +1091,7 @@ function startRoutine(){
     if(el < T){ c.phase = 'stand'; c.k = 0; c.left = T - el; }
     else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
     else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
-    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); if(s.queued){ const q = s.queued; s.queued = null; pickFrac(q); } return; }
+    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); if(s.queued){ const q = s.queued; s.queued = null; setTimeout(()=>{ if(shot === s && !answered) pickFrac(q); }, SETTLE_MS); } return; }
     renderRoutineChip(); draw(false);
     routineRaf = requestAnimationFrame(tick);
   };
