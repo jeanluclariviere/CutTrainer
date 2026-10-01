@@ -94,6 +94,11 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
 .optrange span{color:var(--muted);font-weight:500;margin-left:6px}
 .optrange input{width:100%;accent-color:#1f6fb2}
+.stancecard{position:absolute;left:12px;right:12px;bottom:12px;z-index:8;max-width:420px;margin:0 auto;background:rgba(9,20,31,.92);color:#e6eef3;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;font:400 14px var(--body);text-align:left}
+.stancecard[hidden]{display:none}
+.stancecard b{font-size:16px}.stancecard small{color:#b9c8d3}
+.stancecard label{display:flex;flex-wrap:wrap;gap:4px 6px;font-weight:600}.stancecard label span{color:#ffd34d;font-weight:500}
+.stancecard input{width:100%;accent-color:#ffd34d}.stancecard .startbtn{align-self:center}
 .tutlist{display:flex;flex-direction:column;gap:8px}
 .tutlist button{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;font:600 15px var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer}
 .tutlist button small{color:var(--muted);font-weight:500}
@@ -458,6 +463,14 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
             <dl class="sumgrid" id="sumnotes"></dl>
             <div class="sumbtns"><button class="startbtn" id="sessagain"></button><button class="sumdone" id="sessdone">Done</button></div>
           </div>
+        </div>
+        <div class="stancecard" id="stancecover" hidden>
+          <b>Where do you stand?</b>
+          <small>Set your height and how far back from the cue ball you stand. The table view follows.</small>
+          <label>Your height <span id="st-heightval"></span><input type="range" id="st-height" min="150" max="200" step="1" aria-label="Your height, cm"></label>
+          <label>Standing back from the cue ball <span id="st-backval"></span><input type="range" id="st-back" min="12" max="48" step="1" aria-label="How far you stand behind the cue ball, inches"></label>
+          <small>You can change these any time in Settings ⚙️.</small>
+          <button class="startbtn" id="stancedone">Done</button>
         </div>
         <div class="cover sumcover" id="sessidlecover" hidden>
           <div class="sumcard">
@@ -905,7 +918,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 148;   // one per commit to main
+const BUILD = 149;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1952,7 +1965,7 @@ function unpackShot(o){
 function deal(){
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   // a new element is explained the first time you reach the grade that brings it in
-  if(!tut.on && (settings.task === 'sess' || settings.task === 'shoot')){
+  if(!tut.on && $('stancecover').hidden && (settings.task === 'sess' || settings.task === 'shoot')){
     const tr = settings.task === 'shoot' ? 'shoot' : 'read', g = tr === 'shoot' ? ensureShootLevel().g : (level() ?? -1);
     const k = Object.keys(LESSONS).find(k=>k !== 'intro' && (LESSONS[k].track || 'read') === tr && LESSONS[k].at <= g && !(settings.tutSeen || {})[k]);
     if(k) return startTut(k);
@@ -2003,7 +2016,7 @@ function scheduleFades(){
   fadeRaf = requestAnimationFrame(tick);
 }
 function showSessIdle(){
-  const t = settings.task, idle = !tut.on && sessTask(t) && !(stats.active && stats.active.task===t);
+  const t = settings.task, idle = !tut.on && $('stancecover').hidden && sessTask(t) && !(stats.active && stats.active.task===t);
   $('sessidlecover').hidden = !idle;
   document.querySelectorAll('#answers button, #mods button').forEach(b=>b.disabled = idle || answered);
   if(idle){
@@ -3258,6 +3271,7 @@ $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
+  if(!$('stancecover').hidden){ if(e.key==='Enter'){ closeStance(); e.preventDefault(); } return; }
   if(tut.on && e.key==='Enter'){ tutNext(); e.preventDefault(); return; }
   if(tut.on && e.key==='Escape'){ endTut(); e.preventDefault(); return; }
   if(menuOpen()){ if(e.key==='Escape'){ openMenu(false); e.preventDefault(); } return; }
@@ -3304,12 +3318,17 @@ function applyStance(){
   // reading a shot you lean in a little: eyes about 0.86 of your height off the floor
   VIEWS.stand.h = Math.max(14, hc/2.54*0.86 - BED); VIEWS.stand.back = back;
   const ft = Math.floor(hc/2.54/12), inch = Math.round(hc/2.54 - ft*12);
-  $('heightval').textContent = `${ft}′${inch}″ · ${hc} cm`; $('backval').textContent = `${back}″`;
-  $('heightrange').value = hc; $('backrange').value = back;
+  $('heightval').textContent = $('st-heightval').textContent = `${ft}′${inch}″ · ${hc} cm`; $('backval').textContent = $('st-backval').textContent = `${back}″`;
+  $('heightrange').value = $('st-height').value = hc; $('backrange').value = $('st-back').value = back;
 }
 applyStance();
-$('heightrange').addEventListener('input', e=>{ settings.heightCm = +e.target.value; saveSettings(); applyStance(); pcache.key = null; if(shot) draw(answered); });
-$('backrange').addEventListener('input', e=>{ settings.standBack = +e.target.value; saveSettings(); applyStance(); pcache.key = null; if(shot) draw(answered); });
+const setStance = (k, v) => { settings[k] = v; saveSettings(); applyStance(); pcache.key = null; if(shot) draw(answered); };
+['heightrange', 'st-height'].forEach(id=>$(id).addEventListener('input', e=>setStance('heightCm', +e.target.value)));
+['backrange', 'st-back'].forEach(id=>$(id).addEventListener('input', e=>setStance('standBack', +e.target.value)));
+// first launch: set where you stand before anything else
+function closeStance(){ settings.stanceSet = 1; saveSettings(); $('stancecover').hidden = true; showSessIdle(); deal(); }
+$('stancedone').addEventListener('click', e=>{ e.stopPropagation(); closeStance(); });
+['click', 'pointerdown'].forEach(t=>$('stancecover').addEventListener(t, e=>e.stopPropagation()));
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 settings.throw='0';   // throw option removed
@@ -3335,6 +3354,7 @@ syncPressed();
 renderStats();
 sizeTable();
 if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAtContact, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, PE, engineTable, G3: ()=>G3, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(!settings.stanceSet && !settings.tut && !(stats.log || []).length && !baselines().length){ $('stancecover').hidden = false; showSessIdle(); }   // a new player sets their stance first
 deal();
 syncStreakPill();
 if(!settings.tut && !(stats.log || []).length && !baselines().length){ settings.tut = 1; saveSettings(); }   // first visit: the Shooting lesson opens on the first shot
