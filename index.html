@@ -907,7 +907,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 140;   // one per commit to main
+const BUILD = 141;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1223,7 +1223,7 @@ function takeShot(id){
   const bits = [];
   if(!ok) bits.push(`It was <b>${lab(right)}</b>`);
   if(run.scratch) bits.push('Scratch: the cue ball went in');
-  else if(!run.hit) bits.push(run.scratch ? 'Missed the object ball' : 'Too soft to reach it');
+  else if(!run.hit) bits.push('Missed the object ball');
   else if(!run.made) bits.push(run.obIn ? 'Wrong pocket' : 'Missed the pocket');
   if(s.zone && run.made && !run.scratch) bits.push(run.inZone ? 'In the zone' : `Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
   if(ctrl().speed) bits.push(`Speed ${speedLevel()} <small>· ideal ${levelForSpeed(idealV)}</small>`);
