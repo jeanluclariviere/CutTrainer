@@ -221,7 +221,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .tabpanel .options{gap:12px 18px}
 .quick .ql{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
 .quick .ql.tap{font-size:13px}
-.quick .vgrid{display:grid;grid-template-columns:auto auto 1fr;gap:3px 12px;align-items:baseline;width:100%;margin-top:4px;font-size:13px}
+.quick .vgrid{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:baseline;width:100%;margin-top:4px;font-size:13px}
 .quick .vgrid>span{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px;font-weight:600}
 .quick .vgrid i{font-style:normal;font-weight:600;color:var(--ink)} .quick .vgrid i.ok{color:var(--good)} .quick .vgrid i.no{color:var(--bad)}
 .quick .vgrid small{font-size:inherit;font-weight:600;color:var(--ink)}
@@ -949,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 191;   // one per commit to main
+const BUILD = 192;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1301,7 +1301,7 @@ function takeShot(id){
   const ball = run.scratch ? 'Scratch: the cue ball went in' : !run.hit ? 'Missed the object ball' : !run.made ? (run.obIn ? 'Wrong pocket' : 'Missed the pocket')
     : s.zone ? (run.inZone ? 'Pocketed, in the zone' : `Pocketed, missed the zone by ${run.zoneMiss.toFixed(1)}″`) : 'Pocketed';
   rows.push(['Ball', ball, run.made && !run.scratch && (!s.zone || run.inZone), '']);
-  const bits = [], grid = `<div class="vgrid">${rows.map(([k, v, good, note])=>`<span>${k}</span><i class="${good ? 'ok' : 'no'}">${v}</i><small>${note}</small>`).join('')}</div>`;
+  const bits = [], grid = `<div class="vgrid">${rows.map(([k, v, good])=>`<span>${k}</span><i class="${good ? 'ok' : 'no'}">${v}</i>`).join('')}</div>`;   // the right fraction shows on its green button
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
   $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>${grid}`;
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
