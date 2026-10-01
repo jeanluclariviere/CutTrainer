@@ -132,7 +132,9 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
 .trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
-.lookbtn{position:absolute;right:12px;bottom:12px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
+.lookbtn kbd{position:absolute;right:50%;transform:translateX(50%);bottom:-15px;font:600 9px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;white-space:nowrap}
+@media (hover:none){.lookbtn kbd{display:none}}
+.lookbtn{position:absolute;right:12px;bottom:22px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
 .practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
 .practicechip b{color:#ffd34d;margin-left:8px}
 .ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
@@ -532,7 +534,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="speedchip" id="speedchip" hidden></div>
         <button class="routinechip" id="routinechip" hidden></button>
         <button class="practicechip" id="practicechip" hidden></button>
-        <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁</button>
+        <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁<kbd>Space</kbd></button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
@@ -956,7 +958,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 213;   // one per commit to main
+const BUILD = 214;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
