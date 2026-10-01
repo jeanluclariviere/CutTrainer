@@ -937,7 +937,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 188;   // one per commit to main
+const BUILD = 189;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1673,7 +1673,7 @@ function perspSVG(s, reveal, view){
   if(key !== pcache.key){
     const segs = tableSegs();
     const ringArc = ringArc3(s.P).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
-    const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
+    const ring = !G3 && ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';   // with the 3D table, a floating arrow marks the pocket instead
     pcache = {key, back: G3 ? '' : perspBack(cam, s, reveal, segs, ring), front: G3 ? '' : perspFront(cam, s, reveal, segs, ring),
       fx: ring && !reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : ''};
   }
@@ -2078,9 +2078,27 @@ function draw(reveal){
     const fx = $('tablefx');
     if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
-    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
+    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setArrow(arrowAt()); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
   }
 }
+// The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
+function arrowAt(){
+  if(!shot || !shot.P || settings.view === 'top' || (tut.on && tut.zb > .5)) return null;
+  const E = engineTable().pockets[POCKETS.indexOf(shot.P)], t = performance.now()/1000;
+  return {p: E.hole, z: 4.2 + .7*Math.sin(t*2*Math.PI/1.6), spin: t*.6};
+}
+let arrowRaf = 0, arrowLast = 0;
+function arrowLoop(){
+  if(arrowRaf || !G3) return;
+  const tick = now => {
+    arrowRaf = 0;
+    if(!G3 || !lastCam || settings.view === 'top' || document.hidden) return;
+    if(now - arrowLast >= 33){ arrowLast = now; G3.setArrow(arrowAt()); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
+    arrowRaf = requestAnimationFrame(tick);
+  };
+  arrowRaf = requestAnimationFrame(tick);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && shot) arrowLoop(); });
 // the gold ring round the target pocket: round the engine's hole, the part that's outside the playing surface
 function ringArc3(P){
   const E = engineTable().pockets[POCKETS.indexOf(P)], r = E.holeR + 0.6, out = [];
