@@ -949,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 194;   // one per commit to main
+const BUILD = 195;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -990,7 +990,7 @@ const SHOOT_TEXT = [
   'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
   'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Top of the ladder'];
 const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand', 5:'Down on the shot: 3 s · 9 ft table',
-  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Top of the ladder'};
+  6:'📐 Any angle · no down timer · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Top of the ladder'};
 const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
@@ -1006,7 +1006,8 @@ const isFree = () => settings.task === 'free';
 const isShooting = () => isShoot() || isFree();
 function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
 const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : (stats.shoot ? stats.shoot.g : 0);
-const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : 3;
+const NO_TIMER = 1e6;   // from Any angle on, nothing hurries you: you get down when you're ready
+const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : g < SH.any ? 3 : NO_TIMER;
 // what you control at each step (Free play: everything you've unlocked)
 const ctrl = () => {
   const g = shootLevel();
@@ -1160,7 +1161,7 @@ function startRoutine(){
     else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
     else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
     else { c.phase = 'down'; c.k = 1; c.downAt = now; renderRoutineChip(); draw(false); featherLoop(s); return; }
-    renderRoutineChip(); draw(false);
+    renderRoutineChip(); if(c.phase !== 'stand') draw(false);   // standing still needs no redraw
     routineRaf = requestAnimationFrame(tick);
   };
   routineRaf = requestAnimationFrame(tick);
@@ -1170,7 +1171,7 @@ function renderRoutineChip(){
   const el = $('routinechip'); if(!el) return;
   const c = shot && shot.cam;
   if(!isShoot() || tut.on || answered || !c || !c.T || c.phase !== 'stand'){ el.hidden = true; return; }
-  el.hidden = false; el.innerHTML = `Down in ${Math.ceil(c.left)}<kbd>Enter</kbd>`;
+  el.hidden = false; el.innerHTML = (c.T >= NO_TIMER ? 'Get down' : `Down in ${Math.ceil(c.left)}`) + '<kbd>Enter</kbd>';
 }
 // Enter (or the chip) gets you down now instead of waiting out the standing time
 function goDown(){
@@ -3266,7 +3267,7 @@ const SL_DOWN = [
   {aids:{}, next:true,
    text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, hiding part of the view as they do at a real table. You can make them see-through in Settings.'},
   {finish:true, aids:{},
-   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
+   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three. From <b>Any angle</b> on there\'s no timer: you get down when you\'re ready.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
