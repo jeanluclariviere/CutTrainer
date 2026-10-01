@@ -94,6 +94,8 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
 .optrange span{color:var(--muted);font-weight:500;margin-left:6px}
 .optrange input{width:100%;accent-color:#1f6fb2}
+.optcolor{display:flex;align-items:center;justify-content:space-between}
+.optcolor input{width:44px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
 .stancecard{position:absolute;left:12px;right:12px;bottom:12px;z-index:8;max-width:420px;margin:0 auto;background:rgba(9,20,31,.92);color:#e6eef3;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;font:400 14px var(--body);text-align:left}
 .stancecard[hidden]{display:none}
 .stancecard b{font-size:16px}.stancecard small{color:#b9c8d3}
@@ -421,6 +423,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="hand-L" data-set="hand" data-val="L">Left</button>
         </div>
       </div>
+      <div class="opt optcolor">Glove <input type="color" id="glovecolor" aria-label="Glove colour"></div>
+      <div class="opt optcolor">Hand <input type="color" id="skincolor" aria-label="Hand colour"></div>
       <div class="opt">Flash: each shot shows for
         <div class="seg" role="group" aria-label="How long each Flash shot shows">
           <button id="flash-1500" data-set="flash" data-val="1500">1.5 s</button>
@@ -919,7 +923,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 175;   // one per commit to main
+const BUILD = 176;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1847,7 +1851,7 @@ function rigAlpha(s){
   if(!isShoot() || tut.on || settings.view === 'top' || !s) return {a:0};
   const g = shootLevel(), c = s.cam;
   if(g < SH.down || !c || !c.T) return {a:0};
-  const base = g >= SH.full ? .5 : .22, down = c.phase === 'down' ? c.k : 0, now = performance.now();
+  const base = g >= SH.full ? .6 : .35, down = c.phase === 'down' ? c.k : 0, now = performance.now();
   if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
     const fe = c.downAt ? featherAt(now - c.downAt, strokeBack(s)) : 0;
     return {a: base*down, ac: base*down, push: fe};
@@ -1892,7 +1896,11 @@ function featherLoop(s){   // keeps the practice strokes moving while you're dow
   const tick = ()=>{ if(shot !== s || answered || !isShoot() || tut.on || rigAlpha(s).a < .01) return; draw(false); featherRaf = requestAnimationFrame(tick); };
   featherRaf = requestAnimationFrame(tick);
 }
-const shadeHex = (hex, k) => '#' + [1, 3, 5].map(i=>Math.round(parseInt(hex.slice(i, i + 2), 16)*k).toString(16).padStart(2, '0')).join('');
+// Glove and hand colours (Settings, any colour): a black glove and a grey hand to start.
+const isHex = c => /^#[0-9a-f]{6}$/i.test(c || '');
+const GLOVE_DEF = '#1a1a1a', HAND_DEF = '#8a8f96';
+const strapOf = c => { const l = [1, 3, 5].reduce((t, i)=>t + parseInt(c.slice(i, i + 2), 16), 0)/3; return l < 70 ? shadeHex(c, 1, 60) : shadeHex(c, .8); };   // a little lighter on a dark glove, darker on a light one
+const shadeHex = (hex, k, add = 0) => '#' + [1, 3, 5].map(i=>Math.min(255, Math.round(parseInt(hex.slice(i, i + 2), 16)*k + add)).toString(16).padStart(2, '0')).join('');
 function cueRig(cam, s){
   const {a, ac, push} = rigAlpha(s);
   if(a < .01) return '';
@@ -1923,7 +1931,7 @@ function cueRig(cam, s){
   const zv = Math.max(.9, Cp[2] + Lb*Math.tan(EL) - .3);                     // the V: just under the cue
   const L = (x, y, z) => [Bp[0] + u[0]*x + sd[0]*y, Bp[1] + u[1]*x + sd[1]*y, z];
   const V = (x, y, z) => [u[0]*x + sd[0]*y, u[1]*x + sd[1]*y, z];
-  const box = (c, ax, ay, az) => {   // centre and half-axes (world): the faces that face the eye
+  const box = (c, ax, ay, az, col) => {   // centre and half-axes (world): the faces that face the eye
     const corner = (i, j, k) => [0,1,2].map(m=>c[m] + i*ax[m] + j*ay[m] + k*az[m]);
     for(const [ax2, sgn] of [[0,1],[0,-1],[1,1],[1,-1],[2,1],[2,-1]]){
       const nrm = [ax, ay, az][ax2].map(v=>v*sgn), fc = c.map((v, m)=>v + nrm[m]);
@@ -1931,19 +1939,22 @@ function cueRig(cam, s){
       const q = ax2 === 0 ? [corner(sgn,-1,-1), corner(sgn,1,-1), corner(sgn,1,1), corner(sgn,-1,1)]
               : ax2 === 1 ? [corner(-1,sgn,-1), corner(1,sgn,-1), corner(1,sgn,1), corner(-1,sgn,1)]
               :             [corner(-1,-1,sgn), corner(1,-1,sgn), corner(1,1,sgn), corner(-1,1,sgn)];
-      faces.push([q, '#4a525c']);   // slate, like a bridge glove: no skin tone
+      faces.push([q, col]);
     }
   };
-  const limb = (P, Q, w, h) => {   // a box from P to Q (local), w wide, h thick
+  const limb = (P, Q, w, h, col) => {   // a box from P to Q (local), w wide, h thick
     const a = L(...P), b = L(...Q), c = a.map((v, m)=>(v + b[m])/2), ax = a.map((v, m)=>(b[m] - v)/2);
     const hz = [0, 0, 1], wy = norm3(cross3(hz, ax)), up = norm3(cross3(ax, wy));
-    box(c, ax, wy.map(v=>v*w/2), up.map(v=>v*h/2));
+    box(c, ax, wy.map(v=>v*w/2), up.map(v=>v*h/2), col);
   };
-  limb([-3.6, 1.6, .55], [-.1, 1.5, zv - .35], 3.2, 1.0);                    // palm: heel on the cloth, knuckles up by the V
-  [[.4, .25], [1.2, .7], [2.0, 1.15], [2.7, 1.55]].forEach(([y, fan], i)=>limb([-.1, y, zv - .55], [2.6 - i*.25, y + fan, .3], .62, .55));   // fingers spread on the cloth
-  limb([-1.7, -.1, zv - .85], [.8, -.2, zv - .2], .7, .6);                  // thumb, up against the cue: the V
-  limb([-3.6, 1.6, .7], [-5, 1.9, 1.6], 2.6, 1.1);                          // wrist
-  limb([-5, 1.9, 1.6], [-14, 5.6, 6.2], 2.9, 2.3);                          // forearm, back up toward the shoulder
+  // a pool glove: palm, thumb, index and middle fingers covered, ring and little finger bare, a strap at the wrist
+  const gc = isHex(settings.glove) ? settings.glove : GLOVE_DEF, sk = isHex(settings.skin) ? settings.skin : HAND_DEF;
+  limb([-3.6, 1.6, .55], [-.1, 1.5, zv - .35], 3.2, 1.0, gc);                // palm: heel on the cloth, knuckles up by the V
+  [[.4, .25], [1.2, .7], [2.0, 1.15], [2.7, 1.55]].forEach(([y, fan], i)=>limb([-.1, y, zv - .55], [2.6 - i*.25, y + fan, .3], .62, .55, i < 2 ? gc : sk));   // fingers spread on the cloth
+  limb([-1.7, -.1, zv - .85], [.8, -.2, zv - .2], .7, .6, gc);              // thumb, up against the cue: the V
+  limb([-3.6, 1.6, .7], [-5, 1.9, 1.6], 2.6, 1.1, gc);                      // wrist, under the glove's strap
+  limb([-4.1, 1.7, .85], [-4.7, 1.8, 1.3], 2.85, 1.35, strapOf(gc));   // the strap
+  limb([-5, 1.9, 1.6], [-14, 5.6, 6.2], 2.9, 2.3, sk);                      // forearm, back up toward the shoulder
   // far to near, see-through
   return faces.map(([q, col, cue])=>({q, col, cue, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
     .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${ac.toFixed(3)}"/>`
@@ -2974,7 +2985,7 @@ function applySetting(key, val){
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
-  else if(key==='view' || key==='cam' || key==='hand'){ if(shot) draw(answered); }   // same shot, new viewpoint
+  else if(key==='view' || key==='cam' || key==='hand' || key==='glove' || key==='skin'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
   renderStats();
@@ -3516,6 +3527,10 @@ if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
+if(!isHex(settings.glove)) settings.glove = GLOVE_DEF;
+if(!isHex(settings.skin)) settings.skin = HAND_DEF;
+$('glovecolor').value = settings.glove; $('skincolor').value = settings.skin;
+[['glovecolor', 'glove'], ['skincolor', 'skin']].forEach(([id, k])=>$(id).addEventListener('input', e=>{ settings[k] = e.target.value; saveSettings(); if(shot) draw(answered); }));
 settings.throw='0';   // throw option removed
 settings.table = progTable();   // not a setting: your grade picks it
 if(stats.active){ stats.active.size = RUN_SIZE; delete stats.active.base; }   // a session left open from before just carries on as the run
