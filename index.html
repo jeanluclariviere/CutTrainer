@@ -949,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 196;   // one per commit to main
+const BUILD = 197;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1127,17 +1127,23 @@ function shootDeal(){
       return finishDeal(s);
     }
     if(!step) return finishDeal(s);
+    // the zone is made with a stroke you can actually play: one of your four speeds, and a tip on the pad's 0.1 steps
     const spec = STEP_STROKES[step](s), V0 = strikeOf(s).V, d1 = len(sub(s.gb, s.cb));
-    let V = V0*rnd(...(spec.k || [1, 1]));
-    if(spec.stun){ const ug = PE.C.muSlide*PE.G; V = Math.max(V0, Math.sqrt(d1*49*ug/12))*rnd(1.05, 1.35); }
-    const r = playAim(s, idealDir(s), {V, tip: spec.tip}, false);
+    let want = V0*rnd(...(spec.k || [1, 1]));
+    if(spec.stun){ const ug = PE.C.muSlide*PE.G; want = Math.max(V0, Math.sqrt(d1*49*ug/12))*1.05; }
+    const lvl = COARSE.find(l=>STROKE_MPH[l]*MPH >= want);
+    if(!lvl) continue;
+    const zs = {V: STROKE_MPH[lvl]*MPH, tip: spec.tip.map(x=>Math.round(x*10)/10)};
+    let r = playAim(s, idealDir(s), zs, false);
+    if(!r.made || r.scratch || !r.hit) continue;
+    r = playAim(s, aimFor(s, zs), zs, false);           // and played exactly as your right call would play it
     if(!r.made || r.scratch || !r.hit) continue;
     if(spec.cushion && !r.cushionAfter) continue;
     const c = r.cueEnd, zr = g >= SH.cushion ? 5 : 6;
     if(c[0] < 3 || c[0] > W-3 || c[1] < 3 || c[1] > H-3) continue;
     if(POCKETS.some(P=>len(sub(c, P.c)) < 7)) continue;
     if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
-    s.zone = {c, r: zr, step};
+    s.zone = {c, r: zr, step, lvl, tip: zs.tip};
     return finishDeal(s);
   }
   return finishDeal(best || generate());
@@ -1305,7 +1311,7 @@ function takeShot(id){
   }
   const lab = r => r.id === 'full' ? 'Full' : r.label;
   // the verdict as a small table: your call and the right one, your stroke and the one it wanted, and what the balls did
-  const spd = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] : String(n), want = levelForSpeed(idealV), mine = speedLevel();
+  const spd = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] : String(n), want = s.zone && s.zone.lvl ? s.zone.lvl : levelForSpeed(idealV), mine = speedLevel();
   const rows = [['Call', lab(picked), ok, ok ? '' : `right: ${lab(right)}`]];
   if(ctrl().speed) rows.push(['Stroke', spd(mine), spd(mine) === spd(want), spd(mine) === spd(want) ? '' : `ideal: ${spd(want)}`]);
   const ball = run.scratch ? 'Scratch: the cue ball went in' : !run.hit ? 'Missed the object ball' : !run.made ? (run.obIn ? 'Wrong pocket' : 'Missed the pocket')
