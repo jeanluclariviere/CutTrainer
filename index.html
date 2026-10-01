@@ -132,6 +132,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
 .trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
+.lookbtn{position:absolute;right:12px;bottom:12px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
 .practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
 .practicechip b{color:#ffd34d;margin-left:8px}
 .ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
@@ -531,6 +532,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="speedchip" id="speedchip" hidden></div>
         <button class="routinechip" id="routinechip" hidden></button>
         <button class="practicechip" id="practicechip" hidden></button>
+        <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁</button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
@@ -954,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 200;   // one per commit to main
+const BUILD = 201;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1204,13 +1206,16 @@ const ease = u => u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
 function renderRoutineChip(){
   const el = $('routinechip'); if(!el) return;
   const c = shot && shot.cam;
-  if(!isShoot() || tut.on || answered || !c || !c.T || c.phase !== 'stand'){ el.hidden = true; return; }
-  el.hidden = false; el.innerHTML = (c.T >= NO_TIMER ? 'Get down' : `Down in ${Math.ceil(c.left)}`) + '<kbd>Enter</kbd>';
+  const upAgain = c && c.up && c.phase === 'down' && c.k < 1;
+  if(!isShoot() || tut.on || answered || !c || !c.T || (c.phase !== 'stand' && !upAgain) || look.k > 0){ el.hidden = true; return; }
+  el.hidden = false; el.innerHTML = (c.T >= NO_TIMER || upAgain ? 'Get down' : `Down in ${Math.ceil(c.left)}`) + '<kbd>Enter</kbd>';
 }
 // Enter (or the chip) gets you down now instead of waiting out the standing time
 function goDown(){
   const c = shot && shot.cam;
-  if(!c || !c.T || c.phase !== 'stand' || answered || !isShoot() || tut.on) return false;
+  if(!c || !c.T || answered || !isShoot() || tut.on || look.target) return false;
+  if(c.phase === 'down' && c.up && c.k < 1){ c.up = false; renderRoutineChip(); riseCam(shot, 1, ()=>{ c.downAt = performance.now(); featherLoop(shot); }); return true; }   // back down after a look
+  if(c.phase !== 'stand') return false;
   c.t0 = performance.now() - c.T*1000; return true;
 }
 // The Shoot camera: standing on the ball line, standing behind your aim line, or down on your aim line, blended by the routine.
@@ -1219,27 +1224,77 @@ function shootCam(s, view){
   const stand = camAlong(s, d, VIEWS.stand), standAim = camAlong(s, aim, VIEWS.stand), down = camAlong(s, aim, VIEWS.down);
   const c = s.cam || {phase:'stand', k:0};
   const mix = (A, B, k) => camFrom(A.E.map((x, i)=>x + (B.E[i]-x)*k), norm3(A.f.map((x, i)=>x + (B.f[i]-x)*k)), A.hfov + (B.hfov - A.hfov)*k);
-  if(c.phase === 'step') return mix(stand, standAim, c.k);
-  if(c.phase === 'down') return mix(standAim, down, c.k);
-  return view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
+  const base = c.phase === 'step' ? mix(stand, standAim, c.k) : c.phase === 'down' ? mix(standAim, down, c.k) : view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
+  return look.k > 0 ? mix(base, overviewCam(s), ease(look.k)) : base;
+}
+// Step back (hold Space, or the eye button): up high behind the shot, the whole table in view. Free while standing;
+// down on the shot it stands you up first, and you get down again (Enter, a call or the chip) when you're ready.
+const look = {k: 0, target: 0, raf: 0};
+function overviewCam(s){
+  const d = norm(sub(s.ob, s.cb)), pts = [[0,0,0],[W,0,0],[W,H,0],[0,H,0], [s.cb[0],s.cb[1],R], [s.ob[0],s.ob[1],R]];
+  if(s.zone) pts.push([s.zone.c[0], s.zone.c[1], 0]);
+  const T = [W/2, H/2, 0], m = 14;
+  let cam = null;
+  for(let dist = 40; dist <= 260; dist += 8){
+    const E = [T[0] - d[0]*dist*.55, T[1] - d[1]*dist*.55, 18 + dist*.85];
+    cam = camFrom(E, norm3([T[0]-E[0], T[1]-E[1], T[2]-E[2]]), 64);
+    if(pts.every(P=>{ const q = cam.toCam(P); if(q[2] <= NEAR) return false; const [x, y] = cam.proj(q); return x >= m && x <= VW-m && y >= m && y <= VH-m; })) break;
+  }
+  return cam;
+}
+function setLook(on){
+  if(!shot || !isShooting() || tut.on || settings.view === 'top') return;
+  look.target = on ? 1 : 0;
+  const c = shot.cam;
+  if(on && !answered && c && c.T && c.phase === 'down' && c.k > 0){ c.up = true; cancelAnimationFrame(featherRaf); riseCam(shot, 0); }
+  cancelAnimationFrame(look.raf);
+  let last = performance.now();
+  const tick = now => {
+    const dt = now - last; last = now;
+    look.k = look.target ? Math.min(1, look.k + dt/350) : Math.max(0, look.k - dt/350);
+    draw(answered); renderRoutineChip();
+    if(look.k !== look.target) look.raf = requestAnimationFrame(tick);
+  };
+  look.raf = requestAnimationFrame(tick);
+}
+function riseCam(s, k1, done){   // move between standing behind the aim line (0) and down on it (1)
+  const c = s.cam, k0 = c.k, t0 = performance.now();
+  const tick = now => {
+    if(shot !== s) return;
+    const u = Math.min(1, (now - t0)/450); c.k = k0 + (k1 - k0)*ease(u);
+    if(!look.k) draw(answered);
+    if(u < 1) requestAnimationFrame(tick); else if(done) done();
+  };
+  requestAnimationFrame(tick);
 }
 // a camera behind the cue ball looking along dir, tilted to keep the cue ball (and, standing, the pocket) in frame
 function camAlong(s, dir, c){
   const eye = sub(s.cb, mul(dir, c.back)), E = [eye[0], eye[1], c.h];
   const hd = P=>Math.max(0.1, (P[0]-E[0])*dir[0] + (P[1]-E[1])*dir[1]);
   const aCB = Math.atan2(R - c.h, hd(s.cb)), aP = Math.atan2(1.6 - c.h, hd(s.P.c));
-  const vHalf = Math.atan((VH/2)/((VW/2)/Math.tan(c.hfov/2*RAD))), mg = 5*RAD;
+  let hfov = c.hfov;
+  const Z = c === VIEWS.stand && s.zone ? s.zone : null, zf = Z ? hd(Z.c) : 0;
+  if(Z && zf > 6){   // standing, with a zone ahead of you: widen the view (up to 96°) to take it in sideways
+    const zs = Math.abs((Z.c[0]-E[0])*dir[1] - (Z.c[1]-E[1])*dir[0]) + Z.r;
+    hfov = Math.min(96, Math.max(hfov, 2*(Math.atan2(zs, zf)/RAD + 4)));
+  }
+  const vHalf = Math.atan((VH/2)/((VW/2)/Math.tan(hfov/2*RAD))), mg = 5*RAD;
   let pr = c.pitch*RAD;
   if(c === VIEWS.stand && aP > pr + vHalf - mg) pr = aP - vHalf + mg;
   if(aCB < pr - vHalf + mg) pr = aCB + vHalf - mg;
-  return camFrom(E, norm3([dir[0]*Math.cos(pr), dir[1]*Math.cos(pr), Math.sin(pr)]), c.hfov);
+  if(Z && zf > 6){   // and tilt to it, if the pocket and cue ball stay in view
+    const aZn = Math.atan2(-c.h, Math.max(1, zf - Z.r)), aZf = Math.atan2(-c.h, zf + Z.r);
+    if(aZn < pr - vHalf + mg){ const p2 = aZn + vHalf - mg; if(aP <= p2 + vHalf - mg) pr = p2; }
+    if(aZf > pr + vHalf - mg){ const p2 = aZf - vHalf + mg; if(aCB >= p2 - vHalf + mg && aP <= p2 + vHalf - mg) pr = p2; }
+  }
+  return camFrom(E, norm3([dir[0]*Math.cos(pr), dir[1]*Math.cos(pr), Math.sin(pr)]), hfov);
 }
 
 // ---------- controls: speed bar and tip pad ----------
 function renderShootControls(){
   const box = $('shootctl'); if(!box) return;
   const on = isShooting() && !tut.on, c = ctrl();
-  box.hidden = !on;
+  box.hidden = !on; $('lookbtn').hidden = !on;
   if(!on) return;
   $('speedbar').hidden = !c.speed;
   $('freebtns').hidden = !isFree();
@@ -3570,6 +3625,9 @@ if(DEV) $('devlvl').addEventListener('click', ()=>{   // testing: level up now, 
   const d = levelPoint(true); if(stats.active) stats.active.pending = null; save();
   if(d){ showLevel(d, from); setTimeout(()=>{ if(!tut.on) deal(); }, 2900); }
 });
+document.addEventListener('keyup', e=>{ if(e.key===' ' && look.target){ e.preventDefault(); setLook(false); } });
+{ const b = $('lookbtn'); b.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); setLook(true); });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, e=>{ e.stopPropagation(); if(look.target) setLook(false); })); b.addEventListener('click', e=>e.stopPropagation()); }
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
   const i = +li.dataset.g;
@@ -3592,6 +3650,7 @@ $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   if((e.key==='m' || e.key==='M') && !e.metaKey && !e.ctrlKey){ const L = ['off','parlor','smoke','felt']; applySetting('music', L[(L.indexOf(settings.music) + 1) % L.length]); e.preventDefault(); return; }
+  if(e.key===' ' && isShooting() && !tut.on && settings.view !== 'top' && $('stancecover').hidden){ e.preventDefault(); if(!e.repeat) setLook(true); return; }
   if(!$('stancecover').hidden){ if(e.key==='Enter'){ closeStance(); e.preventDefault(); } return; }
   if(tut.on && e.key==='Enter'){ tutNext(); e.preventDefault(); return; }
   if(tut.on && e.key==='Escape'){ endTut(); e.preventDefault(); return; }
