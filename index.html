@@ -423,6 +423,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="hand-L" data-set="hand" data-val="L">Left</button>
         </div>
       </div>
+      <div class="opt optrange">Cue and hand opacity <span id="rigopval"></span>
+        <input type="range" id="rigoprange" min="50" max="100" step="5" aria-label="Cue and hand opacity, percent">
+      </div>
       <div class="opt">Bridge
         <div class="seg" role="group" aria-label="Bridge">
           <button id="bridge-open" data-set="bridge" data-val="open">Open</button>
@@ -929,7 +932,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 183;   // one per commit to main
+const BUILD = 184;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -963,15 +966,15 @@ const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain f
 
 // ---------- the Shoot ladder ----------
 const SHOOT_GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S-','S','S+'];
-const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:6, speed:7, throw:8, follow:9, stun:10, draw:11, cushion:12, english:13, all:14, full:15};
+const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:6, speed:7, throw:8, follow:9, stun:10, draw:11, cushion:12, english:13, all:14};   // S+ (15) is the top: nothing new yet
 const SHOOT_TEXT = [
   'Aim with the ghost ball, guide line and the object ball’s path', 'Object-ball path gone', 'Guide line gone', 'Ghost ball gone: aim from your own read',
   'Down on the shot: 5 s standing', 'Down on the shot: 3 s standing · 9 ft table',
   'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
-  'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Full view: your cue and bridge hand'];
+  'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Top of the ladder'];
 const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand', 5:'Down on the shot: 3 s · 9 ft table',
-  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full view: your cue and hand in the way'};
-const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english', 15:'Cue and hand see-through again'};
+  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Top of the ladder'};
+const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
 // the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C (Sessions by your grade; Flash and Free play by your best)
@@ -1860,12 +1863,13 @@ function perspDyn(cam, s, reveal){
 // ---------- your cue and bridge hand, down on the shot ----------
 // Low-poly shapes in table space, drawn see-through over the table, so the cut is read around them as it is at a real table.
 // Faint from Down on the shot (C-), more solid at the top of the ladder (S+). An open bridge for now.
+const rigOpacity = () => Math.max(.5, Math.min(1, (+settings.rigOpacity || 100)/100));
 const stanceIn = () => (+settings.heightCm >= 150 && +settings.heightCm <= 200 ? +settings.heightCm : 175)/2.54;
 function rigAlpha(s){
   if(!isShoot() || tut.on || settings.view === 'top' || !s) return {a:0};
   const g = shootLevel(), c = s.cam;
   if(g < SH.down || !c || !c.T) return {a:0};
-  const base = .5 + .5*Math.min(1, (g - SH.down)/(SH.full - SH.down)),   // 50% opaque at C-, up a step each grade to solid at S+
+  const base = rigOpacity(),   // your setting, 50–100%
     down = c.phase === 'down' ? c.k : 0, now = performance.now();
   if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
     // each practice stroke keeps the length it started with; a new speed shows from the next one, so nothing jumps
@@ -3208,7 +3212,7 @@ const SL_DOWN = [
   {aids:{}, next:true,
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
   {aids:{}, next:true,
-   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, see-through for now: they get more solid as you climb. They hide part of the view, as they do at a real table.'},
+   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, hiding part of the view as they do at a real table. You can make them see-through in Settings.'},
   {finish:true, aids:{},
    text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
 ];
@@ -3265,9 +3269,6 @@ const SL_ENGLISH = [
   {aids:{}, play:{k:2.6, tip:[-.45,0]}, next:true, text:'The other side, the other way.'},
   {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off line (<b>squirt</b>) and throws the object ball a little, so on some shots it changes which fraction to call.'},
 ];
-const SL_FULL = [
-  {deg:30, aids:{}, finish:true, text:'<b>Full view</b>: down on the shot, your cue and bridge hand are solid, and block as much as they do at a real table. Read the cut around them.'},
-];
 const SL_ALL = [
   {deg:30, aids:{}, finish:true, text:'Everything is yours: speed, top, back and side. Each zone can be reached more than one way: pick the stroke, then aim for what it does.'},
 ];
@@ -3284,7 +3285,6 @@ const LESSONS = {
   cushion: {name:'Off a cushion', at:SH.cushion, track:'shoot', steps:SL_CUSHION},
   english: {name:'English', at:SH.english, track:'shoot', steps:SL_ENGLISH},
   all:     {name:'Everything', at:SH.all, track:'shoot', steps:SL_ALL},
-  full:    {name:'Full view', at:SH.full, track:'shoot', steps:SL_FULL},
 };
 const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
 const tstep = () => tsteps()[tut.i];
@@ -3561,6 +3561,9 @@ if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
+if(!(+settings.rigOpacity >= 50 && +settings.rigOpacity <= 100)) settings.rigOpacity = 100;
+$('rigoprange').value = settings.rigOpacity; $('rigopval').textContent = settings.rigOpacity + '%';
+$('rigoprange').addEventListener('input', e=>{ settings.rigOpacity = +e.target.value; $('rigopval').textContent = settings.rigOpacity + '%'; saveSettings(); if(shot) draw(answered); });
 if(!isHex(settings.glove)) settings.glove = GLOVE_DEF;
 if(!isHex(settings.skin)) settings.skin = HAND_DEF;
 $('glovecolor').value = settings.glove; $('skincolor').value = settings.skin;
