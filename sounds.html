@@ -26,7 +26,7 @@
 <div class="grid">
   <div class="card"><h2>Shot</h2><small>Two sounds per shot: the contact, then what the object ball does</small>
     <div class="row">
-      <button data-p="click">Contact</button><button data-p="drop">Pocket</button><button data-p="rail">Rail</button><button data-p="jaw">Jaw</button>
+      <button data-p="cue">Cue strike</button><button data-p="click">Contact</button><button data-p="drop">Pocket</button><button data-p="rail">Rail</button><button data-p="jaw">Jaw</button>
     </div>
     <div class="row" style="margin-top:8px">
       <button class="seq" data-p="make">▶ Make</button><button class="seq" data-p="miss">▶ Miss</button><button class="seq" data-p="jawshot">▶ Jaw rattle</button>
@@ -57,6 +57,7 @@ function sfxTone(out, at, dur, f0, f1, gain, type){
   o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
 const SFX = {
+  cue:    (o, t, v)=>{ sfxTone(o, t, .07, 230, 130, .7*v); sfxNoise(o, t, .03, 'lowpass', 1100, .8, .35*v); },
   click:  (o, t, v)=>{ sfxTone(o, t, .12, 1175, 0, .55*v); sfxTone(o, t, .08, 1760, 0, .3*v); sfxTone(o, t, .025, 2349, 0, .12*v, 'triangle'); },
   drop:   (o, t, v)=>{ sfxTone(o, t, .14, 405, 127, .8*v, 'triangle'); },
   rail:   (o, t, v)=>{ sfxNoise(o, t, .08, 'lowpass', 500, .9, .6*v); sfxTone(o, t, .1, 140, 90, .6*v); },
@@ -98,8 +99,8 @@ const CHIMES = {
   leveldown: ()=>{ const o = audioOut(0.2); [[0,7,.22],[.2,3,.22],[.4,0,.7]].forEach(([t,n,d])=>tone(o, semis(392,n), t, d, 0.8)); },
 };
 const PLAYS = {
-  click: [[0,'click']], drop: [[0,'drop']], rail: [[0,'rail']], jaw: [[0,'jaw']],
-  make: [[0,'click'],[.6,'drop']], miss: [[0,'click'],[.6,'rail']], jawshot: [[0,'click'],[.6,'jaw']],
+  cue: [[0,'cue']], click: [[0,'click']], drop: [[0,'drop']], rail: [[0,'rail']], jaw: [[0,'jaw']],
+  make: [[0,'cue'],[.35,'click'],[.95,'drop']], miss: [[0,'cue'],[.35,'click'],[.95,'rail']], jawshot: [[0,'cue'],[.35,'click'],[.95,'jaw']],
 };
 document.addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
