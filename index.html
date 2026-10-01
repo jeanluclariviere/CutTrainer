@@ -949,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 193;   // one per commit to main
+const BUILD = 194;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1102,12 +1102,21 @@ const STEP_STROKES = {   // the kind of stroke a step's zones are made from (the
 };
 function zoneStep(g){ if(g < SH.follow) return null; if(g >= SH.all) return pick([SH.follow, SH.stun, SH.draw, SH.cushion, SH.english]); return g === SH.cushion ? SH.cushion : g >= SH.english ? SH.english : g; }
 // Deal a Shoot shot: any angle (the Read ladder's dealer), plus a target zone from a stroke that really gets there.
+// Room behind the cue ball, along the aim, for a bridge hand on the cloth: a forearm's length to the bridge plus the hand (about 4").
+// Closer to the cushion you'd be bridging on the rail, with the cue raised, and couldn't strike low on the ball.
+function railBehind(p, u){   // distance from p back along -u to the cushion
+  let t = Infinity;
+  for(const k of [0, 1]){ const d = -u[k], hi = k ? H : W; if(d > 1e-9) t = Math.min(t, (hi - p[k])/d); else if(d < -1e-9) t = Math.min(t, (0 - p[k])/d); }
+  return t;
+}
+function handRoom(s){ return railBehind(s.cb, norm(sub(s.gbLook || s.gb, s.cb))) >= 0.146*stanceIn() - 1.25 + 4; }
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
   let best = null;
   for(let tries = 0; tries < 40; tries++){
     const s = dealShot();   // leaning on your weak spots
     if(!s) continue;
+    if(!handRoom(s) && tries < 36) continue;   // your bridge hand has to fit on the cloth behind the cue ball (no rail bridges yet)
     best = best || s;
     if(diamondsFromSpeed(strikeOf(s).V) > 24) continue;   // no shots that need a near-break stroke just to reach the pocket
     if(g === SH.throw && !isFree()){   // throw: cut shots where the plain aim, played soft with stun, misses: throw decides it
@@ -1951,7 +1960,11 @@ function cueRig(cam, s){
   const sd = settings.hand === 'L' ? mul(n, -1) : n;                        // the bridge hand's side: left of the cue for a right-handed player
   const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
   const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
-  const EL = 4*RAD, f3 = [u[0]*Math.cos(EL), u[1]*Math.cos(EL), -Math.sin(EL)];
+  // How steep the cue is: a touch more with top, a touch less with draw (you keep it level to hit low), and as steep as it
+  // has to be to clear the cushion behind the cue ball (the butt has to pass over the rail).
+  const t0 = railBehind(s.cb, u), rAt = d => .255 + (d/58)*(.6 - .255);
+  const clear = Math.atan2(1.6 + .15 + rAt(t0) - Cp[2], t0);
+  const EL = Math.max((4 + 2*ty)*RAD, clear), f3 = [u[0]*Math.cos(EL), u[1]*Math.cos(EL), -Math.sin(EL)];
   const at = (P, d) => [P[0] - f3[0]*d, P[1] - f3[1]*d, P[2] - f3[2]*d];   // d inches back along the cue from P
   const faces = [];   // [pts3, fill]
   // the cue: a tapered band facing the eye, 58" long, tip 13 mm, butt 1.2"
