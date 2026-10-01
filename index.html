@@ -242,6 +242,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .main.persp{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
 .dip{position:absolute;inset:0;z-index:4;background:#15100c;opacity:0;pointer-events:none;transition:opacity .15s ease-in}
 .dip.out{transition:opacity .2s ease-out}
+.table-box{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.dragging{-webkit-user-select:none;user-select:none}
 .table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
@@ -958,7 +960,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 215;   // one per commit to main
+const BUILD = 216;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -2363,7 +2365,7 @@ function deal(){
     const k = Object.keys(LESSONS).find(k=>k !== 'intro' && (LESSONS[k].track || 'read') === tr && LESSONS[k].at <= g && !(settings.tutSeen || {})[k]);
     if(k) return startTut(k);
   }
-  walk = null; walkDrag = null;
+  walk = null; walkDrag = null; document.body.classList.remove('dragging');
   showSessIdle();   // the mode's run starts with its first shot
   if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
   syncRefs();
@@ -3267,6 +3269,7 @@ svgEl.addEventListener('pointerdown', ev=>{
   if(dragging) return;   // aiming or moving a ball, not looking around
   if(!walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
   // a drag across the full width of the table swings you half way round the object ball
+  document.body.classList.add('dragging'); try{ getSelection().removeAllRanges(); }catch(e){}
   walkDrag = {x: ev.clientX, y: ev.clientY, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth), kv: (12*RAD) / Math.max(150, svgEl.clientHeight*0.45)};
 });
 svgEl.addEventListener('pointermove', ev=>{
@@ -3280,7 +3283,7 @@ svgEl.addEventListener('pointermove', ev=>{
 });
 function walkRelease(){
   if(!walkDrag) return;
-  const moved = walkDrag.moved; walkDrag = null;
+  const moved = walkDrag.moved; walkDrag = null; document.body.classList.remove('dragging');
   if(!moved || !walk) return;
   walkEndedAt = performance.now();
   const from = walk.blend, start = performance.now(), dur = 320;
