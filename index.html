@@ -413,6 +413,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="opt optrange">Standing back from the cue ball <span id="backval"></span>
         <input type="range" id="backrange" min="24" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
       </div>
+      <div class="opt">Streaks
+        <div class="seg" role="group" aria-label="Streaks">
+          <button id="streaks-0" data-set="streaks" data-val="0">Off</button>
+          <button id="streaks-1" data-set="streaks" data-val="1">On</button>
+        </div>
+      </div>
       <div class="opt">Shot animation
         <div class="seg" role="group" aria-label="Shot animation">
           <button id="animate-0" data-set="animate" data-val="0">Off</button>
@@ -905,7 +911,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 156;   // one per commit to main
+const BUILD = 157;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1219,13 +1225,16 @@ function takeShot(id){
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
   document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });
   if(isShoot()){
+    const prevStreak = curStreak();
     logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
     if(!partial){
       const from = shootLevel(); stats.shoot.bestBefore = Math.max(stats.shoot.best ?? 0, stats.shoot.g);
       const d = levelPoint(full);
       if(d) setTimeout(()=>showLevel(d, from), 350); else renderBadge();
     } else renderBadge();
-    if(full){ const st = curStreak(); if(st >= STREAK_HOT) playSound('streak', st); }
+    const st = curStreak();
+    if(full && st >= STREAK_HOT) playSound('streak', st); else if(!full && prevStreak >= STREAK_HOT) playSound('streakEnd');
+    showStreak(st, !full && prevStreak >= STREAK_HOT ? prevStreak : 0);
   }
   const lab = r => r.id === 'full' ? 'Full' : r.label;
   const bits = [];
@@ -2100,6 +2109,7 @@ function notice(text){   // a brief note in the pill spot, e.g. an aid locking o
 }
 function showStreak(cur, endedAt){
   const el = $('streakpill'); clearTimeout(streakTimer);
+  if(settings.streaks === '0'){ el.hidden = true; return; }   // streaks switched off: no pill
   el.classList.remove('hot','over','pop');
   if(cur >= STREAK_HOT){
     el.innerHTML = `<span class="spark"></span>Streak <b>${cur}</b>`;
@@ -2112,6 +2122,7 @@ function showStreak(cur, endedAt){
 }
 function playSound(kind, streak){
   if(settings.sound === '0') return;
+  if(settings.streaks === '0' && (kind === 'streak' || kind === 'streakEnd')) return;   // nor its chimes
   try{
     if(kind === 'made'){ const o = audioOut(0.22); tone(o, 880, 0, 0.22, 1); tone(o, 1318.5, 0.075, 0.32, 0.9); }
     else if(kind === 'miss'){ const o = audioOut(0.22); tone(o, 392, 0, 0.30, 0.9, 330); }
@@ -2808,6 +2819,7 @@ function applySetting(key, val){
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
+  else if(key==='streaks') syncStreakPill();
   else if(key==='view' || key==='cam'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
@@ -3322,6 +3334,7 @@ $('stancedone').addEventListener('click', e=>{ e.stopPropagation(); closeStance(
 ['click', 'pointerdown'].forEach(t=>$('stancecover').addEventListener(t, e=>e.stopPropagation()));
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
+if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 settings.throw='0';   // throw option removed
 settings.table = progTable();   // not a setting: your grade picks it
 settings.pockets = 'std';   // pockets fixed at 4.5″: with reference cuts only, pocket size never changed a result
