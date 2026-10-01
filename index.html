@@ -958,7 +958,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 214;   // one per commit to main
+const BUILD = 215;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -2233,7 +2233,10 @@ function edgePose(cam, T){
   const ax = VW/2 + dx*k, ay = VH/2 + dy*k, fx = (ax - VW/2)/cam.focal, fy = -(ay - VH/2)/cam.focal;
   const right = norm3(cross3([0, 0, 1], cam.f)), up = cross3(cam.f, right);
   const ray = norm3([0, 1, 2].map(i=>right[i]*fx + up[i]*fy + cam.f[i]));
-  const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*60);   // 60" out, right at the edge of the view: small, out of the way
+  let dist = 60;   // 60" out, right at the edge of the view: small, out of the way...
+  if(ray[2] < 0) dist = Math.min(dist, (cam.E[2] - 4)/-ray[2]);   // ...but never down through the table: it stays 4" above the cloth
+  if(dist < 6) return null;
+  const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*dist);
   return {p: P, dir: norm3([T[0]-P[0], T[1]-P[1], T[2]-P[2]])};
 }
 function placeArrow(which, F, T){
