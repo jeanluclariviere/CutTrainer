@@ -923,7 +923,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 177;   // one per commit to main
+const BUILD = 178;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -963,9 +963,9 @@ const SHOOT_TEXT = [
   'Down on the shot: 5 s standing', 'Down on the shot: 3 s standing · 9 ft table',
   'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
   'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Full view: your cue and bridge hand'];
-const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand (faint)', 5:'Down on the shot: 3 s · 9 ft table',
+const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand', 5:'Down on the shot: 3 s · 9 ft table',
   6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full view: your cue and hand in the way'};
-const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english', 15:'Cue and hand faint again'};
+const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english', 15:'Cue and hand see-through again'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
 // the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C (Sessions by your grade; Flash and Free play by your best)
@@ -1855,7 +1855,8 @@ function rigAlpha(s){
   if(!isShoot() || tut.on || settings.view === 'top' || !s) return {a:0};
   const g = shootLevel(), c = s.cam;
   if(g < SH.down || !c || !c.T) return {a:0};
-  const base = g >= SH.full ? .6 : .35, down = c.phase === 'down' ? c.k : 0, now = performance.now();
+  const base = .5 + .5*Math.min(1, (g - SH.down)/(SH.full - SH.down)),   // 50% opaque at C-, up a step each grade to solid at S+
+    down = c.phase === 'down' ? c.k : 0, now = performance.now();
   if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
     const fe = c.downAt ? featherAt(now - c.downAt, strokeBack(s)) : 0;
     return {a: base*down, ac: base*down, push: fe};
@@ -3183,7 +3184,7 @@ const SL_DOWN = [
   {aids:{}, next:true,
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
   {aids:{}, next:true,
-   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, faint for now. They hide part of the view, as they do at a real table.'},
+   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, see-through for now: they get more solid as you climb. They hide part of the view, as they do at a real table.'},
   {finish:true, aids:{},
    text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
 ];
@@ -3239,7 +3240,7 @@ const SL_ENGLISH = [
   {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off line (<b>squirt</b>) and throws the object ball a little, so on some shots it changes which fraction to call.'},
 ];
 const SL_FULL = [
-  {deg:30, aids:{}, finish:true, text:'<b>Full view</b>: down on the shot, your cue and bridge hand now block as much as they do at a real table. Read the cut around them.'},
+  {deg:30, aids:{}, finish:true, text:'<b>Full view</b>: down on the shot, your cue and bridge hand are solid, and block as much as they do at a real table. Read the cut around them.'},
 ];
 const SL_ALL = [
   {deg:30, aids:{}, finish:true, text:'Everything is yours: speed, top, back and side. Each zone can be reached more than one way: pick the stroke, then aim for what it does.'},
