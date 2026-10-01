@@ -916,7 +916,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 160;   // one per commit to main
+const BUILD = 161;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1100,7 +1100,7 @@ function startRoutine(){
     if(el < T){ c.phase = 'stand'; c.k = 0; c.left = T - el; }
     else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
     else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
-    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); return; }
+    else { c.phase = 'down'; c.k = 1; c.downAt = now; renderRoutineChip(); draw(false); featherLoop(s); return; }
     renderRoutineChip(); draw(false);
     routineRaf = requestAnimationFrame(tick);
   };
@@ -1211,7 +1211,7 @@ function cutForDir(s, dir){
 // any other call plays that fraction's contact exactly
 function takeShot(id){
   if(answered || !shot || !isShooting() || anim) return;
-  const s = shot, stroke = shotStroke(s);
+  const s = shot, stroke = shotStroke(s), withCue = rigAlpha(s).a > .01, from = withCue ? rigAlpha(s).push : 0;
   const needDir = aimFor(s, stroke), need = cutForDir(s, needDir), right = nearestRef(need);
   const picked = ALL.find(r=>r.id===id) || right, ok = picked.id === right.id;
   const dir = ok ? needDir : dirForCut(s, picked.deg);
@@ -1228,7 +1228,10 @@ function takeShot(id){
   const partial = ok && clean && !full;
   const q = sub(s.ob, s.cb), qb = dot(q, dir), disc = qb*qb - dot(q, q) + 4*R*R;   // where the cue ball meets the object ball on your call
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
-  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });
+  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; });
+  cancelAnimationFrame(featherRaf);
+  const play = () => {
+  document.querySelectorAll('#answers button').forEach(x=>{ x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });
   if(isShoot()){
     const prevStreak = curStreak();
     logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
@@ -1258,6 +1261,18 @@ function takeShot(id){
     if(isShoot()) sessionTick(full, run.made);
   }, ok ? '#ffd34d' : MISS, run);
   finishRound();
+  };
+  if(!withCue){ s.follow = 0; return play(); }
+  // the stroke: back 3" (soft) to 10" (hard), a pause, forward; contact starts the shot
+  const lvl = levelForSpeed(stroke.V), ty = (stroke.tip || [0, 0])[1];
+  s.follow = (ty > .2 ? 5 : ty < -.2 ? 2 : 3.5)*(.7 + lvl*.05);
+  const st = cueStroke = {s, t0: performance.now(), from, back: 3 + 7*(lvl - 1)/9, tb: 380, tp: 140, tf: 230 - 10*lvl};
+  const tick = now => {
+    if(shot !== s){ cueStroke = null; return; }
+    if(now - st.t0 >= st.tb + st.tp + st.tf){ cueStroke = null; play(); return; }
+    draw(false); requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 // Free play: put the layout back, or a new one
 let freeLayout = null;
@@ -1813,11 +1828,29 @@ function rigAlpha(s){
   if(!isShoot() || tut.on || settings.view === 'top' || !s) return {a:0};
   const g = shootLevel(), c = s.cam;
   if(g < SH.down || !c || !c.T) return {a:0};
-  const base = g >= SH.full ? .5 : .22, down = c.phase === 'down' ? c.k : 0;
-  if(!answered) return {a: base*down, push: 0};
-  if(!anim) return {a:0};
-  const t = performance.now() - anim.t0;   // the stroke: the cue goes through, then cue and hand fade
-  return {a: base*Math.max(0, 1 - (t - 120)/200), push: 2*Math.min(1, t/120)};
+  const base = g >= SH.full ? .5 : .22, down = c.phase === 'down' ? c.k : 0, now = performance.now();
+  if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
+    const fe = c.downAt ? -.8*(1 - Math.cos(2*Math.PI*(now - c.downAt)/1500)) : 0;
+    return {a: base*down, push: fe};
+  }
+  if(cueStroke && cueStroke.s === s) return {a: base, push: strokeAt(cueStroke, now)};
+  if(!anim || !s.follow) return {a:0};
+  const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, then cue and hand fade
+  return {a: base*Math.max(0, 1 - (t - 150)/220), push: s.follow*(1 - (1 - k)*(1 - k))};
+}
+// The final stroke: back (further for a harder shot), a pause, then forward, faster into the ball.
+let cueStroke = null, featherRaf = 0;
+function strokeAt(st, now){
+  const t = now - st.t0;
+  if(t < st.tb){ const k = t/st.tb; return st.from + (-st.back - st.from)*(1 - Math.cos(Math.PI*k))/2; }
+  if(t < st.tb + st.tp) return -st.back;
+  const k = Math.min(1, (t - st.tb - st.tp)/st.tf);
+  return -st.back*(1 - k*k);
+}
+function featherLoop(s){   // keeps the practice strokes moving while you're down and haven't called
+  cancelAnimationFrame(featherRaf);
+  const tick = ()=>{ if(shot !== s || answered || !isShoot() || tut.on || rigAlpha(s).a < .01) return; draw(false); featherRaf = requestAnimationFrame(tick); };
+  featherRaf = requestAnimationFrame(tick);
 }
 function cueRig(cam, s){
   const {a, push} = rigAlpha(s);
@@ -2034,6 +2067,7 @@ function unpackShot(o){
   return s;
 }
 function deal(){
+  if(cueStroke && cueStroke.s === shot) return;   // mid-stroke: the shot goes first
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   // a new element is explained the first time you reach the grade that brings it in
   if(!tut.on && $('stancecover').hidden && (settings.task === 'sess' || settings.task === 'shoot')){
@@ -2920,7 +2954,7 @@ $('nudge-r').addEventListener('click', ()=>nudge(1));
 let jumpingAhead = false;
 function nextShot(){
   if(tut.on){ tutNext(); return; }
-  if(!answered || !$('endcover').hidden) return;
+  if(!answered || !$('endcover').hidden || cueStroke) return;
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
   if($('sesscover').hidden) deal();
 }
