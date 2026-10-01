@@ -916,7 +916,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 164;   // one per commit to main
+const BUILD = 165;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1257,7 +1257,7 @@ function takeShot(id){
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
   animateShot({made: run.made}, ms=>{   // the shot counts once it's played out (or skipped), so the last one of a session is watched too
     if(isShoot() && stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (ms||0);
-    if(!jumpingAhead) draw(true);
+    if(!jumpingAhead){ draw(true); standUp(s); }
     if(isShoot()) sessionTick(full, run.made);
   }, ok ? '#ffd34d' : MISS, run);
   finishRound();
@@ -1831,12 +1831,13 @@ function rigAlpha(s){
   const base = g >= SH.full ? .5 : .22, down = c.phase === 'down' ? c.k : 0, now = performance.now();
   if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
     const fe = c.downAt ? featherAt(now - c.downAt) : 0;
-    return {a: base*down, push: fe};
+    return {a: base*down, ac: base*down, push: fe};
   }
-  if(cueStroke && cueStroke.s === s) return {a: base, push: strokeAt(cueStroke, now)};
-  if(!anim || !s.follow) return {a:0};
-  const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, then cue and hand fade
-  return {a: base*Math.max(0, 1 - (t - 150)/220), push: s.follow*(1 - (1 - k)*(1 - k))};
+  if(cueStroke && cueStroke.s === s) return {a: base, ac: base, push: strokeAt(cueStroke, now)};
+  if(!s.follow) return {a:0};
+  if(!anim) return {a: base*down, ac: 0, push: s.follow};   // the shot's played: the hand stays until you stand up
+  const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, then the cue fades
+  return {a: base, ac: base*Math.max(0, 1 - (t - 150)/220), push: s.follow*(1 - (1 - k)*(1 - k))};
 }
 // Practice strokes: 1.6" back, a brief hold at the back, then forward; 1.6 s a cycle.
 function featherAt(t){
@@ -1852,6 +1853,19 @@ function strokeAt(st, now){
   const k = Math.min(1, (t - st.tb - st.tp)/st.tf);
   return -st.back*(1 - k*k);
 }
+// Once the balls have stopped, made or missed, you stand back up (behind the aim line) and the hand comes off the table.
+function standUp(s){
+  const c = s.cam;
+  if(!c || !c.T || c.phase !== 'down' || !isShoot()) return;
+  const t0 = performance.now(), k0 = c.k;
+  const tick = now => {
+    if(shot !== s) return;
+    c.k = k0*(1 - ease(Math.min(1, (now - t0)/600)));
+    draw(true);
+    if(c.k > 0) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 function featherLoop(s){   // keeps the practice strokes moving while you're down and haven't called
   cancelAnimationFrame(featherRaf);
   const tick = ()=>{ if(shot !== s || answered || !isShoot() || tut.on || rigAlpha(s).a < .01) return; draw(false); featherRaf = requestAnimationFrame(tick); };
@@ -1859,7 +1873,7 @@ function featherLoop(s){   // keeps the practice strokes moving while you're dow
 }
 const shadeHex = (hex, k) => '#' + [1, 3, 5].map(i=>Math.round(parseInt(hex.slice(i, i + 2), 16)*k).toString(16).padStart(2, '0')).join('');
 function cueRig(cam, s){
-  const {a, push} = rigAlpha(s);
+  const {a, ac, push} = rigAlpha(s);
   if(a < .01) return '';
   const u = norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];          // forward along the aim, and to its left
   const sd = settings.hand === 'L' ? mul(n, -1) : n;                        // the bridge hand's side: left of the cue for a right-handed player
@@ -1871,7 +1885,7 @@ function cueRig(cam, s){
   // the cue: a tapered band facing the eye, 58" long, tip 13 mm, butt 1.2"
   const T0 = at(Cp, 0.4 - push), LEN = 58, cueR = t => .255 + t*(.6 - .255);
   const st = [0, 1, 6, 16, 29, 36, 44, 54, 58];
-  for(let i = 0; i < st.length - 1; i++){
+  for(let i = 0; i < st.length - 1 && ac >= .01; i++){
     const A = at(T0, st[i]), B = at(T0, st[i+1]);
     const side = P => { const v = norm3([cam.E[0]-P[0], cam.E[1]-P[1], cam.E[2]-P[2]]), w = cross3(f3, v), l = Math.hypot(...w) || 1; return [w[0]/l, w[1]/l, w[2]/l]; };
     const sa = side(A), sb = side(B), ra = cueR(st[i]/LEN), rb = cueR(st[i+1]/LEN);
@@ -1911,7 +1925,7 @@ function cueRig(cam, s){
   limb([-5, 1.9, 1.6], [-14, 5.6, 6.2], 2.9, 2.3);                          // forearm, back up toward the shoulder
   // far to near, see-through
   return faces.map(([q, col, cue])=>({q, col, cue, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
-    .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}"/>`
+    .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${ac.toFixed(3)}"/>`
       : `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#5c524a" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>`; }).join('');
 }
 function perspFront(cam, s, reveal, segs, ring){
