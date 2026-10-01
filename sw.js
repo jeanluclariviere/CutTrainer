@@ -1,7 +1,7 @@
 // Network first, and never a stale copy, so every update you push shows up on the next load;
 // the cached copy is only used when you're offline.
-const CACHE = 'cut-trainer-v5';
-const CORE = ['./', './index.html', './ar.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './ar-core.js', './ar-worker.js', './engine.js'];
+const CACHE = 'cut-trainer-v6';
+const CORE = ['./', './index.html', './ar.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './ar-core.js', './ar-worker.js', './engine.js', './table3d.js', './vendor/three.min.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).catch(()=>{})); self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener('fetch', e => {
