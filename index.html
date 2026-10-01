@@ -916,7 +916,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 165;   // one per commit to main
+const BUILD = 166;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1835,9 +1835,9 @@ function rigAlpha(s){
   }
   if(cueStroke && cueStroke.s === s) return {a: base, ac: base, push: strokeAt(cueStroke, now)};
   if(!s.follow) return {a:0};
-  if(!anim) return {a: base*down, ac: 0, push: s.follow};   // the shot's played: the hand stays until you stand up
-  const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, then the cue fades
-  return {a: base, ac: base*Math.max(0, 1 - (t - 150)/220), push: s.follow*(1 - (1 - k)*(1 - k))};
+  if(!anim) return {a: base*down, ac: base*down, push: s.follow};   // the shot's played: cue and hand stay until you stand up
+  const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, and hold it there
+  return {a: base, ac: base, push: s.follow*(1 - (1 - k)*(1 - k))};
 }
 // Practice strokes: 1.6" back, a brief hold at the back, then forward; 1.6 s a cycle.
 function featherAt(t){
