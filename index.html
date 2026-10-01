@@ -956,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 211;   // one per commit to main
+const BUILD = 212;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -2150,7 +2150,7 @@ function perspTop(cam, s, reveal){
   const ringPts = ringArc3(s.P).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
   const ringVisible = ringPts.some(([x,y])=>x>=0 && x<=VW && y>=0 && y<=VH);
   o += tutLayer(cam, s, reveal);
-  if(!G3 && !ringVisible && !(tut.on && tut.zb > 0) && !look.k){
+  if(!ringVisible && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0)){
     const pc = cam.toCam([s.P.c[0], s.P.c[1], 1.6]);
     let dx = pc[0], dy = -pc[1];
     if(pc[2] <= NEAR){ dy = Math.abs(dy)+1; }
@@ -2248,7 +2248,7 @@ function placeArrow(which, F, T){
 }
 function setArrows(){
   const A = arrowAt(), Z = zoneArrowAt();
-  G3.setArrow(placeArrow('pocket', A, A && [A.p[0], A.p[1], 1.6]));
+  G3.setArrow(A);   // the pocket's arrow just floats over the pocket
   G3.setArrow(placeArrow('zone', Z, Z && [Z.p[0], Z.p[1], .03]), 'zone');
 }
 let arrowRaf = 0, arrowLast = 0;
