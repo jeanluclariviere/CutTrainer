@@ -277,7 +277,6 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .answers button span{font:500 11px var(--mono);color:var(--muted);letter-spacing:.02em}
 .answers button:hover:not(:disabled){border-color:var(--accent)}
 .answers button:disabled{cursor:default}
-.answers button.queued{border-color:#1f6fb2;background:color-mix(in srgb,#1f6fb2 12%,var(--surface))}
 .answers button.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
 .answers button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -906,7 +905,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 155;   // one per commit to main
+const BUILD = 156;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1079,7 +1078,6 @@ function finishDeal(s){
 
 // ---------- the routine: read from the ball line, step behind your aim line, get down on it ----------
 let routineRaf = 0;
-const SETTLE_MS = 700;   // a call made standing: a moment settled down on the shot before it goes
 function startRoutine(){
   cancelAnimationFrame(routineRaf);
   const s = shot, T = standTime(shootLevel());
@@ -1091,7 +1089,7 @@ function startRoutine(){
     if(el < T){ c.phase = 'stand'; c.k = 0; c.left = T - el; }
     else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
     else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
-    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); if(s.queued){ const q = s.queued; s.queued = null; setTimeout(()=>{ if(shot === s && !answered) pickFrac(q); }, SETTLE_MS); } return; }
+    else { c.phase = 'down'; c.k = 1; renderRoutineChip(); draw(false); return; }
     renderRoutineChip(); draw(false);
     routineRaf = requestAnimationFrame(tick);
   };
@@ -1945,7 +1943,7 @@ const tableBox = document.querySelector('.table-box');
 
 function packShot(s){
   const o = {...s, P: POCKETS.indexOf(s.P), answer: s.answer.id, tb: curTable, seenAt: Date.now()};
-  delete o.pick; delete o.anim; delete o.final; delete o.t0; delete o.place; delete o.queued;
+  delete o.pick; delete o.anim; delete o.final; delete o.t0; delete o.place;
   return o;
 }
 function unpackShot(o){
@@ -2325,11 +2323,7 @@ function markPend(){
 function pickFrac(id){
   if(!canCall()) return;
   const c = shot.cam;
-  if(isShoot() && c && c.T && !(c.phase === 'down' && c.k === 1)){   // from Down on the shot: a call made standing goes through the routine, then shoots
-    shot.queued = id; goDown();
-    document.querySelectorAll('#answers button').forEach(b=>b.classList.toggle('queued', b.dataset.id === id));
-    return;
-  }
+  if(isShoot() && c && c.T && !(c.phase === 'down' && c.k === 1)){ goDown(); return; }   // from Down on the shot: no shooting standing, a call gets you down first
   if(isShooting()) return takeShot(id);   // the call is the aim: the shot goes off with the stroke you've set
   if(!shot.phys) return answer(id);
   pend.f = id; markPend();
@@ -2993,7 +2987,7 @@ const SL_DOWN = [
   {aids:{}, next:true,
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
   {finish:true, aids:{},
-   text:'Call it standing and you still go through the routine before the shot goes off. <b>Enter</b> gets you down without calling. Wait too long and you go down anyway: five seconds to start, then three for good.'},
+   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
