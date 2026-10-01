@@ -956,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 210;   // one per commit to main
+const BUILD = 211;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -2242,7 +2242,9 @@ function placeArrow(which, F, T){
   st.k = e ? Math.min(1, st.k + dt/300) : Math.max(0, st.k - dt/300);
   if(!st.k || !st.edge) return F;
   const k = ease(st.k), P = [F.p[0], F.p[1], F.z], E = st.edge;
-  return {p: [P[0] + (E.p[0]-P[0])*k, P[1] + (E.p[1]-P[1])*k], z: P[2] + (E.p[2]-P[2])*k, dir: norm3([0, 1, 2].map(i=>(i === 2 ? -1 : 0)*(1 - k) + E.dir[i]*k)), spin: F.spin};
+  const bob = .5*Math.sin(now/1000*2*Math.PI/1.6 + (which === 'zone' ? 1.3 : 0))*k;   // at the edge it still nudges, toward what it points at
+  const Q = [0, 1, 2].map(i=>E.p[i] + E.dir[i]*bob);
+  return {p: [P[0] + (Q[0]-P[0])*k, P[1] + (Q[1]-P[1])*k], z: P[2] + (Q[2]-P[2])*k, dir: norm3([0, 1, 2].map(i=>(i === 2 ? -1 : 0)*(1 - k) + E.dir[i]*k)), spin: F.spin};
 }
 function setArrows(){
   const A = arrowAt(), Z = zoneArrowAt();
