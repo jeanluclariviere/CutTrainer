@@ -199,10 +199,16 @@ function make(canvas){
     const shaft = new T3.Mesh(new T3.CylinderGeometry(.42, .42, 2.2, 20), mat); shaft.rotation.x = Math.PI/2; shaft.position.z = 2.9;
     g.add(head, shaft); g.visible = false; world.add(g); return g;
   }
+  const DOWN = new T3.Vector3(0, 0, -1);
   const arrows = {pocket: makeArrow(0xffd34d), zone: makeArrow(0x5be0c8)};
   function setArrow(a, which = 'pocket'){   // a: {p:[x, y], z} (the tip), or null
     const g = arrows[which]; g.visible = !!a;
-    if(a){ g.position.set(a.p[0], a.p[1], a.z); g.rotation.z = (a.spin || 0); }
+    if(a){
+      g.position.set(a.p[0], a.p[1], a.z);
+      const d = a.dir || [0, 0, -1];   // the way the tip points (straight down when it floats over its target)
+      g.quaternion.setFromUnitVectors(DOWN, new T3.Vector3(d[0], d[1], d[2]).normalize());
+      g.rotateZ(a.spin || 0);
+    }
   }
 
   // ---------- frame ----------
