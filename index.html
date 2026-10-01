@@ -444,6 +444,17 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="flash-750" data-set="flash" data-val="750">0.75 s<span class="lock" id="fastlock" hidden> 🔒</span></button>
         </div>
       </div>
+      <div class="opt">Music <small class="muted">(M to switch)</small>
+        <div class="seg" role="group" aria-label="Music">
+          <button id="music-off" data-set="music" data-val="off">Off</button>
+          <button id="music-parlor" data-set="music" data-val="parlor">Parlor</button>
+          <button id="music-smoke" data-set="music" data-val="smoke">Smoke</button>
+          <button id="music-felt" data-set="music" data-val="felt">Felt</button>
+        </div>
+      </div>
+      <div class="opt optrange">Music volume <span id="musicvolval"></span>
+        <input type="range" id="musicvol" min="0" max="100" step="5" aria-label="Music volume, percent">
+      </div>
       <div class="opt">Streaks
         <div class="seg" role="group" aria-label="Streaks">
           <button id="streaks-0" data-set="streaks" data-val="0">Off</button>
@@ -637,6 +648,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
 <script src="engine.js"></script>
 <script src="vendor/three.min.js"></script>
 <script src="table3d.js"></script>
+<script src="music.js"></script>
 <script>
 (function(){
 const R = 1.125;               // ball radius, inches (2.25" ball)
@@ -937,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 189;   // one per commit to main
+const BUILD = 190;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -3046,6 +3058,7 @@ function applySetting(key, val){
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
+  else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); }
   else if(key==='view' || key==='cam' || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
@@ -3519,6 +3532,7 @@ $('sessidlecover').addEventListener('click', e=>e.stopPropagation());
 $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
+  if((e.key==='m' || e.key==='M') && !e.metaKey && !e.ctrlKey){ const L = ['off','parlor','smoke','felt']; applySetting('music', L[(L.indexOf(settings.music) + 1) % L.length]); e.preventDefault(); return; }
   if(!$('stancecover').hidden){ if(e.key==='Enter'){ closeStance(); e.preventDefault(); } return; }
   if(tut.on && e.key==='Enter'){ tutNext(); e.preventDefault(); return; }
   if(tut.on && e.key==='Escape'){ endTut(); e.preventDefault(); return; }
@@ -3587,6 +3601,14 @@ if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
+// background music: off to start; it can only begin after a tap or key (browsers block sound before that)
+if(!['off','parlor','smoke','felt'].includes(settings.music)) settings.music = 'off';
+if(!(+settings.musicVol >= 0 && +settings.musicVol <= 100)) settings.musicVol = 50;
+$('musicvol').value = settings.musicVol; $('musicvolval').textContent = settings.musicVol + '%';
+if(window.Music) Music.setVolume(settings.musicVol/100);
+$('musicvol').addEventListener('input', e=>{ settings.musicVol = +e.target.value; $('musicvolval').textContent = settings.musicVol + '%'; saveSettings(); if(window.Music) Music.setVolume(settings.musicVol/100); });
+const startMusic = () => { if(window.Music && settings.music !== 'off' && !Music.playing()) Music.play(settings.music); };
+['pointerdown', 'keydown'].forEach(t=>document.addEventListener(t, startMusic, {once: false, passive: true}));
 if(!(+settings.rigOpacity >= 50 && +settings.rigOpacity <= 100) || !settings.rigOpV){ settings.rigOpacity = 75; settings.rigOpV = 1; }
 $('rigoprange').value = settings.rigOpacity; $('rigopval').textContent = settings.rigOpacity + '%';
 $('rigoprange').addEventListener('input', e=>{ settings.rigOpacity = +e.target.value; $('rigopval').textContent = settings.rigOpacity + '%'; saveSettings(); if(shot) draw(answered); });
