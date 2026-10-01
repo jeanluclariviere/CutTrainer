@@ -566,7 +566,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       <div class="shootctl" id="shootctl" hidden>
         <div class="tippad" id="tippad" hidden><small>Tip</small>
-          <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".1" stroke="#1b6fd1" stroke-opacity=".5" stroke-width=".02" stroke-dasharray=".06 .05"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
+          <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".45"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
           <span class="ckeys" id="tipkeys"></span><button class="link" id="tipcentre">Centre <kbd>X</kbd></button>
         </div>
         <div class="freebtns" id="freebtns" hidden><button class="sumdone" id="freereset">Reset balls</button><button class="sumdone" id="freenew">New layout</button><small>Drag a ball to move it · tap a pocket to aim for it</small></div>
@@ -954,7 +954,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 199;   // one per commit to main
+const BUILD = 200;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1055,14 +1055,23 @@ const MPH = 17.6, STROKE_MPH = {3:1.5, 5:3.5, 8:7, 10:15};   // full stroke ease
 function speedSetting(){ return SPEED_LEVELS[speedLevel() - 1]; }
 const levelForSpeed = V => coarseSpeed() ? COARSE.reduce((b, c)=>Math.abs(Math.log(STROKE_MPH[c]*MPH/V)) < Math.abs(Math.log(STROKE_MPH[b]*MPH/V)) ? c : b, COARSE[0]) : levelForSpeedFine(V);
 const levelForSpeedFine = V => { const d = diamondsFromSpeed(V); let best = 1; SPEED_LEVELS.forEach((x, i)=>{ if(Math.abs(Math.log(x/d)) < Math.abs(Math.log(SPEED_LEVELS[best-1]/d))) best = i + 1; }); return best; };
-function nudgeTip(k){   // W up, S down, A left, D right, X back to centre; within what you've unlocked
+// The tip moves in half-tip steps: half a 12.5 mm tip is 6.25 mm, about 0.22 of the ball's radius. Two steps (a full tip)
+// each way, and never past half the radius from the centre (Dr. Dave's miscue limit).
+const TIP_STEP = 6.25/28.575, TIP_STEPS = 2, TIP_MAX = .5 + 1e-6;
+function snapTip(t, c = {up:true, down:true, side:true}){
+  let nx = c.side ? Math.max(-TIP_STEPS, Math.min(TIP_STEPS, Math.round((t[0] || 0)/TIP_STEP))) : 0;
+  let ny = Math.max(c.down ? -TIP_STEPS : 0, Math.min(c.up ? TIP_STEPS : 0, Math.round((t[1] || 0)/TIP_STEP)));
+  while(Math.hypot(nx, ny)*TIP_STEP > TIP_MAX){ if(Math.abs(nx) >= Math.abs(ny)) nx -= Math.sign(nx); else ny -= Math.sign(ny); }
+  return [+(nx*TIP_STEP).toFixed(4), +(ny*TIP_STEP).toFixed(4)];
+}
+function nudgeTip(k){   // W up, S down, A left, D right (half a tip each), X back to centre; within what you've unlocked
   const c = ctrl(); if(!(c.up || c.side)) return;
-  let [x, y] = settings.shotTip || [0, 0];
+  let [x, y] = snapTip(settings.shotTip || [0, 0], c);
   if(k === 'x'){ x = 0; y = 0; }
-  if(k === 'w') y += .1; if(k === 's') y -= .1; if(k === 'a') x -= .1; if(k === 'd') x += .1;
-  y = Math.max(c.down ? -.6 : 0, Math.min(c.up ? .6 : 0, y)); x = c.side ? Math.max(-.6, Math.min(.6, x)) : 0;
-  const l = Math.hypot(x, y); if(l > .6){ x *= .6/l; y *= .6/l; }
-  settings.shotTip = [Math.round(x*20)/20, Math.round(y*20)/20]; saveSettings(); renderShootControls();
+  if(k === 'w') y += TIP_STEP; if(k === 's') y -= TIP_STEP; if(k === 'a') x -= TIP_STEP; if(k === 'd') x += TIP_STEP;
+  const n = snapTip([x, y], c);
+  if(Math.hypot(...n) > TIP_MAX) return;
+  settings.shotTip = n; saveSettings(); renderShootControls();
 }
 // Speed is four strokes: ¼, ½, ¾ and the full stroke (the finer 1–10 is off for now).
 const COARSE = [3, 5, 8, 10], COARSE_F = {3:.25, 5:.5, 8:.75, 10:1}, COARSE_LBL = {3:'¼', 5:'½', 8:'¾', 10:'Full'};
@@ -1085,7 +1094,7 @@ function shotStroke(s){
   const c = ctrl(), g = shootLevel(), ideal = strikeOf(s);
   const V = c.speed ? (coarseSpeed() ? STROKE_MPH[speedLevel()]*MPH : speedFromDiamonds(speedSetting())) : ideal.V;
   let tip = g === SH.throw && !isFree() ? [0, -.35] : [0, ideal.b];   // the throw step plays soft stun for you: that's where throw shows most
-  if(c.up || c.side){ const t = settings.shotTip || [0, 0]; tip = [c.side ? t[0] : 0, Math.max(c.down ? -0.6 : 0, Math.min(c.up ? 0.6 : 0, t[1]))]; }
+  if(c.up || c.side) tip = snapTip(settings.shotTip || [0, 0], c);
   return {V, tip};
 }
 // Play the shot from the cue ball along dir with a stroke: the engine runs it. Squirt is in the engine's strike.
@@ -1152,7 +1161,7 @@ function shootDeal(){
     if(spec.stun){ const ug = PE.C.muSlide*PE.G; want = Math.max(V0, Math.sqrt(d1*49*ug/12))*1.05; }
     const lvl = COARSE.find(l=>STROKE_MPH[l]*MPH >= want);
     if(!lvl) continue;
-    const zs = {V: STROKE_MPH[lvl]*MPH, tip: spec.tip.map(x=>Math.round(x*10)/10)};
+    const zs = {V: STROKE_MPH[lvl]*MPH, tip: snapTip(spec.tip)};
     let r = playAim(s, idealDir(s), zs, false);
     if(!r.made || r.scratch || !r.hit) continue;
     r = playAim(s, aimFor(s, zs), zs, false);           // and played exactly as your right call would play it
@@ -1247,9 +1256,14 @@ function renderShootControls(){
     $('tipkeys').innerHTML = [c.up && 'W', c.side && 'A', c.down && 'S', c.side && 'D'].filter(Boolean).map(k=>`<kbd>${k}</kbd>`).join('');
   }
 }
-function tipLimitPath(c){   // the part of the cue ball you're allowed to strike, outlined
-  const x0 = c.side ? -.6 : -.06, x1 = c.side ? .6 : .06, y0 = c.up ? -.6 : 0, y1 = c.down ? .6 : 0;
-  return `M${x0} ${y0 - .02}H${x1}V${y1 + .02}H${x0}Z`;
+function tipLimitPath(c){   // the points you can strike: one dot per half-tip step you've unlocked
+  let d = '';
+  for(let i = -TIP_STEPS; i <= TIP_STEPS; i++) for(let j = -TIP_STEPS; j <= TIP_STEPS; j++){
+    const [x, y] = snapTip([i*TIP_STEP, j*TIP_STEP], c);
+    if(Math.abs(x - i*TIP_STEP) > 1e-3 || Math.abs(y - j*TIP_STEP) > 1e-3) continue;
+    d += `M${(x - .035).toFixed(3)} ${(-y).toFixed(3)}a.035 .035 0 1 0 .07 0a.035 .035 0 1 0 -.07 0`;
+  }
+  return d;
 }
 function wireShootControls(){
   $('routinechip').addEventListener('click', ()=>goDown());
@@ -1265,10 +1279,7 @@ function wireShootControls(){
   const setTipFrom = ev => {
     const svg = $('tipsvg'), pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
     const q = pt.matrixTransform(svg.getScreenCTM().inverse()), c = ctrl();
-    let x = c.side ? q.x : 0, y = -q.y;
-    y = Math.max(c.down ? -.6 : 0, Math.min(c.up ? .6 : 0, y)); x = Math.max(-.6, Math.min(.6, x));
-    const l = Math.hypot(x, y); if(l > .6){ x *= .6/l; y *= .6/l; }
-    settings.shotTip = [Math.round(x*20)/20, Math.round(y*20)/20]; saveSettings(); renderShootControls();
+    settings.shotTip = snapTip([c.side ? q.x : 0, -q.y], c); saveSettings(); renderShootControls();
   };
   let tDrag = false;
   pad.addEventListener('pointerdown', ev=>{ if(answered) return; tDrag = true; try{ pad.setPointerCapture(ev.pointerId); }catch(e){} setTipFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
