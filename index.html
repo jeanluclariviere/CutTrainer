@@ -413,6 +413,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="opt optrange">Standing back from the cue ball <span id="backval"></span>
         <input type="range" id="backrange" min="24" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
       </div>
+      <div class="opt">Shooting hand
+        <div class="seg" role="group" aria-label="Shooting hand">
+          <button id="hand-R" data-set="hand" data-val="R">Right</button>
+          <button id="hand-L" data-set="hand" data-val="L">Left</button>
+        </div>
+      </div>
       <div class="opt">Flash: each shot shows for
         <div class="seg" role="group" aria-label="How long each Flash shot shows">
           <button id="flash-1500" data-set="flash" data-val="1500">1.5 s</button>
@@ -910,7 +916,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 159;   // one per commit to main
+const BUILD = 160;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -944,15 +950,15 @@ const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain f
 
 // ---------- the Shoot ladder ----------
 const SHOOT_GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S-','S','S+'];
-const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:6, speed:7, throw:8, follow:9, stun:10, draw:11, cushion:12, english:13, all:14};   // S+ (15) is the top: nothing new yet
+const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:6, speed:7, throw:8, follow:9, stun:10, draw:11, cushion:12, english:13, all:14, full:15};
 const SHOOT_TEXT = [
   'Aim with the ghost ball, guide line and the object ball’s path', 'Object-ball path gone', 'Guide line gone', 'Ghost ball gone: aim from your own read',
   'Down on the shot: 5 s standing', 'Down on the shot: 3 s standing · 9 ft table',
   'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
-  'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Top of the ladder'];
-const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot', 5:'Down on the shot: 3 s · 9 ft table',
-  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Top of the ladder'};
-const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
+  'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Full view: your cue and bridge hand'];
+const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand (faint)', 5:'Down on the shot: 3 s · 9 ft table',
+  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Follow · 🎯 Cue ball zones', 10:'⏹️ Stun', 11:'⤵️ Draw', 12:'↩️ Off a cushion', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full view: your cue and hand in the way'};
+const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Standing, untimed', 5:'Down on the shot: 5 s · back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english', 15:'Cue and hand faint again'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
 // the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C (Sessions by your grade; Flash and Free play by your best)
@@ -1795,7 +1801,74 @@ function perspDyn(cam, s, reveal){
     }
     if(it.ghost) o = o.slice(0, itemStart) + `<g opacity=".5">${o.slice(itemStart)}</g>`;
   }
+  o += cueRig(cam, s);   // your cue and bridge hand, in front of everything
   return o;
+}
+
+// ---------- your cue and bridge hand, down on the shot ----------
+// Low-poly shapes in table space, drawn see-through over the table, so the cut is read around them as it is at a real table.
+// Faint from Down on the shot (C-), more solid at the top of the ladder (S+). An open bridge for now.
+const stanceIn = () => (+settings.heightCm >= 150 && +settings.heightCm <= 200 ? +settings.heightCm : 175)/2.54;
+function rigAlpha(s){
+  if(!isShoot() || tut.on || settings.view === 'top' || !s) return {a:0};
+  const g = shootLevel(), c = s.cam;
+  if(g < SH.down || !c || !c.T) return {a:0};
+  const base = g >= SH.full ? .5 : .22, down = c.phase === 'down' ? c.k : 0;
+  if(!answered) return {a: base*down, push: 0};
+  if(!anim) return {a:0};
+  const t = performance.now() - anim.t0;   // the stroke: the cue goes through, then cue and hand fade
+  return {a: base*Math.max(0, 1 - (t - 120)/200), push: 2*Math.min(1, t/120)};
+}
+function cueRig(cam, s){
+  const {a, push} = rigAlpha(s);
+  if(a < .01) return '';
+  const u = norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];          // forward along the aim, and to its left
+  const sd = settings.hand === 'L' ? mul(n, -1) : n;                        // the bridge hand's side: left of the cue for a right-handed player
+  const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
+  const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
+  const EL = 4*RAD, f3 = [u[0]*Math.cos(EL), u[1]*Math.cos(EL), -Math.sin(EL)];
+  const at = (P, d) => [P[0] - f3[0]*d, P[1] - f3[1]*d, P[2] - f3[2]*d];   // d inches back along the cue from P
+  const faces = [];   // [pts3, fill]
+  // the cue: a tapered band facing the eye, 58" long, tip 13 mm, butt 1.2"
+  const T0 = at(Cp, 0.4 - push), LEN = 58, cueR = t => .255 + t*(.6 - .255);
+  const st = [0, 1, 6, 16, 29, 36, 44, 54, 58];
+  for(let i = 0; i < st.length - 1; i++){
+    const A = at(T0, st[i]), B = at(T0, st[i+1]);
+    const side = P => { const v = norm3([cam.E[0]-P[0], cam.E[1]-P[1], cam.E[2]-P[2]]), w = cross3(f3, v), l = Math.hypot(...w) || 1; return [w[0]/l, w[1]/l, w[2]/l]; };
+    const sa = side(A), sb = side(B), ra = cueR(st[i]/LEN), rb = cueR(st[i+1]/LEN);
+    const q = [[A[0]+sa[0]*ra, A[1]+sa[1]*ra, A[2]+sa[2]*ra], [B[0]+sb[0]*rb, B[1]+sb[1]*rb, B[2]+sb[2]*rb], [B[0]-sb[0]*rb, B[1]-sb[1]*rb, B[2]-sb[2]*rb], [A[0]-sa[0]*ra, A[1]-sa[1]*ra, A[2]-sa[2]*ra]];
+    faces.push([q, i === 0 ? '#f2efe8' : st[i] >= 29 ? '#3b2a20' : '#d8b57a']);
+  }
+  // the hand: an open bridge a forearm's length (less 1¼") behind the cue ball, the cue resting in the V of thumb and index knuckle
+  const Hh = stanceIn(), Lb = 0.146*Hh - 1.25;
+  const Bp = [Cp[0] - u[0]*Lb, Cp[1] - u[1]*Lb];
+  const zv = Math.max(.9, Cp[2] + Lb*Math.tan(EL) - .3);                     // the V: just under the cue
+  const L = (x, y, z) => [Bp[0] + u[0]*x + sd[0]*y, Bp[1] + u[1]*x + sd[1]*y, z];
+  const V = (x, y, z) => [u[0]*x + sd[0]*y, u[1]*x + sd[1]*y, z];
+  const box = (c, ax, ay, az) => {   // centre and half-axes (world): the faces that face the eye
+    const corner = (i, j, k) => [0,1,2].map(m=>c[m] + i*ax[m] + j*ay[m] + k*az[m]);
+    for(const [ax2, sgn] of [[0,1],[0,-1],[1,1],[1,-1],[2,1],[2,-1]]){
+      const nrm = [ax, ay, az][ax2].map(v=>v*sgn), fc = c.map((v, m)=>v + nrm[m]);
+      if((cam.E[0]-fc[0])*nrm[0] + (cam.E[1]-fc[1])*nrm[1] + (cam.E[2]-fc[2])*nrm[2] <= 0) continue;
+      const q = ax2 === 0 ? [corner(sgn,-1,-1), corner(sgn,1,-1), corner(sgn,1,1), corner(sgn,-1,1)]
+              : ax2 === 1 ? [corner(-1,sgn,-1), corner(1,sgn,-1), corner(1,sgn,1), corner(-1,sgn,1)]
+              :             [corner(-1,-1,sgn), corner(1,-1,sgn), corner(1,1,sgn), corner(-1,1,sgn)];
+      faces.push([q, '#d9d4cf']);
+    }
+  };
+  const limb = (P, Q, w, h) => {   // a box from P to Q (local), w wide, h thick
+    const a = L(...P), b = L(...Q), c = a.map((v, m)=>(v + b[m])/2), ax = a.map((v, m)=>(b[m] - v)/2);
+    const hz = [0, 0, 1], wy = norm3(cross3(hz, ax)), up = norm3(cross3(ax, wy));
+    box(c, ax, wy.map(v=>v*w/2), up.map(v=>v*h/2));
+  };
+  limb([-3.6, 1.6, .55], [-.1, 1.5, zv - .35], 3.2, 1.0);                    // palm: heel on the cloth, knuckles up by the V
+  [[.4, .25], [1.2, .7], [2.0, 1.15], [2.7, 1.55]].forEach(([y, fan], i)=>limb([-.1, y, zv - .55], [2.6 - i*.25, y + fan, .3], .62, .55));   // fingers spread on the cloth
+  limb([-1.7, -.1, zv - .85], [.8, -.2, zv - .2], .7, .6);                  // thumb, up against the cue: the V
+  limb([-3.6, 1.6, .7], [-5, 1.9, 1.6], 2.6, 1.1);                          // wrist
+  limb([-5, 1.9, 1.6], [-14, 5.6, 6.2], 2.9, 2.3);                          // forearm, back up toward the shoulder
+  // far to near, see-through
+  return faces.map(([q, col])=>({q, col, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
+    .map(({q, col})=>{ const d = polyD(cam, q); return d ? `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#5c524a" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>` : ''; }).join('');
 }
 function perspFront(cam, s, reveal, segs, ring){
   let o = '';
@@ -2818,7 +2891,7 @@ function applySetting(key, val){
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
-  else if(key==='view' || key==='cam'){ if(shot) draw(answered); }   // same shot, new viewpoint
+  else if(key==='view' || key==='cam' || key==='hand'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
   renderStats();
@@ -3000,6 +3073,8 @@ const SL_DOWN = [
    text:'From here every shot is a routine. You start <b>standing on the ball line</b>, cue ball to object ball, to read the layout.'},
   {aids:{}, next:true,
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
+  {aids:{}, next:true,
+   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, faint for now. They hide part of the view, as they do at a real table.'},
   {finish:true, aids:{},
    text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
 ];
@@ -3052,6 +3127,9 @@ const SL_ENGLISH = [
   {aids:{}, play:{k:2.6, tip:[-.45,0]}, next:true, text:'The other side, the other way.'},
   {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off line (<b>squirt</b>) and throws the object ball a little, so on some shots it changes which fraction to call.'},
 ];
+const SL_FULL = [
+  {deg:30, aids:{}, finish:true, text:'<b>Full view</b>: down on the shot, your cue and bridge hand now block as much as they do at a real table. Read the cut around them.'},
+];
 const SL_ALL = [
   {deg:30, aids:{}, finish:true, text:'Everything is yours: speed, top, back and side. Each zone can be reached more than one way: pick the stroke, then aim for what it does.'},
 ];
@@ -3068,6 +3146,7 @@ const LESSONS = {
   cushion: {name:'Off a cushion', at:SH.cushion, track:'shoot', steps:SL_CUSHION},
   english: {name:'English', at:SH.english, track:'shoot', steps:SL_ENGLISH},
   all:     {name:'Everything', at:SH.all, track:'shoot', steps:SL_ALL},
+  full:    {name:'Full view', at:SH.full, track:'shoot', steps:SL_FULL},
 };
 const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
 const tstep = () => tsteps()[tut.i];
@@ -3342,6 +3421,7 @@ $('stancedone').addEventListener('click', e=>{ e.stopPropagation(); closeStance(
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
+if(!['R','L'].includes(settings.hand)) settings.hand='R';
 settings.throw='0';   // throw option removed
 settings.table = progTable();   // not a setting: your grade picks it
 if(stats.active){ stats.active.size = RUN_SIZE; delete stats.active.base; }   // a session left open from before just carries on as the run
