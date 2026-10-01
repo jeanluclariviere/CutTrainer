@@ -155,7 +155,10 @@ function make(canvas){
       }
       x.putImageData(img, 0, 0);
     } else {
-      x.fillStyle = color; x.fillRect(0, 0, w, h);
+      if(+number >= 9){   // a stripe: white, with a coloured band round the middle that the number sits on
+        x.fillStyle = '#f4efe0'; x.fillRect(0, 0, w, h);
+        x.fillStyle = color; x.fillRect(0, h*0.31, w, h*0.38);
+      } else { x.fillStyle = color; x.fillRect(0, 0, w, h); }
       // the number spot sits at the texture's centre: local +x
       x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(w/2, h/2, w*0.072, h*0.145, 0, 0, Math.PI*2); x.fill();
       x.fillStyle = '#111'; x.font = `700 ${Math.round(h*0.17)}px Barlow Condensed, Arial Narrow, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
