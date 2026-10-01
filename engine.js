@@ -80,7 +80,11 @@ function makeTable(W, H, mouth){
       const corner = corners.some(c=>v2.len(v2.sub(c, pt)) < mC);
       const J = (corner ? C.jawAngle.corner : C.jawAngle.side)*Math.PI/180;
       const f = v2.add(v2.mul(away, Math.cos(J)), v2.mul(out, Math.sin(J)));
-      segs.push({a:pt, b:v2.add(pt, v2.mul(f, C.jawLength)), jaw:true, away, out, n:s.n, corner});
+      // the jaw runs back until it meets the hole (or its full length)
+      const P = pockets.find(P=>P.points.some(q=>v2.len(v2.sub(q, pt)) < 1e-6));
+      let L = C.jawLength;
+      if(P){ const q = v2.sub(pt, P.hole), bq = v2.dot(q, f), cq = v2.dot(q, q) - P.holeR*P.holeR, disc = bq*bq - cq; if(disc > 0){ const t = -bq - Math.sqrt(disc); if(t > 0) L = Math.min(L, t); } }
+      segs.push({a:pt, b:v2.add(pt, v2.mul(f, L)), jaw:true, away, out, n:s.n, corner});
     }
   }
   return {W, H, R, mouth, noses, segs, pockets, C};

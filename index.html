@@ -865,7 +865,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', 'Throw: soft stun shots', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 132;   // one per commit to main
+const BUILD = 133;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1172,7 +1172,7 @@ let lastCam = null;
 function pocketInView(s){
   const cam = makeCam(s, settings.view);
   const m = 24;
-  return pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).every(pt=>{
+  return ringArc3(s.P).every(pt=>{
     const c = cam.toCam(pt); if(c[2] <= NEAR) return false;
     const [x,y] = cam.proj(c); return x>=m && x<=VW-m && y>=m && y<=VH-m;
   });
@@ -1217,7 +1217,7 @@ function perspSVG(s, reveal, view){
   const key = [VW, VH, curTable, reveal ? 1 : 0, s.seq, f].join('|');
   if(key !== pcache.key){
     const segs = tableSegs();
-    const ringArc = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+    const ringArc = ringArc3(s.P).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
     const ring = ringArc.length>1 ? 'M'+ringArc.map(q=>q[0].toFixed(1)+' '+q[1].toFixed(1)).join('L') : '';
     pcache = {key, back: G3 ? '' : perspBack(cam, s, reveal, segs, ring), front: G3 ? '' : perspFront(cam, s, reveal, segs, ring),
       fx: ring && !reveal ? `<path d="${ring}" fill="none" stroke="#ffd34d" stroke-width="1.65"/>` : ''};
@@ -1433,7 +1433,7 @@ function perspFront(cam, s, reveal, segs, ring){
 function perspTop(cam, s, reveal){
   let o = '';
   // pocket pointer: only when no part of the pocket ring is on screen
-  const ringPts = pocketArc(s.P, pocketR(s.P)+0.8, 1.63, false).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+  const ringPts = ringArc3(s.P).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
   const ringVisible = ringPts.some(([x,y])=>x>=0 && x<=VW && y>=0 && y<=VH);
   o += tutLayer(cam, s, reveal);
   if(!ringVisible && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0)){
@@ -1477,6 +1477,14 @@ function draw(reveal){
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
     if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
   }
+}
+// the gold ring round the target pocket: round the engine's hole, the part that's outside the playing surface
+function ringArc3(P){
+  const E = engineTable().pockets[POCKETS.indexOf(P)], r = E.holeR + 0.6, out = [];
+  for(let k=0;k<=72;k++){ const a = k/72*Math.PI*2, x = E.hole[0] + r*Math.cos(a), y = E.hole[1] + r*Math.sin(a); if(x < 0 || x > W || y < 0 || y > H) out.push([x, y, 1.63]); }
+  // start the arc at a gap, so it draws as one stroke
+  const gap = out.findIndex((q, i)=>i && Math.hypot(q[0]-out[i-1][0], q[1]-out[i-1][1]) > r*0.2);
+  return gap > 0 ? [...out.slice(gap), ...out.slice(0, gap)] : out;
 }
 // the table in 3D (table3d.js); without WebGL everything is drawn in the SVG as before
 let G3 = null, G3BALLS = [], boxPx = [600, 400];
