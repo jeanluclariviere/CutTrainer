@@ -956,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 203;   // one per commit to main
+const BUILD = 204;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1272,22 +1272,11 @@ function camAlong(s, dir, c){
   const eye = sub(s.cb, mul(dir, c.back)), E = [eye[0], eye[1], c.h];
   const hd = P=>Math.max(0.1, (P[0]-E[0])*dir[0] + (P[1]-E[1])*dir[1]);
   const aCB = Math.atan2(R - c.h, hd(s.cb)), aP = Math.atan2(1.6 - c.h, hd(s.P.c));
-  let hfov = c.hfov;
-  const Z = c === VIEWS.stand && s.zone ? s.zone : null, zf = Z ? hd(Z.c) : 0;
-  if(Z && zf > 6){   // standing, with a zone ahead of you: widen the view (up to 96°) to take it in sideways
-    const zs = Math.abs((Z.c[0]-E[0])*dir[1] - (Z.c[1]-E[1])*dir[0]) + Z.r;
-    hfov = Math.min(96, Math.max(hfov, 2*(Math.atan2(zs, zf)/RAD + 4)));
-  }
-  const vHalf = Math.atan((VH/2)/((VW/2)/Math.tan(hfov/2*RAD))), mg = 5*RAD;
+  const vHalf = Math.atan((VH/2)/((VW/2)/Math.tan(c.hfov/2*RAD))), mg = 5*RAD;
   let pr = c.pitch*RAD;
   if(c === VIEWS.stand && aP > pr + vHalf - mg) pr = aP - vHalf + mg;
   if(aCB < pr - vHalf + mg) pr = aCB + vHalf - mg;
-  if(Z && zf > 6){   // and tilt to it, if the pocket and cue ball stay in view
-    const aZn = Math.atan2(-c.h, Math.max(1, zf - Z.r)), aZf = Math.atan2(-c.h, zf + Z.r);
-    if(aZn < pr - vHalf + mg){ const p2 = aZn + vHalf - mg; if(aP <= p2 + vHalf - mg) pr = p2; }
-    if(aZf > pr + vHalf - mg){ const p2 = aZf - vHalf + mg; if(aCB >= p2 - vHalf + mg && aP <= p2 + vHalf - mg) pr = p2; }
-  }
-  return camFrom(E, norm3([dir[0]*Math.cos(pr), dir[1]*Math.cos(pr), Math.sin(pr)]), hfov);
+  return camFrom(E, norm3([dir[0]*Math.cos(pr), dir[1]*Math.cos(pr), Math.sin(pr)]), c.hfov);
 }
 
 // ---------- controls: speed bar and tip pad ----------
