@@ -124,7 +124,9 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .table-box.placing svg{touch-action:none;cursor:crosshair}
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
 .trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
-.routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;pointer-events:none}
+.routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
+.routinechip kbd{font:600 10px var(--body);padding:0 4px;margin-left:6px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d}
+@media (hover:none){.routinechip kbd{display:none}}
 .speedbar{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:none;cursor:ns-resize;user-select:none}
 .speedtrack{position:relative;width:16px;height:min(60%,180px);min-height:120px;border-radius:9px;background:rgba(255,255,255,.18);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
 .speedtrack i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#ffd34d,#f08a24)}
@@ -487,7 +489,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         </div>
         <div class="streakpill" id="streakpill" hidden aria-live="polite"></div>
         <div class="speedchip" id="speedchip" hidden></div>
-        <div class="routinechip" id="routinechip" hidden></div>
+        <button class="routinechip" id="routinechip" hidden></button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
@@ -907,7 +909,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 143;   // one per commit to main
+const BUILD = 144;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1100,7 +1102,13 @@ function renderRoutineChip(){
   const el = $('routinechip'); if(!el) return;
   const c = shot && shot.cam;
   if(!isShoot() || tut.on || answered || !c || !c.T || c.phase !== 'stand'){ el.hidden = true; return; }
-  el.hidden = false; el.textContent = `Down in ${Math.ceil(c.left)}`;
+  el.hidden = false; el.innerHTML = `Down in ${Math.ceil(c.left)}<kbd>Enter</kbd>`;
+}
+// Enter (or the chip) gets you down now instead of waiting out the standing time
+function goDown(){
+  const c = shot && shot.cam;
+  if(!c || !c.T || c.phase !== 'stand' || answered || !isShoot() || tut.on) return false;
+  c.t0 = performance.now() - c.T*1000; return true;
 }
 // The Shoot camera: standing on the ball line, standing behind your aim line, or down on your aim line, blended by the routine.
 function shootCam(s, view){
@@ -1150,6 +1158,7 @@ function tipLimitPath(c){   // the part of the cue ball you're allowed to strike
   return `M${x0} ${y0 - .02}H${x1}V${y1 + .02}H${x0}Z`;
 }
 function wireShootControls(){
+  $('routinechip').addEventListener('click', ()=>goDown());
   const bar = $('speedbar'), pad = $('tippad');
   const setSpeedFrom = ev => {
     const r = $('speedtrack').getBoundingClientRect(), f = Math.max(0, Math.min(1, (r.bottom - ev.clientY)/r.height));
@@ -1231,8 +1240,11 @@ function takeShot(id){
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
   $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>`;
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
-  if(isShoot()) sessionTick(full, run.made);
-  animateShot({made: run.made}, ()=>{ draw(true); }, ok ? '#ffd34d' : MISS, run);
+  animateShot({made: run.made}, ms=>{   // the shot counts once it's played out (or skipped), so the last one of a session is watched too
+    if(isShoot() && stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (ms||0);
+    if(!jumpingAhead) draw(true);
+    if(isShoot()) sessionTick(full, run.made);
+  }, ok ? '#ffd34d' : MISS, run);
   finishRound();
 }
 // Free play: put the layout back, or a new one
@@ -2970,9 +2982,11 @@ const SL_SHOOT = [
 ];
 const SL_DOWN = [
   {deg:30, aids:{}, next:true,
-   text:'From here every shot is a routine. You start <b>standing on the ball line</b> for a few seconds to read the layout.'},
+   text:'From here every shot is a routine. You start <b>standing on the ball line</b>, cue ball to object ball, to read the layout.'},
+  {aids:{}, next:true,
+   text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
   {finish:true, aids:{},
-   text:'Then you <b>get down on the shot</b> and call it from there. Five seconds standing to start, then four, then three for good.'},
+   text:'You can call while standing, or press <b>Enter</b> to get down first. Wait too long and you go down anyway: five seconds to start, then four, then three for good.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
@@ -3259,7 +3273,7 @@ document.addEventListener('keydown', e=>{
   else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1, e.shiftKey ? 6 : 1); e.preventDefault(); }
   else if(isShooting() && !answered && ctrl().speed && (e.key==='ArrowUp' || e.key==='ArrowDown')){ setSpeedLevel(speedLevel() + (e.key==='ArrowUp' ? 1 : -1)); e.preventDefault(); }
   else if(isShooting() && !answered && /^[wasdx]$/i.test(e.key) && !e.metaKey && !e.ctrlKey){ nudgeTip(e.key.toLowerCase()); e.preventDefault(); }
-  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ if(answered){ deal(); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
 if(!['stand','down'].includes(settings.view)) settings.view='stand';
