@@ -960,7 +960,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 216;   // one per commit to main
+const BUILD = 217;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -2228,7 +2228,18 @@ function zoneArrowAt(){
 const arrowPose = {pocket: {k: 0, t: 0, edge: null}, zone: {k: 0, t: 0, edge: null}};
 function edgePose(cam, T){
   const q = cam.toCam(T), m = 50;
-  if(q[2] > NEAR){ const [x, y] = cam.proj(q); if(x >= m && x <= VW - m && y >= m && y <= VH - m) return null; }
+  if(q[2] > NEAR){
+    const [x, y] = cam.proj(q);
+    if(x >= m && x <= VW - m && y >= m && y <= VH - m){
+      // the zone's on screen: fine, unless it's so far off that the arrow floating over it is above the top of the view
+      const top = cam.toCam([T[0], T[1], T[2] + 7.5]);
+      if(top[2] > NEAR && cam.proj(top)[1] >= 8) return null;
+      const right = norm3(cross3([0, 0, 1], cam.f)), up = cross3(cam.f, right), fx = (x - VW/2)/cam.focal, fy = -(Math.max(40, y - 60) - VH/2)/cam.focal;
+      const ray = norm3([0, 1, 2].map(i=>right[i]*fx + up[i]*fy + cam.f[i])), dist = Math.min(60, Math.hypot(...q)*.8);
+      const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*dist);
+      return {p: P, dir: norm3([T[0]-P[0], T[1]-P[1], T[2]-P[2]])};   // just above it, on screen, pointing down at it
+    }
+  }
   let dx = q[0], dy = -q[1];
   if(q[2] <= NEAR) dy = Math.abs(dy) + 1;
   const k = Math.min((VW/2 - 40)/Math.abs(dx || 1e-6), (VH/2 - 40)/Math.abs(dy || 1e-6));
