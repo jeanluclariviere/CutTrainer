@@ -193,17 +193,39 @@ function make(canvas){
   const mul3 = (A, B) => A.map(r=>[0,1,2].map(j=>r[0]*B[0][j] + r[1]*B[1][j] + r[2]*B[2][j]));
 
   // ---------- the target pocket: a yellow arrow floating over it, pointing down ----------
-  const arrow = new T3.Group();
-  {
-    const mat = new T3.MeshStandardMaterial({color:0xffd34d, emissive:0x6b4f00, roughness:.45, metalness:0});
-    const head = new T3.Mesh(new T3.ConeGeometry(1.1, 1.8, 24), mat); head.rotation.x = Math.PI/2; head.position.z = 0.9;    // tip at z = 0, pointing down
-    const shaft = new T3.Mesh(new T3.CylinderGeometry(.42, .42, 2.2, 20), mat); shaft.rotation.x = Math.PI/2; shaft.position.z = 1.8 + 1.1;
-    head.rotation.x = -Math.PI/2;
-    arrow.add(head, shaft); arrow.visible = false; world.add(arrow);
+  function makeArrow(color){
+    const g = new T3.Group(), mat = new T3.MeshStandardMaterial({color, emissive: new T3.Color(color).multiplyScalar(.35), roughness:.45, metalness:0});
+    const head = new T3.Mesh(new T3.ConeGeometry(1.1, 1.8, 24), mat); head.rotation.x = -Math.PI/2; head.position.z = 0.9;   // tip at z = 0, pointing down
+    const shaft = new T3.Mesh(new T3.CylinderGeometry(.42, .42, 2.2, 20), mat); shaft.rotation.x = Math.PI/2; shaft.position.z = 2.9;
+    g.add(head, shaft); g.visible = false; world.add(g); return g;
   }
-  function setArrow(a){   // a: {p:[x, y], z} (the tip), or null
-    arrow.visible = !!a;
-    if(a){ arrow.position.set(a.p[0], a.p[1], a.z); arrow.rotation.z = (a.spin || 0); }
+  const DOWN = new T3.Vector3(0, 0, -1);
+  const arrows = {pocket: makeArrow(0xffd34d), zone: makeArrow(0x5be0c8)};
+  function setArrow(a, which = 'pocket'){   // a: {p:[x, y], z} (the tip), or null
+    const g = arrows[which]; g.visible = !!a;
+    if(a){
+      g.position.set(a.p[0], a.p[1], a.z);
+      const d = a.dir || [0, 0, -1];   // the way the tip points (straight down when it floats over its target)
+      g.quaternion.setFromUnitVectors(DOWN, new T3.Vector3(d[0], d[1], d[2]).normalize());
+      g.rotateZ(a.spin || 0);
+    }
+  }
+
+  // ---------- the cue ball's target zone, on the cloth (under the balls, so a ball sitting in it hides it) ----------
+  const zone = new T3.Group(); world.add(zone); let zoneKey = '';
+  function setZone(z){   // z: {c:[x, y], r} or null
+    zone.visible = !!z; if(!z) return;
+    const key = z.r.toFixed(2);
+    if(key !== zoneKey){
+      zoneKey = key; zone.children.slice().forEach(m=>{ zone.remove(m); m.geometry.dispose(); });
+      const col = 0x5be0c8;
+      const fill = new T3.Mesh(new T3.CircleGeometry(z.r, 64), new T3.MeshBasicMaterial({color: col, transparent: true, opacity: .16, depthWrite: false, side: T3.DoubleSide}));
+      zone.add(fill);
+      const dashMat = new T3.MeshBasicMaterial({color: col, transparent: true, opacity: .9, depthWrite: false, side: T3.DoubleSide});
+      const n = Math.max(12, Math.round(2*Math.PI*z.r/1.6));   // dashes about 1" long with 0.6" gaps
+      for(let i = 0; i < n; i++){ const a0 = i/n*2*Math.PI; zone.add(new T3.Mesh(new T3.RingGeometry(z.r - .22, z.r + .22, 6, 1, a0, 2*Math.PI/n*.62), dashMat)); }
+    }
+    zone.position.set(z.c[0], z.c[1], .03);
   }
 
   // ---------- frame ----------
@@ -217,7 +239,7 @@ function make(canvas){
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
   }
-  return {build, setBalls, setArrow, render, renderer};
+  return {build, setBalls, setArrow, setZone, render, renderer};
 }
 root.Table3D = {make};
 })(typeof window !== 'undefined' ? window : this);

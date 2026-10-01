@@ -132,7 +132,9 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .modes{display:grid;grid-template-columns:1fr 1fr 1fr;width:100%}
 .trackseg{display:grid;grid-template-columns:1fr 1fr;width:100%;margin-top:6px}
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
-.lookbtn{position:absolute;right:12px;bottom:12px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
+.lookbtn kbd{position:absolute;right:50%;transform:translateX(50%);bottom:-15px;font:600 9px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;white-space:nowrap}
+@media (hover:none){.lookbtn kbd{display:none}}
+.lookbtn{position:absolute;right:12px;bottom:22px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
 .practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
 .practicechip b{color:#ffd34d;margin-left:8px}
 .ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
@@ -219,7 +221,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .trend .tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--ink);color:var(--bg);font-size:12px;line-height:1.3;padding:5px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:2}
 .trend .tip b{font-size:13px}
 .devlvl{position:fixed;left:70px;bottom:calc(2px + env(safe-area-inset-bottom));z-index:50;font:600 11px system-ui,sans-serif;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
-.buildtag{position:fixed;left:8px;bottom:calc(6px + env(safe-area-inset-bottom));font:600 11px/1 system-ui,sans-serif;color:var(--ink);opacity:.45;pointer-events:none;z-index:50}
+.buildtag{flex:none;margin:6px 0 0 2px;font:600 11px/1 system-ui,sans-serif;color:var(--ink);opacity:.45;pointer-events:none}
 .trend .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center}
 .tabpanel .pgrid{grid-template-columns:1fr;gap:18px}
 .tabpanel .options{gap:12px 18px}
@@ -240,6 +242,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .main.persp{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
 .dip{position:absolute;inset:0;z-index:4;background:#15100c;opacity:0;pointer-events:none;transition:opacity .15s ease-in}
 .dip.out{transition:opacity .2s ease-out}
+.table-box{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.dragging{-webkit-user-select:none;user-select:none}
 .table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
@@ -532,7 +536,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="speedchip" id="speedchip" hidden></div>
         <button class="routinechip" id="routinechip" hidden></button>
         <button class="practicechip" id="practicechip" hidden></button>
-        <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁</button>
+        <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁<kbd>Space</kbd></button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
@@ -956,8 +960,9 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 206;   // one per commit to main
-if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
+const BUILD = 219;   // one per commit to main
+document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
+if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
 function setGradeForTesting(i){
@@ -1845,7 +1850,7 @@ function perspBack(cam, s, reveal, segs, ring){
 function perspDyn(cam, s, reveal){
   let o = '';
   // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
-  if(s.zone) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+  if(s.zone && !G3) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
   if(isShooting() && !reveal && !s.anim && shootAid('path')){
     const pe = pocketEdge(s.ob, s.P, s.T);
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
@@ -2159,7 +2164,7 @@ function perspTop(cam, s, reveal){
       <text y="${ay > VH/2 ? -14 : 22}" text-anchor="middle" font-size="13" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d">pocket</text></g>`;
   }
   // the cue ball's zone, when none of it is on screen: a pointer at the edge, the same way
-  if(s.zone && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0) && !look.k){
+  if(!G3 && s.zone && !answered && !(tut.on && tut.zb > 0) && !look.k){
     // shown whenever most of it is off screen (a sliver at the edge is easy to miss)
     const inV = ([x, y])=>x>=0 && x<=VW && y>=0 && y<=VH, ring = circ3(s.zone.c, s.zone.r, .03, 16).map(cam.toCam);
     const seen = ring.filter(c=>c[2]>NEAR && inV(cam.proj(c))).length, zc0 = cam.toCam([s.zone.c[0], s.zone.c[1], .03]);
@@ -2203,7 +2208,7 @@ function draw(reveal){
     const fx = $('tablefx');
     if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
-    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setArrow(arrowAt()); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
+    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setZone(shot && shot.zone && settings.view !== 'top' ? shot.zone : null); setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
   }
 }
 // The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
@@ -2212,13 +2217,67 @@ function arrowAt(){
   const E = engineTable().pockets[POCKETS.indexOf(shot.P)], t = performance.now()/1000;
   return {p: E.hole, z: 4.2 + .7*Math.sin(t*2*Math.PI/1.6), spin: t*.6};
 }
+// the same arrow, in the zone's colour, over the middle of the cue ball's zone (until the shot's played)
+function zoneArrowAt(){
+  if(!shot || !shot.zone || answered || settings.view === 'top' || (tut.on && tut.zb > .5)) return null;
+  const c = shot.cam; if(c && c.phase === 'down' && c.k > .5) return null;   // down on the shot it's gone: nothing in the way of the shot
+  const t = performance.now()/1000;
+  return {p: shot.zone.c, z: 4.2 + .7*Math.sin(t*2*Math.PI/1.6 + 1.3), spin: t*.6};
+}
+// When an arrow's target is off screen, the same arrow comes in to the edge of the view and tilts to point at it;
+// turn toward the target and it glides back to float over it.
+const arrowPose = {pocket: {k: 0, t: 0, edge: null}, zone: {k: 0, t: 0, edge: null}};
+function edgePose(cam, T){
+  const q = cam.toCam(T), m = 50;
+  if(q[2] > NEAR){
+    const [x, y] = cam.proj(q);
+    if(x >= m && x <= VW - m && y >= m && y <= VH - m){
+      // the zone's on screen: fine, unless it's so far off that the arrow floating over it is above the top of the view
+      const top = cam.toCam([T[0], T[1], T[2] + 7.5]);
+      if(top[2] > NEAR && cam.proj(top)[1] >= 8) return null;
+      const right = norm3(cross3([0, 0, 1], cam.f)), up = cross3(cam.f, right), fx = (x - VW/2)/cam.focal, fy = -(Math.max(40, y - 60) - VH/2)/cam.focal;
+      const ray = norm3([0, 1, 2].map(i=>right[i]*fx + up[i]*fy + cam.f[i])), dist = Math.min(60, Math.hypot(...q)*.8);
+      const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*dist);
+      return {p: P, dir: norm3([T[0]-P[0], T[1]-P[1], T[2]-P[2]])};   // just above it, on screen, pointing down at it
+    }
+  }
+  let dx = q[0], dy = -q[1];
+  if(q[2] <= NEAR) dy = Math.abs(dy) + 1;
+  const k = Math.min((VW/2 - 40)/Math.abs(dx || 1e-6), (VH/2 - 40)/Math.abs(dy || 1e-6));
+  const ax = VW/2 + dx*k, ay = VH/2 + dy*k, fx = (ax - VW/2)/cam.focal, fy = -(ay - VH/2)/cam.focal;
+  const right = norm3(cross3([0, 0, 1], cam.f)), up = cross3(cam.f, right);
+  const ray = norm3([0, 1, 2].map(i=>right[i]*fx + up[i]*fy + cam.f[i]));
+  let dist = 60;   // 60" out, right at the edge of the view: small, out of the way...
+  if(ray[2] < 0) dist = Math.min(dist, (cam.E[2] - 4)/-ray[2]);   // ...but never down through the table: it stays 4" above the cloth
+  if(dist < 6) return null;
+  const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*dist);
+  return {p: P, dir: norm3([T[0]-P[0], T[1]-P[1], T[2]-P[2]])};
+}
+function placeArrow(which, F, T){
+  const st = arrowPose[which], now = performance.now(), dt = st.t ? Math.min(100, now - st.t) : 0; st.t = now;
+  if(!F){ st.k = 0; return null; }
+  const c = shot && shot.cam, down = c && c.phase === 'down' && c.k > .05;   // down on the shot it stays out of your view
+  const e = lastCam && !look.k && !down ? edgePose(lastCam, T) : null;
+  if(e) st.edge = e;
+  st.k = e ? Math.min(1, st.k + dt/300) : Math.max(0, st.k - dt/300);
+  if(!st.k || !st.edge) return F;
+  const k = ease(st.k), P = [F.p[0], F.p[1], F.z], E = st.edge;
+  const bob = .5*Math.sin(now/1000*2*Math.PI/1.6 + (which === 'zone' ? 1.3 : 0))*k;   // at the edge it still nudges, toward what it points at
+  const Q = [0, 1, 2].map(i=>E.p[i] + E.dir[i]*bob);
+  return {p: [P[0] + (Q[0]-P[0])*k, P[1] + (Q[1]-P[1])*k], z: P[2] + (Q[2]-P[2])*k, dir: norm3([0, 1, 2].map(i=>(i === 2 ? -1 : 0)*(1 - k) + E.dir[i]*k)), spin: F.spin};
+}
+function setArrows(){
+  const A = arrowAt(), Z = zoneArrowAt();
+  G3.setArrow(A);   // the pocket's arrow just floats over the pocket
+  G3.setArrow(placeArrow('zone', Z, Z && [Z.p[0], Z.p[1], .03]), 'zone');
+}
 let arrowRaf = 0, arrowLast = 0;
 function arrowLoop(){
   if(arrowRaf || !G3) return;
   const tick = now => {
     arrowRaf = 0;
     if(!G3 || !lastCam || settings.view === 'top' || document.hidden) return;
-    if(now - arrowLast >= 33){ arrowLast = now; G3.setArrow(arrowAt()); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
+    if(now - arrowLast >= 33){ arrowLast = now; setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
     arrowRaf = requestAnimationFrame(tick);
   };
   arrowRaf = requestAnimationFrame(tick);
@@ -2318,7 +2377,7 @@ function deal(){
     const k = Object.keys(LESSONS).find(k=>k !== 'intro' && (LESSONS[k].track || 'read') === tr && LESSONS[k].at <= g && !(settings.tutSeen || {})[k]);
     if(k) return startTut(k);
   }
-  walk = null; walkDrag = null;
+  walk = null; walkDrag = null; document.body.classList.remove('dragging');
   showSessIdle();   // the mode's run starts with its first shot
   if(baseRun()){ const v = stats.active.n < stats.active.size/2 ? 'stand' : 'down'; if(settings.view!==v){ settings.view = v; syncPressed(); } }
   syncRefs();
@@ -3222,6 +3281,7 @@ svgEl.addEventListener('pointerdown', ev=>{
   if(dragging) return;   // aiming or moving a ball, not looking around
   if(!walkOn() || !shot || !$('sesscover').hidden || !$('startcover').hidden || !$('sessidlecover').hidden) return;
   // a drag across the full width of the table swings you half way round the object ball
+  document.body.classList.add('dragging'); try{ getSelection().removeAllRanges(); }catch(e){}
   walkDrag = {x: ev.clientX, y: ev.clientY, moved:false, id: ev.pointerId, k: Math.PI / Math.max(300, svgEl.clientWidth), kv: (12*RAD) / Math.max(150, svgEl.clientHeight*0.45)};
 });
 svgEl.addEventListener('pointermove', ev=>{
@@ -3235,7 +3295,7 @@ svgEl.addEventListener('pointermove', ev=>{
 });
 function walkRelease(){
   if(!walkDrag) return;
-  const moved = walkDrag.moved; walkDrag = null;
+  const moved = walkDrag.moved; walkDrag = null; document.body.classList.remove('dragging');
   if(!moved || !walk) return;
   walkEndedAt = performance.now();
   const from = walk.blend, start = performance.now(), dur = 320;
