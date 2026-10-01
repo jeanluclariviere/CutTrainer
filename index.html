@@ -919,7 +919,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 169;   // one per commit to main
+const BUILD = 170;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -3155,6 +3155,8 @@ const SL_DOWN = [
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
   {aids:{}, next:true,
    text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, faint for now. They hide part of the view, as they do at a real table.'},
+  {aids:{}, next:true,
+   text:'Your <b>bridge</b> stays put; the length of your <b>stroke</b> sets the speed. A short stroke for a soft shot, half your stroke for a medium one, the full stroke, tip back to your bridge, for a hard one. Same tempo, same <b>follow-through</b> every time.'},
   {finish:true, aids:{},
    text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
 ];
