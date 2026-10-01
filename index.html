@@ -933,7 +933,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 186;   // one per commit to main
+const BUILD = 187;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1262,7 +1262,7 @@ function takeShot(id){
   const partial = ok && clean && !full;
   const q = sub(s.ob, s.cb), qb = dot(q, dir), disc = qb*qb - dot(q, q) + 4*R*R;   // where the cue ball meets the object ball on your call
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
-  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });   // your call is marked straight away
+  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===id ? (ok && run.made ? 'right' : run.made ? 'also' : 'wrong') : x.dataset.id===right.id ? 'right' : ''; });   // your call is marked straight away: the right fraction played too soft or too hard is still a miss
   cancelAnimationFrame(featherRaf);
   const play = () => {
   if(isShoot()){
@@ -1278,13 +1278,10 @@ function takeShot(id){
     showStreak(st, !full && prevStreak >= STREAK_HOT ? prevStreak : 0);
   }
   const lab = r => r.id === 'full' ? 'Full' : r.label;
-  const bits = [];
-  if(!ok) bits.push(`It was <b>${lab(right)}</b>`);
-  if(run.scratch) bits.push('Scratch: the cue ball went in');
-  else if(!run.hit) bits.push('Missed the object ball');
-  else if(!run.made) bits.push(run.obIn ? 'Wrong pocket' : 'Missed the pocket');
-  if(s.zone && run.made && !run.scratch) bits.push(run.inZone ? 'In the zone' : `Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
-  if(ctrl().speed) bits.push(coarseSpeed() ? `${speedLabel(speedLevel())} <small>· ideal ${speedLabel(levelForSpeed(idealV))}</small>` : `Speed ${speedLevel()} <small>· ideal ${levelForSpeed(idealV)}</small>`);
+  const bits = [];   // just the answer: the fraction, and (once speed is yours) the stroke it wanted
+  bits.push(`<b>${lab(right)}</b>` + (ctrl().speed ? ` · <b>${coarseSpeed() ? speedLabel(levelForSpeed(idealV)) : 'speed ' + levelForSpeed(idealV)}</b>` : ''));
+  if(run.scratch) bits.push('Scratch');
+  if(s.zone && run.made && !run.scratch && !run.inZone) bits.push(`Missed the zone by ${run.zoneMiss.toFixed(1)}″`);
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
   $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>`;
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
