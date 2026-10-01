@@ -929,7 +929,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 182;   // one per commit to main
+const BUILD = 183;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1258,10 +1258,9 @@ function takeShot(id){
   const partial = ok && clean && !full;
   const q = sub(s.ob, s.cb), qb = dot(q, dir), disc = qb*qb - dot(q, q) + 4*R*R;   // where the cue ball meets the object ball on your call
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
-  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; });
+  document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });   // your call is marked straight away
   cancelAnimationFrame(featherRaf);
   const play = () => {
-  document.querySelectorAll('#answers button').forEach(x=>{ x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });
   if(isShoot()){
     const prevStreak = curStreak();
     logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
@@ -1299,9 +1298,9 @@ function takeShot(id){
   s.follow = FOLLOW_THROUGH;
   // the call doesn't cut the practice stroke short: it finishes, the cue rests at the ball for a beat (as long as the pause at
   // the back), then the backswing
-  const now0 = performance.now(), downAt = s.cam && s.cam.downAt, TP = 180;
-  const rest = downAt ? (1600 - (now0 - downAt) % 1600) % 1600 : 0;
-  const st = cueStroke = {s, downAt, fBack: s.cam && s.cam.fBack, t0: now0 + rest + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
+  const now0 = performance.now(), TP = 180, x0 = rigAlpha(s).push || 0, fb = Math.max(.1, (s.cam && s.cam.fBack) || strokeBack(s));
+  const ft = x0 < -.05 ? Math.max(120, 520*Math.abs(x0)/fb) : 0;   // the practice stroke comes forward to the ball from where it is
+  const st = cueStroke = {s, x0, t1: now0, ft, t0: now0 + ft + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
   const tick = now => {
     if(shot !== s){ cueStroke = null; return; }
     if(now - st.t0 >= st.tb + st.tp + st.tf){ cueStroke = null; play(); return; }
@@ -1891,7 +1890,7 @@ function featherAt(t, back){
 let cueStroke = null, featherRaf = 0;
 const FOLLOW_THROUGH = 4;   // inches past the cue ball, every stroke
 function strokeAt(st, now){
-  if(now < st.t0 - st.tp) return st.downAt ? featherAt(now - st.downAt, st.fBack ?? st.back) : 0;   // the practice stroke you were in finishes, at its own length
+  if(now < st.t0 - st.tp){ const k = Math.min(1, (now - st.t1)/Math.max(1, st.ft)); return st.x0*(1 + Math.cos(Math.PI*k))/2; }   // the practice stroke you were in comes forward to the ball
   if(now < st.t0) return 0;                                                          // a beat at the ball
   const t = now - st.t0;
   if(t < st.tb){ const k = t/st.tb; return st.from + (-st.back - st.from)*(1 - Math.cos(Math.PI*k))/2; }
