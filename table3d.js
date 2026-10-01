@@ -193,17 +193,16 @@ function make(canvas){
   const mul3 = (A, B) => A.map(r=>[0,1,2].map(j=>r[0]*B[0][j] + r[1]*B[1][j] + r[2]*B[2][j]));
 
   // ---------- the target pocket: a yellow arrow floating over it, pointing down ----------
-  const arrow = new T3.Group();
-  {
-    const mat = new T3.MeshStandardMaterial({color:0xffd34d, emissive:0x6b4f00, roughness:.45, metalness:0});
-    const head = new T3.Mesh(new T3.ConeGeometry(1.1, 1.8, 24), mat); head.rotation.x = Math.PI/2; head.position.z = 0.9;    // tip at z = 0, pointing down
-    const shaft = new T3.Mesh(new T3.CylinderGeometry(.42, .42, 2.2, 20), mat); shaft.rotation.x = Math.PI/2; shaft.position.z = 1.8 + 1.1;
-    head.rotation.x = -Math.PI/2;
-    arrow.add(head, shaft); arrow.visible = false; world.add(arrow);
+  function makeArrow(color){
+    const g = new T3.Group(), mat = new T3.MeshStandardMaterial({color, emissive: new T3.Color(color).multiplyScalar(.35), roughness:.45, metalness:0});
+    const head = new T3.Mesh(new T3.ConeGeometry(1.1, 1.8, 24), mat); head.rotation.x = -Math.PI/2; head.position.z = 0.9;   // tip at z = 0, pointing down
+    const shaft = new T3.Mesh(new T3.CylinderGeometry(.42, .42, 2.2, 20), mat); shaft.rotation.x = Math.PI/2; shaft.position.z = 2.9;
+    g.add(head, shaft); g.visible = false; world.add(g); return g;
   }
-  function setArrow(a){   // a: {p:[x, y], z} (the tip), or null
-    arrow.visible = !!a;
-    if(a){ arrow.position.set(a.p[0], a.p[1], a.z); arrow.rotation.z = (a.spin || 0); }
+  const arrows = {pocket: makeArrow(0xffd34d), zone: makeArrow(0x5be0c8)};
+  function setArrow(a, which = 'pocket'){   // a: {p:[x, y], z} (the tip), or null
+    const g = arrows[which]; g.visible = !!a;
+    if(a){ g.position.set(a.p[0], a.p[1], a.z); g.rotation.z = (a.spin || 0); }
   }
 
   // ---------- frame ----------
