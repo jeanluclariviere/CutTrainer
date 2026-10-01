@@ -929,7 +929,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 181;   // one per commit to main
+const BUILD = 182;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1009,8 +1009,9 @@ const SPEED_MIN = 0.5, SPEED_MAX = 48;
 const SPEED_LEVELS = [1, 2, 3, 4, 6, 8, 11, 15, 20, 28];
 const speedLevel = () => { const n = +settings.speedLevel, v = n >= 1 && n <= 10 ? Math.round(n) : 5; return coarseSpeed() ? nearestCoarse(v) : v; };
 // The four strokes as cue ball speeds, from Dr. Dave's typical speeds (TP B.6): ¼ a touch shot (1.5 mph, under a table length),
-// ½ a lag (3.5 mph, about 2 lengths), ¾ medium (7 mph, about 3 lengths), the full stroke a power shot (20 mph, about 5 lengths).
-const MPH = 17.6, STROKE_MPH = {3:1.5, 5:3.5, 8:7, 10:20};
+// ½ a lag (3.5 mph, about 2 lengths), ¾ medium (7 mph, about 3 lengths), the full stroke a power shot (20 mph, about 5 lengths;
+// eased to 15 mph, about 4 lengths, for now).
+const MPH = 17.6, STROKE_MPH = {3:1.5, 5:3.5, 8:7, 10:15};   // full stroke eased from Dr. Dave's 20 mph power shot to 15 for now
 function speedSetting(){ return SPEED_LEVELS[speedLevel() - 1]; }
 const levelForSpeed = V => coarseSpeed() ? COARSE.reduce((b, c)=>Math.abs(Math.log(STROKE_MPH[c]*MPH/V)) < Math.abs(Math.log(STROKE_MPH[b]*MPH/V)) ? c : b, COARSE[0]) : levelForSpeedFine(V);
 const levelForSpeedFine = V => { const d = diamondsFromSpeed(V); let best = 1; SPEED_LEVELS.forEach((x, i)=>{ if(Math.abs(Math.log(x/d)) < Math.abs(Math.log(SPEED_LEVELS[best-1]/d))) best = i + 1; }); return best; };
@@ -3216,7 +3217,7 @@ const SL_SPEED = [
   {deg:30, aids:{}, next:true,
    text:'<b>Speed</b> is yours now: four strokes, <b>¼</b>, <b>½</b>, <b>¾</b> and <b>full</b>. <b>↑ ↓</b>, or the bar on the right of the table. Set it before you call.'},
   {aids:{}, next:true,
-   text:'Rolling, a <b>¼</b> stroke (a touch shot) goes under a table length, <b>½</b> (a lag) about two, <b>¾</b> about three, and the <b>full</b> stroke (a power shot) about five, rails included.'},
+   text:'Rolling, a <b>¼</b> stroke (a touch shot) goes under a table length, <b>½</b> (a lag) about two, <b>¾</b> about three, and the <b>full</b> stroke (a power shot) about four, rails included.'},
   {aids:{}, next:true,
    text:'Your <b>bridge</b> stays put: how much of your <b>stroke</b> you use sets the speed. The full stroke brings the tip back to your bridge; ½ goes half as far. Same tempo, same <b>follow-through</b> every time.'},
   {aids:{}, play:{k:.45, tip:[0,.4]}, next:true, text:'Too soft and it dies short. Watch.'},
