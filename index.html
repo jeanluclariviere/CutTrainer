@@ -905,7 +905,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 151;   // one per commit to main
+const BUILD = 152;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -942,12 +942,12 @@ const SHOOT_GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+
 const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:7, speed:8, throw:9, follow:10, stun:11, draw:12, cushion:13, english:14, all:15};
 const SHOOT_TEXT = [
   'Aim with the ghost ball, guide line and the object ball’s path', 'Object-ball path gone', 'Guide line gone', 'Ghost ball gone: aim from your own read',
-  'Down on the shot: 5 s standing', 'Down on the shot: 4 s standing', 'Down on the shot: 3 s standing',
+  'Down on the shot: 5 s standing', 'Down on the shot: 3 s standing', '9 ft table',
   'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
   'Follow: land the cue ball in the zone', 'Stun: stop it, or send it along the tangent line', 'Draw', 'Cue ball path off a cushion', 'English: change the angle off the cushion', 'Everything: speed, spin and english'];
-const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot', 5:'Down on the shot: 4 s', 6:'Down on the shot: 3 s · 9 ft table',
+const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot', 5:'Down on the shot: 3 s', 6:'🎱 9 ft table',
   7:'📐 Any angle · 🎱 Free play unlocked', 8:'🎚️ Speed · 0.75 s Flash', 9:'🌀 Throw', 10:'⤴️ Follow · 🎯 Cue ball zones', 11:'⏹️ Stun', 12:'⤵️ Draw', 13:'↩️ Off a cushion', 14:'🌪️ English', 15:'🏆 Everything'};
-const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 6:'Back to the 8 ft table', 4:'Standing, untimed', 7:'Fraction angles only', 8:'Speed set for you', 10:'No more zones · tip back to centre', 12:'No more draw', 14:'No more english'};
+const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 5:'Down on the shot: 5 s', 6:'Back to the 8 ft table', 4:'Standing, untimed', 7:'Fraction angles only', 8:'Speed set for you', 10:'No more zones · tip back to centre', 12:'No more draw', 14:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
 // the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C+ (Sessions by your grade; Flash and Free play by your best)
@@ -962,7 +962,7 @@ const isFree = () => settings.task === 'free';
 const isShooting = () => isShoot() || isFree();
 function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
 const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : (stats.shoot ? stats.shoot.g : 0);
-const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : g === SH.down + 1 ? 4 : 3;
+const standTime = g => g < SH.down ? 0 : g === SH.down ? 5 : 3;
 // what you control at each step (Free play: everything you've unlocked)
 const ctrl = () => {
   const g = shootLevel();
@@ -2987,7 +2987,7 @@ const SL_DOWN = [
   {aids:{}, next:true,
    text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
   {finish:true, aids:{},
-   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then four, then three for good.'},
+   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three for good.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
