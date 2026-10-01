@@ -956,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 212;   // one per commit to main
+const BUILD = 213;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -2227,17 +2227,18 @@ function edgePose(cam, T){
   if(q[2] > NEAR){ const [x, y] = cam.proj(q); if(x >= m && x <= VW - m && y >= m && y <= VH - m) return null; }
   let dx = q[0], dy = -q[1];
   if(q[2] <= NEAR) dy = Math.abs(dy) + 1;
-  const k = Math.min((VW/2 - 70)/Math.abs(dx || 1e-6), (VH/2 - 70)/Math.abs(dy || 1e-6));
+  const k = Math.min((VW/2 - 40)/Math.abs(dx || 1e-6), (VH/2 - 40)/Math.abs(dy || 1e-6));
   const ax = VW/2 + dx*k, ay = VH/2 + dy*k, fx = (ax - VW/2)/cam.focal, fy = -(ay - VH/2)/cam.focal;
   const right = norm3(cross3([0, 0, 1], cam.f)), up = cross3(cam.f, right);
   const ray = norm3([0, 1, 2].map(i=>right[i]*fx + up[i]*fy + cam.f[i]));
-  const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*30);   // 30" in front of you, at the edge of the view
+  const P = [0, 1, 2].map(i=>cam.E[i] + ray[i]*60);   // 60" out, right at the edge of the view: small, out of the way
   return {p: P, dir: norm3([T[0]-P[0], T[1]-P[1], T[2]-P[2]])};
 }
 function placeArrow(which, F, T){
   const st = arrowPose[which], now = performance.now(), dt = st.t ? Math.min(100, now - st.t) : 0; st.t = now;
   if(!F){ st.k = 0; return null; }
-  const e = lastCam && !look.k ? edgePose(lastCam, T) : null;
+  const c = shot && shot.cam, down = c && c.phase === 'down' && c.k > .05;   // down on the shot it stays out of your view
+  const e = lastCam && !look.k && !down ? edgePose(lastCam, T) : null;
   if(e) st.edge = e;
   st.k = e ? Math.min(1, st.k + dt/300) : Math.max(0, st.k - dt/300);
   if(!st.k || !st.edge) return F;
