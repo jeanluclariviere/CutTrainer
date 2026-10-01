@@ -57,7 +57,7 @@ function sfxTone(out, at, dur, f0, f1, gain, type){
   o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
 const SFX = {
-  cue:    (o, t, v)=>{ sfxTone(o, t, .07, 230, 130, .7*v); sfxNoise(o, t, .03, 'lowpass', 1100, .8, .35*v); },
+  cue:    (o, t, v)=>{ sfxTone(o, t, .06, 760, 520, .55*v); sfxTone(o, t, .04, 1520, 1100, .14*v, 'triangle'); sfxNoise(o, t, .012, 'bandpass', 2400, 1.2, .3*v); },   // a hollow 'ponc'
   click:  (o, t, v)=>{ sfxTone(o, t, .12, 1175, 0, .55*v); sfxTone(o, t, .08, 1760, 0, .3*v); sfxTone(o, t, .025, 2349, 0, .12*v, 'triangle'); },
   drop:   (o, t, v)=>{ sfxTone(o, t, .14, 405, 127, .8*v, 'triangle'); },
   rail:   (o, t, v)=>{ sfxNoise(o, t, .08, 'lowpass', 500, .9, .6*v); sfxTone(o, t, .1, 140, 90, .6*v); },

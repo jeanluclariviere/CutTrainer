@@ -916,7 +916,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 163;   // one per commit to main
+const BUILD = 164;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1266,7 +1266,7 @@ function takeShot(id){
   // the stroke: back 3" (soft) to 10" (hard), a pause, forward; contact starts the shot
   const lvl = levelForSpeed(stroke.V), ty = (stroke.tip || [0, 0])[1];
   s.follow = (ty > .2 ? 5 : ty < -.2 ? 2 : 3.5)*(.7 + lvl*.05);
-  const st = cueStroke = {s, t0: performance.now(), from, back: 3 + 7*(lvl - 1)/9, tb: 380, tp: 140, tf: 230 - 10*lvl};
+  const st = cueStroke = {s, t0: performance.now(), from, back: 3 + 7*(lvl - 1)/9, tb: 380, tp: 180, tf: 230 - 10*lvl};
   const tick = now => {
     if(shot !== s){ cueStroke = null; return; }
     if(now - st.t0 >= st.tb + st.tp + st.tf){ cueStroke = null; play(); return; }
@@ -1830,13 +1830,18 @@ function rigAlpha(s){
   if(g < SH.down || !c || !c.T) return {a:0};
   const base = g >= SH.full ? .5 : .22, down = c.phase === 'down' ? c.k : 0, now = performance.now();
   if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
-    const fe = c.downAt ? -.8*(1 - Math.cos(2*Math.PI*(now - c.downAt)/1500)) : 0;
+    const fe = c.downAt ? featherAt(now - c.downAt) : 0;
     return {a: base*down, push: fe};
   }
   if(cueStroke && cueStroke.s === s) return {a: base, push: strokeAt(cueStroke, now)};
   if(!anim || !s.follow) return {a:0};
   const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, then cue and hand fade
   return {a: base*Math.max(0, 1 - (t - 150)/220), push: s.follow*(1 - (1 - k)*(1 - k))};
+}
+// Practice strokes: 1.6" back, a brief hold at the back, then forward; 1.6 s a cycle.
+function featherAt(t){
+  const p = (t % 1600)/1600, ease = k => (1 - Math.cos(Math.PI*k))/2;
+  return p < .4 ? -1.6*ease(p/.4) : p < .5 ? -1.6 : -1.6*(1 - ease((p - .5)/.5));
 }
 // The final stroke: back (further for a harder shot), a pause, then forward, faster into the ball.
 let cueStroke = null, featherRaf = 0;
@@ -1852,6 +1857,7 @@ function featherLoop(s){   // keeps the practice strokes moving while you're dow
   const tick = ()=>{ if(shot !== s || answered || !isShoot() || tut.on || rigAlpha(s).a < .01) return; draw(false); featherRaf = requestAnimationFrame(tick); };
   featherRaf = requestAnimationFrame(tick);
 }
+const shadeHex = (hex, k) => '#' + [1, 3, 5].map(i=>Math.round(parseInt(hex.slice(i, i + 2), 16)*k).toString(16).padStart(2, '0')).join('');
 function cueRig(cam, s){
   const {a, push} = rigAlpha(s);
   if(a < .01) return '';
@@ -1869,8 +1875,12 @@ function cueRig(cam, s){
     const A = at(T0, st[i]), B = at(T0, st[i+1]);
     const side = P => { const v = norm3([cam.E[0]-P[0], cam.E[1]-P[1], cam.E[2]-P[2]]), w = cross3(f3, v), l = Math.hypot(...w) || 1; return [w[0]/l, w[1]/l, w[2]/l]; };
     const sa = side(A), sb = side(B), ra = cueR(st[i]/LEN), rb = cueR(st[i+1]/LEN);
-    const q = [[A[0]+sa[0]*ra, A[1]+sa[1]*ra, A[2]+sa[2]*ra], [B[0]+sb[0]*rb, B[1]+sb[1]*rb, B[2]+sb[2]*rb], [B[0]-sb[0]*rb, B[1]-sb[1]*rb, B[2]-sb[2]*rb], [A[0]-sa[0]*ra, A[1]-sa[1]*ra, A[2]-sa[2]*ra]];
-    faces.push([q, i === 0 ? '#f2efe8' : st[i] >= 29 ? '#3b2a20' : '#d8b57a']);
+    const col = i === 0 ? '#f2efe8' : st[i] >= 29 ? '#3b2a20' : '#d8b57a', NS = 6;
+    for(let j = 0; j < NS; j++){   // strips across the cue, shaded like a cylinder: lit along the top, darker at the edges
+      const t0 = Math.sin(-Math.PI/2 + Math.PI*j/NS), t1 = Math.sin(-Math.PI/2 + Math.PI*(j + 1)/NS), lit = Math.cos(-Math.PI/2 + Math.PI*(j + .5)/NS);
+      const P = (C, sv, rr, k) => [C[0] + sv[0]*rr*k, C[1] + sv[1]*rr*k, C[2] + sv[2]*rr*k];
+      faces.push([[P(A, sa, ra, t0), P(B, sb, rb, t0), P(B, sb, rb, t1), P(A, sa, ra, t1)], shadeHex(col, .55 + .45*lit), true]);
+    }
   }
   // the hand: an open bridge a forearm's length (less 1¼") behind the cue ball, the cue resting in the V of thumb and index knuckle
   const Hh = stanceIn(), Lb = 0.146*Hh - 1.25;
@@ -1900,8 +1910,9 @@ function cueRig(cam, s){
   limb([-3.6, 1.6, .7], [-5, 1.9, 1.6], 2.6, 1.1);                          // wrist
   limb([-5, 1.9, 1.6], [-14, 5.6, 6.2], 2.9, 2.3);                          // forearm, back up toward the shoulder
   // far to near, see-through
-  return faces.map(([q, col])=>({q, col, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
-    .map(({q, col})=>{ const d = polyD(cam, q); return d ? `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#5c524a" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>` : ''; }).join('');
+  return faces.map(([q, col, cue])=>({q, col, cue, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
+    .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}"/>`
+      : `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#5c524a" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>`; }).join('');
 }
 function perspFront(cam, s, reveal, segs, ring){
   let o = '';
@@ -2277,7 +2288,7 @@ const SFX = {
   click:  (o, t, v)=>{ sfxTone(o, t, .12, 1175, 0, .55*v); sfxTone(o, t, .08, 1760, 0, .3*v); sfxTone(o, t, .025, 2349, 0, .12*v, 'triangle'); },   // tink
   drop:   (o, t, v)=>{ sfxTone(o, t, .14, 405, 127, .8*v, 'triangle'); },   // bloop
   rail:   (o, t, v)=>{ sfxNoise(o, t, .08, 'lowpass', 500, .9, .6*v); sfxTone(o, t, .1, 140, 90, .6*v); },                                    // a muted, woody thump
-  cue:    (o, t, v)=>{ sfxTone(o, t, .07, 230, 130, .7*v); sfxNoise(o, t, .03, 'lowpass', 1100, .8, .35*v); },   // the tip on the cue ball: a short, medium thud
+  cue:    (o, t, v)=>{ sfxTone(o, t, .06, 760, 520, .55*v); sfxTone(o, t, .04, 1520, 1100, .14*v, 'triangle'); sfxNoise(o, t, .012, 'bandpass', 2400, 1.2, .3*v); },   // a hollow 'ponc'   // the tip on the cue ball: a short, medium thud
   jaw:    (o, t, v)=>{ sfxTone(o, t, .06, 430, 300, .6*v, 'triangle'); sfxTone(o, t + .08, .28, 220, 90, .55*v); },   // clack-bwomp
 };
 // schedule a shot's sounds on one bus (times in seconds from now), so they can be cut if the shot is skipped
