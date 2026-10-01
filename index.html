@@ -929,7 +929,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 180;   // one per commit to main
+const BUILD = 181;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1300,7 +1300,7 @@ function takeShot(id){
   // the back), then the backswing
   const now0 = performance.now(), downAt = s.cam && s.cam.downAt, TP = 180;
   const rest = downAt ? (1600 - (now0 - downAt) % 1600) % 1600 : 0;
-  const st = cueStroke = {s, downAt, t0: now0 + rest + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
+  const st = cueStroke = {s, downAt, fBack: s.cam && s.cam.fBack, t0: now0 + rest + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
   const tick = now => {
     if(shot !== s){ cueStroke = null; return; }
     if(now - st.t0 >= st.tb + st.tp + st.tf){ cueStroke = null; play(); return; }
@@ -1868,7 +1868,10 @@ function rigAlpha(s){
   const base = .5 + .5*Math.min(1, (g - SH.down)/(SH.full - SH.down)),   // 50% opaque at C-, up a step each grade to solid at S+
     down = c.phase === 'down' ? c.k : 0, now = performance.now();
   if(!answered){   // settled down: slow practice strokes, 1.6" back and forth
-    const fe = c.downAt ? featherAt(now - c.downAt, strokeBack(s)) : 0;
+    // each practice stroke keeps the length it started with; a new speed shows from the next one, so nothing jumps
+    const cyc = c.downAt ? Math.floor((now - c.downAt)/1600) : 0;
+    if(c.downAt && c.fCycle !== cyc){ c.fCycle = cyc; c.fBack = strokeBack(s); }
+    const fe = c.downAt ? featherAt(now - c.downAt, c.fBack) : 0;
     return {a: base*down, ac: base*down, push: fe};
   }
   if(cueStroke && cueStroke.s === s) return {a: base, ac: base, push: strokeAt(cueStroke, now)};
@@ -1887,7 +1890,7 @@ function featherAt(t, back){
 let cueStroke = null, featherRaf = 0;
 const FOLLOW_THROUGH = 4;   // inches past the cue ball, every stroke
 function strokeAt(st, now){
-  if(now < st.t0 - st.tp) return st.downAt ? featherAt(now - st.downAt, st.back) : 0;   // the practice stroke you were in finishes
+  if(now < st.t0 - st.tp) return st.downAt ? featherAt(now - st.downAt, st.fBack ?? st.back) : 0;   // the practice stroke you were in finishes, at its own length
   if(now < st.t0) return 0;                                                          // a beat at the ball
   const t = now - st.t0;
   if(t < st.tb){ const k = t/st.tb; return st.from + (-st.back - st.from)*(1 - Math.cos(Math.PI*k))/2; }
