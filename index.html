@@ -720,10 +720,11 @@ function nearestRef(theta){
   return best;
 }
 
+const FULL_SHARE = .4;   // full-ball shots come up less than the cuts (about 1 in 11)
 function bucketWeights(){
   if(forceFrac) return REFS.map(r=>r.id===forceFrac ? 1 : 0);
   const w = REFS.map(()=>1);
-  if(settings.full!=='1') w[0] = 0;
+  w[0] = settings.full!=='1' ? 0 : FULL_SHARE;
   return w;
 }
 function weightedIndex(w){
@@ -857,7 +858,7 @@ const PTS_UP = 10, PT_RIGHT = 1, PT_WRONG = -2;
 const baseRun = () => !!(stats.active && stats.active.base && stats.active.task===settings.task);
 const baselines = () => (stats.sessions||[]).filter(x=>x.base);
 const hasBaseline = () => baselines().length > 0 || !!stats.level;   // a grade means you've been placed (a picked test grade counts)
-const adaptiveOn = () => hasBaseline() && sessTask(settings.task) && !baseRun();
+const adaptiveOn = () => sessTask(settings.task) && !baseRun();   // everyone starts at F: no placement needed
 // One ladder (the one below, SHOOT_GRADES). Calling fractions lives on in Flash, dealt as the old Read ladder's B:
 // no aids, from the ball line, any angle where the nearest fraction pots. level() is that fixed reading level.
 const READ_FLASH_LEVEL = 8;
@@ -865,7 +866,8 @@ const level = () => READ_FLASH_LEVEL;
 const bestLevel = () => READ_FLASH_LEVEL;
 const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
 const longShare = () => 0.5;   // short and long evenly: long shots aren't harder here (no cueing), so distance only comes in as a weak spot
-const leanK = () => { const g = level(); return g===null || g < LEAN_AT ? 0 : 0.8 + (g - LEAN_AT)*(1.2/(GRADES.length-1-LEAN_AT)); };
+const leanK = () => { if(isShooting()) return 0.8 + shootLevel()*(1.2/(SHOOT_GRADES.length - 1));   // the ladder leans on your weak spots from F, harder as you climb
+  const g = level(); return g===null || g < LEAN_AT ? 0 : 0.8 + (g - LEAN_AT)*(1.2/(GRADES.length-1-LEAN_AT)); };
 function aidMode(key){   // 'on', 'fade' (fades away after a delay) or 'off'; set by your grade alone
   if(baseRun()) return 'off';
   const a = AIDS[key], g = level(), best = bestLevel();
@@ -909,7 +911,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 144;   // one per commit to main
+const BUILD = 145;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1047,7 +1049,7 @@ function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
   let best = null;
   for(let tries = 0; tries < 40; tries++){
-    const s = generate();
+    const s = dealShot();   // leaning on your weak spots
     if(!s) continue;
     best = best || s;
     if(diamondsFromSpeed(strikeOf(s).V) > 24) continue;   // no shots that need a near-break stroke just to reach the pocket
@@ -1221,7 +1223,7 @@ function takeShot(id){
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
   document.querySelectorAll('#answers button').forEach(x=>{ x.disabled = true; x.className = x.dataset.id===right.id ? 'right' : x.dataset.id===id ? (run.made ? 'also' : 'wrong') : ''; });
   if(isShoot()){
-    logEntry({t:'shoot', p:id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
+    logEntry({t:'shoot', p:id, ra: right.id, m: run.made ? 1 : 0, ok: full ? 1 : partial ? .5 : 0, z: s.zone ? (run.inZone ? 1 : 0) : undefined, sc: run.scratch ? 1 : undefined, sv: +ratio.toFixed(2), sg: g});
     if(!partial){
       const from = shootLevel(); stats.shoot.bestBefore = Math.max(stats.shoot.best ?? 0, stats.shoot.g);
       const d = levelPoint(full);
@@ -1311,7 +1313,7 @@ function weakModel(){
   const view = L.filter(e=>e.v===settings.view);
   if(view.length >= 40) L = view;
   L = L.slice(-400);
-  const wrong = e => !success(e);
+  const wrong = e => taskOf(e)==='shoot' ? e.p !== (e.ra || e.a) : !success(e);   // in Sessions a weak spot is a wrong call, whatever the stroke did
   const m = Math.max(0.04, L.filter(wrong).length / Math.max(1, L.length));
   const tally = key => { const c = {}; L.forEach(e=>{ const k = key(e), t = c[k] || (c[k] = {n:0, x:0}); t.n++; if(wrong(e)) t.x++; }); return c; };
   const shrink = (t, prior, w) => (t.x + w*prior)/(t.n + w);
@@ -1906,7 +1908,7 @@ function overlapSVG(s){
 }
 
 // ---------- modes ----------
-const MODE_LABEL = {call:'Sessions', sess:'Read', shoot:'Shoot', free:'Free play', flash:'Flash', place:'Ghost ball'};
+const MODE_LABEL = {call:'Sessions', sess:'Read', shoot:'Sessions', free:'Free play', flash:'Flash', place:'Ghost ball'};
 const taskOf = e => e.t || 'call';
 const sessTask = t => t==='sess' || t==='flash' || t==='shoot';   // played as 50- or 100-shot sessions (Free play isn't)
 const isPlace = () => settings.task==='place';   // (aiming by dragging the ghost ball is off for now: you call the fraction)
@@ -1920,7 +1922,7 @@ function lean(e){          // +1 too thin (overcut), -1 too full (undercut), 0 r
   return 0;
 }
 function modeLog(){ return stats.log.filter(e=>taskOf(e)===settings.task && !e.gh); }   // shots taken with the ghost-ball aid aren't scored
-const statTask = () => settings.statTask==='flash' ? 'flash' : 'sess';   // which mode the Stats tab shows (its own toggle)
+const statTask = () => settings.statTask==='flash' ? 'flash' : 'shoot';   // which mode the Stats tab shows (its own toggle)
 function statLog(){ return stats.log.filter(e=>taskOf(e)===statTask() && !e.gh); }
 
 // ---------- flash ----------
@@ -2650,7 +2652,7 @@ function renderStats(){
   $('s-streak').textContent = r.cur;
   $('s-best').textContent = r.best;
   $('s-n').textContent = n;
-  document.querySelectorAll('.statmode button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.stat===statTask()));
+  document.querySelectorAll('.statmode button').forEach(b=>b.setAttribute('aria-pressed', (b.dataset.stat==='flash') === (statTask()==='flash')));
   $('reset').textContent = `Reset ${MODE_LABEL[statTask()]} stats`;
   $('byfrac-h').textContent = place ? 'Pocketed, by real fraction' : 'Called right, by real fraction';
   const SR = statRefs(L);
@@ -2803,7 +2805,7 @@ function syncPressed(){
 }
 function applySetting(key, val){
   if(tut.on && key==='task') return;
-  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !hasBaseline()) || (key==='ghost' && aidMode('ghost')!=='optional') || (key==='line' && aidMode('line')!=='optional') || (key==='cam' && aidMode('stance')!=='optional') || (key==='walk' && baseRun()) || (key==='flash' && val==='750' && fastFlashLocked())) return;
+  if(settings[key]===val || (BASE_LOCKED.includes(key) && baseRun()) || (key==='task' && val==='flash' && !flashUnlocked()) || (key==='ghost' && aidMode('ghost')!=='optional') || (key==='line' && aidMode('line')!=='optional') || (key==='cam' && aidMode('stance')!=='optional') || (key==='walk' && baseRun()) || (key==='flash' && val==='750' && fastFlashLocked())) return;
   settings[key] = val; saveSettings(); syncPressed();
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
@@ -2916,7 +2918,7 @@ function showSub(t){
 document.querySelectorAll('.subtabs button').forEach(b=>b.addEventListener('click', ()=>showSub(b.dataset.sub)));
 showSub(['overview','fractions','details'].includes(settings.sub) ? settings.sub : 'overview');
 showTab(settings.tab==='misses' ? 'stats' : ['shot','stats'].includes(settings.tab) ? settings.tab : 'shot');   // Misses was folded into Stats
-$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(t==='sess') delete stats.level; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; showSessIdle(); } if(!hasBaseline() && settings.task==='flash') applySetting('task','sess'); syncPressed(); save(); renderStats(); syncStreakPill(); });
+$('reset').addEventListener('click', ()=>{ const t = statTask(); if(!confirm(`Reset all ${MODE_LABEL[t]} stats? This can't be undone.`)) return; stats.log = stats.log.filter(e=>taskOf(e)!==t); stats.sessions = (stats.sessions||[]).filter(x=>x.task!==t); if(t==='sess') delete stats.level; if(stats.active && stats.active.task===t){ restoreView(stats.active); stats.active = null; showSessIdle(); } if(!flashUnlocked() && settings.task==='flash') applySetting('task','shoot'); syncPressed(); save(); renderStats(); syncStreakPill(); });
 document.querySelectorAll('.statmode button').forEach(b=>b.addEventListener('click', ()=>{ settings.statTask = b.dataset.stat; saveSettings(); renderStats(); }));
 document.querySelectorAll('.sesschip').forEach(b=>b.addEventListener('click', ()=>startSession(+b.dataset.sess)));
 $('sessend').addEventListener('click', endSession);
@@ -3132,7 +3134,7 @@ function runStep(){
   $('coachtext').innerHTML = st.text;
   const nx = $('coachnext');
   nx.hidden = !(st.next || st.finish);
-  nx.textContent = st.finish ? (!hasBaseline() && !DEV ? 'Start the baseline' : 'Done') : 'Next';
+  nx.textContent = st.finish ? 'Done' : 'Next';
   document.querySelectorAll('#answers button').forEach(b=>b.disabled = !st.ask);
   draw(false); scheduleFades(); updateControls();
 }
