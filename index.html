@@ -919,7 +919,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 174;   // one per commit to main
+const BUILD = 175;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1931,7 +1931,7 @@ function cueRig(cam, s){
       const q = ax2 === 0 ? [corner(sgn,-1,-1), corner(sgn,1,-1), corner(sgn,1,1), corner(sgn,-1,1)]
               : ax2 === 1 ? [corner(-1,sgn,-1), corner(1,sgn,-1), corner(1,sgn,1), corner(-1,sgn,1)]
               :             [corner(-1,-1,sgn), corner(1,-1,sgn), corner(1,1,sgn), corner(-1,1,sgn)];
-      faces.push([q, '#d9d4cf']);
+      faces.push([q, '#4a525c']);   // slate, like a bridge glove: no skin tone
     }
   };
   const limb = (P, Q, w, h) => {   // a box from P to Q (local), w wide, h thick
@@ -1947,7 +1947,7 @@ function cueRig(cam, s){
   // far to near, see-through
   return faces.map(([q, col, cue])=>({q, col, cue, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
     .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${ac.toFixed(3)}"/>`
-      : `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#5c524a" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>`; }).join('');
+      : `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#c9d3dc" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>`; }).join('');
 }
 function perspFront(cam, s, reveal, segs, ring){
   let o = '';
