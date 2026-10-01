@@ -224,7 +224,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .quick .vgrid{display:grid;grid-template-columns:auto auto 1fr;gap:3px 12px;align-items:baseline;width:100%;margin-top:4px;font-size:13px}
 .quick .vgrid>span{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px;font-weight:600}
 .quick .vgrid i{font-style:normal;font-weight:600;color:var(--ink)} .quick .vgrid i.ok{color:var(--good)} .quick .vgrid i.no{color:var(--bad)}
-.quick .vgrid small{color:var(--muted)}
+.quick .vgrid small{font-size:inherit;font-weight:600;color:var(--ink)}
 .nudge{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .nudge button{font:600 15px var(--body);padding:12px 0;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
 .nudge button:disabled{opacity:.4;cursor:default}
@@ -949,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 190;   // one per commit to main
+const BUILD = 191;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
