@@ -566,6 +566,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
 
 
 </div>
+<script src="engine.js"></script>
 <script>
 (function(){
 const R = 1.125;               // ball radius, inches (2.25" ball)
@@ -651,21 +652,14 @@ const SPEED_LABEL = {slow:'Slow', medium:'Medium', firm:'Firm'};
 const THROW_MAX = {slow:5, medium:3.5, firm:2};      // degrees, at the peak
 const ROLL_V = {slow:45, medium:75, firm:120};       // animation speed, inches per second
 function throwAt(speed, phi){ if(!speed || phi <= 0) return 0; const x = phi/32; return THROW_MAX[speed]*x*Math.exp(1-x); }
-// Throw (Alciatore's model): friction between the balls while they slide against each other drags the object ball toward the
-// cue ball's direction. More when it's slow (the balls grip more) and when the cue ball is sliding (stun); topspin or backspin
-// means the surfaces are already slipping, and there's far less. vIn: cue-ball speed at contact (in/s); spin: its spin as a
-// share of rolling (0 stun, 1 rolling). Returns degrees.
-function throwPhys(vIn, phi, spin){
+// Throw comes out of the engine's ball-ball contact (friction while the balls slide against each other). This asks it how
+// many degrees a hit at cut phi throws, for a cue ball arriving at vc in/s with spin ratio spin (1 rolling, 0 stun).
+function throwAtContact(vc, phi, spin){
   if(phi <= 0) return 0;
-  const v = vIn*0.0254, c = Math.cos(phi*RAD), sn = Math.sin(phi*RAD);
-  const vx = v*sn, vz = v*c*(spin || 0), vrel = Math.hypot(vx, vz);
-  if(vrel < 1e-6) return 0;
-  const mu = 9.951e-3 + 0.108*Math.exp(-1.088*vrel);
-  return Math.atan(Math.min(mu*v*c/vrel, 1/7)*vx/(v*c))/RAD;
+  const n = [Math.sin(phi*RAD), Math.cos(phi*RAD)], r = PE.collide([0,1], vc, spin, n);
+  return Math.acos(Math.min(1, dot(r.obDir, n)))/RAD;
 }
-function throwFor(s, phi){ return s && s.throwOn ? throwPhys(contactSpeed(s), phi, s.spinR ?? 0) : 0; }   // throw is on from A-
-// the contact cut needed so that, after throw, the object ball leaves at the geometric cut tp
-function contactFor(speed, tp){ let c = tp; for(let i=0;i<6;i++) c = tp + throwAt(speed, c); return c; }
+function throwFor(s, phi){ return throwAtContact(contactSpeed(s), phi, s.stroke === 'stun' ? 0 : 1); }
 const MU_G = 108;                                     // sliding friction μ·g, in/s² (μ ≈ 0.28: a medium cloth, not a fast one)
 const A_ROLL = 6;                                     // rolling resistance, in/s²
 const POCKET_ARRIVE = 14;                             // pocket speed: how fast the object ball is still going as it drops, in/s
@@ -729,14 +723,7 @@ function rotAxis(v, k, a){   // rotate v about unit axis k by angle a (Rodrigues
   const kx = [k[1]*v[2]-k[2]*v[1], k[2]*v[0]-k[0]*v[2], k[0]*v[1]-k[1]*v[0]];
   return [0,1,2].map(i=>v[i]*c + kx[i]*sn + k[i]*kd*(1-c));
 }
-function cueScratches(c){
-  // where the cue ball really goes after a pocket-speed stun: along the tangent line, as far as its speed carries it
-  // the cue ball's real (curving) path after contact must stay clear of every pocket
-  const sim = simCue(c, c.gb, false), post = sim.pts.filter(q=>q.t >= sim.T1);
-  if(sim.pocket) return true;
-  for(let i=1;i<post.length;i++) if(POCKETS.some(P => segDist(P.t, post[i-1].p, post[i].p) < pocketR(P) + 1.2)) return true;
-  return false;
-}
+function cueScratches(c){ return outcome(c, c.theta).scratch; }   // the right call sends the cue ball into a pocket
 function generate(){
   const w = bucketWeights();
   const throwOn = throwNow(), phys = physOn(), speed = SHOT_SPEED, wantFlip = throwOn && !tut.on && Math.random() < 1/3;
@@ -758,7 +745,9 @@ function generate(){
     else { const bis = norm([Math.sign(P.c[0]-W/2), Math.sign(P.c[1]-H/2)]); if(dot(u,bis) < Math.cos(44*RAD)) continue; }
     // with speed & throw, the dealt angle is the cut as it looks (the ghost-ball geometry); the hit it needs is thinner
     // with throw, the spread is around the hit the shot needs (so thick and thin both come up); the angle it looks is thicker by the throw
-    const cut = phi, tp = throwOn ? Math.max(0, cut - throwPhys(pocketSpeedFor(Math.max(1, dist))/Math.max(.2, Math.cos(cut*RAD)), cut, 0)) : phi;
+    // throw is real on every shot (the engine's ball-ball friction): small when rolling, most on soft stun (A- up)
+    const stroke = throwOn ? 'stun' : 'roll', vc0 = pocketSpeedFor(Math.max(1, dist))/(Math.max(.2, Math.cos(phi*RAD))*(1 + PE.C.eBall)/2);
+    const cut = phi, tp = Math.max(0, cut - throwAtContact(vc0, cut, stroke === 'stun' ? 0 : 1));
     const sign = Math.random()<.5?-1:1;
     const v = rot(u, sign*tp*RAD);                      // cue direction
     const n = rot(v, -sign*cut*RAD);                    // line of centres at contact
@@ -773,7 +762,7 @@ function generate(){
     const cand = {any: anyOn(), phys, speed, len:lenCls, theta:cut, pathDeg:tp, throwOn, sign, P, ob, cb, gb, u, v, n,
       L: dist, tol: tolC, T, uC, cheat, side: dot(u,right)>0?'R':'L',
       color: pick(OB_COLORS), answer: nearestRef(cut), pick:null, spot: spotToward(sub(cb, ob)),
-      stroke: throwOn ? 'stun' : 'roll', spinR: throwOn ? 0 : 1, throwDeg: cut - tp, gbLook: throwOn ? sub(ob, mul(u, 2*R)) : null};   // gbLook: the ghost ball as the shot looks (the pocket line), before throw   // the call is the hit it needs; with throw that can be a thinner fraction than it looks
+      stroke, spinR: throwOn ? 0 : 1, throwDeg: cut - tp, gbLook: throwOn ? sub(ob, mul(u, 2*R)) : null};   // gbLook: the ghost ball as the shot looks (the pocket line), before throw   // the call is the hit it needs; with throw that can be a thinner fraction than it looks
     if(throwOn && (nearestRef(tp).id !== cand.answer.id) !== wantFlip) continue;   // about one throw shot in three is one where throw changes the fraction
     if(phys){
       // center if the plain fraction pockets at this speed; otherwise which way the hit has to move
@@ -787,10 +776,10 @@ function generate(){
         ? {id: nb.id, mod: cand.mod==='thin' ? 'thick' : 'thin'} : null;
       cand.throwDeg = cut - tp;
     }
-    if(!outcome(cand, cut).made) continue;                // the right call has to drop
+    const play = outcome(cand, cut);
+    if(!play.made || play.scratch) continue;              // the right call has to drop, without the cue ball following it into a pocket
     if(!fallback) fallback = cand;
     if(cand.any && !phys && level() < BETWEEN_AT && !outcome(cand, cand.answer.deg).made) continue;   // any angle (B): only cuts the plain fraction still pockets; from B+ any cut at all
-    if(cueScratches(cand)) continue;                   // don't deal shots where the cue ball rolls into a pocket
     if(Math.abs(u[0]) > 0.85 && dist > W*0.55) continue;   // no long runs across the table along an end rail: that layout only ever came up as a thin cut, so it gave the answer away
     if(pocketInView(cand)) return cand;
   }
@@ -871,7 +860,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', 'Throw: soft stun shots', '0.75 s Flash', 'Harder dealing', 'Top grade'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 130;   // one per commit to main
+const BUILD = 131;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -961,32 +950,46 @@ function dealShot(){
   return cands[weightedIndex(cands.map(c=>Math.pow(model[shotCell(c)]||1, k)))];
 }
 
-// Play a pure hit at cut angle phiC from the real cue-ball position.
-function outcome(s, phiC){
+// ---------- physics: the engine (engine.js) plays every shot ----------
+const PE = window.PoolEngine;
+let TBL = null;
+function engineTable(){   // the engine's table, matching the current size and pockets (its pockets are in the same order as POCKETS)
+  const key = [W, H, PK[0], PK[1]].join();
+  if(!TBL || TBL.key !== key){ TBL = PE.makeTable(W, H, PK); TBL.key = key; }
+  return TBL;
+}
+// how the shot is struck: every call uses the same stroke (speed and tip height); only the aim changes
+function strikeOf(s){
+  if(s.strk) return s.strk;
+  const d1 = len(sub(s.gb, s.cb)), spin = s.stroke === 'stun' ? 0 : 1;
+  let vc = contactSpeed(s), st = PE.strikeFor(vc, spin, d1);
+  for(let k=0; spin < 1 && st.b < -0.6 && k < 40; k++){ vc *= 1.08; st = PE.strikeFor(vc, spin, d1); }   // too soft to stun from this far: it takes more pace
+  s.tip = [0, st.b];
+  return s.strk = {V: st.V, b: st.b, vc};
+}
+// Play the shot with the cue ball aimed for a contact at cut phiC (on the shot's side), and see what happens.
+// record: keep both balls' paths (and how they turn) for the animation.
+function outcome(s, phiC, record){
   const D = len(sub(s.ob,s.cb)), w = norm(sub(s.ob,s.cb));
   const al = Math.asin(Math.min(1, 2*R*Math.sin(phiC*RAD)/D));
   const v2 = rot(w, s.sign*al);
   const t = D*Math.cos(al) - 2*R*Math.cos(phiC*RAD);
   const g2 = add(s.cb, mul(v2,t));
-  const u2 = rot(v2, -s.sign*(phiC - throwFor(s, phiC))*RAD);
+  const st = strikeOf(s);
+  // where the object ball heads off, for the result text: the one contact, as the engine plays it
+  const arr = PE.arrive(st.V, st.b, t), u2 = PE.collide(v2, arr.v, arr.spin, norm(sub(s.ob, g2))).obDir;
   const err = Math.atan2(s.u[0]*u2[1]-s.u[1]*u2[0], dot(s.u,u2));
   const lat = s.L*Math.sin(err);   // off the shot's line (which may cheat the pocket)
-  const uC = s.uC || s.u, errC = Math.atan2(uC[0]*u2[1]-uC[1]*u2[0], dot(uC,u2)), latC = s.L*Math.sin(errC);   // off the pocket's middle: what decides it
-  // pocket speed: a hit thinner than the right one sends the object ball off slower, and it can die short of the pocket
-  // the object ball, played out: slide, roll, cushions, jaws and pockets decide whether it drops
-  const sim = simBall([...s.ob], mul(u2, contactSpeed(s)*Math.cos(phiC*RAD)), [0,0], 0, I3, 1/120, false, [{t:0, p:[...s.ob]}]);
-  const made = sim.pocket === s.P, dies = !made && !sim.pocket && !sim.bounces.length && Math.abs(latC) <= s.tol;
-  return {v2, g2, u2, lat, latC, sim, made, short: dies};
+  const uC = s.uC || s.u, errC = Math.atan2(uC[0]*u2[1]-uC[1]*u2[0], dot(uC,u2)), latC = s.L*Math.sin(errC);
+  const cue = {id:'c', p:[...s.cb]}; PE.strike(cue, v2, st.V, [0, st.b]);
+  const sim = PE.simulate(engineTable(), [cue, {id:'o', p:[...s.ob]}], record ? {record: 3, orient: true, tMax: 14} : {tMax: 14});
+  const into = id => sim.events.find(e=>e.type==='pocket' && e.ids[0]===id) || null;
+  const obIn = into('o'), cbIn = into('c'), made = !!obIn && obIn.pocket === POCKETS.indexOf(s.P);
+  const short = !made && !obIn && !sim.events.some(e=>e.ids[0]==='o' && e.type!=='ball') && Math.abs(latC) <= s.tol;
+  return {phiC, v2, g2, u2, lat, latC, sim, made, short, scratch: !!cbIn, obIn, cbIn};
 }
 // the cue ball's speed at contact for a pocket-speed shot: the right hit gets the object ball to the pocket, arriving slowly
-function contactSpeed(s){ return pocketSpeedFor(Math.max(1, s.L))/Math.max(0.2, Math.cos(s.theta*RAD)); }
-function makeWindow(s){
-  let lo = s.theta, hi = s.theta;
-  while(lo > 0 && outcome(s, lo-0.05).made) lo -= 0.05;
-  while(hi < 88 && outcome(s, hi+0.05).made) hi += 0.05;
-  lo = Math.max(0, lo);
-  return {lo, hi, fThick: 1-Math.sin(lo*RAD), fThin: 1-Math.sin(hi*RAD)};
-}
+function contactSpeed(s){ return pocketSpeedFor(Math.max(1, s.L))/(Math.max(0.2, Math.cos(s.theta*RAD))*(1 + PE.C.eBall)/2); }
 
 function viewBoxFor(s){
   const pts = [s.cb, s.ob, s.P.c];
@@ -1219,7 +1222,7 @@ function perspSVG(s, reveal, view){
 // the jaws: the cushion carried round from each point into the pocket, face and top, in cushion blue
 function jawsSVG(cam, onlySide){
   let o = '';
-  for(const g of railGeom()) if(g.jaw && (!onlySide || (g.n[0] === onlySide[0] && g.n[1] === onlySide[1]))){
+  for(const g of engineTable().segs) if(g.jaw && (!onlySide || (g.n[0] === onlySide[0] && g.n[1] === onlySide[1]))){
     const f = norm(sub(g.b, g.a)), depth = Math.min(len(sub(g.b, g.a)), 1.6/Math.max(.1, dot(f, g.out))), b = add(g.a, mul(f, depth));
     const fn = [-f[1], f[0]], face = dot(fn, g.away) < 0 ? fn : mul(fn, -1), mid = mul(add(g.a, b), .5);
     if(face[0]*(cam.E[0]-mid[0]) + face[1]*(cam.E[1]-mid[1]) > 0)   // the face looks into the pocket: drawn when it faces you
@@ -1311,7 +1314,7 @@ function perspDyn(cam, s, reveal){
   const A = s.anim, F = reveal && !A ? s.final : null;
   const cbP = A ? A.cb : F ? F.cb : s.cb;   // null once the cue ball has dropped into a pocket
   const items = tut.on && tut.zb > 0.5 || !cbP ? [] : [{p: cbP, kind:'cb', z: A && A.cbZ != null ? Math.min(R, A.cbZ) : R, shadow: A && A.cbShadow != null ? A.cbShadow : 1, pocket: A && A.cbPocket}];   // the tutorial close-up looks from in front of the cue ball
-  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A && A.obZ < R ? 1 : A ? A.obScale : 1, z: A ? A.obZ : R, shadow: A ? A.obShadow : 1, pocket: A && A.obPocket});
+  if(A ? A.ob : F ? F.ob : true) items.push({p: A ? A.ob : F ? F.ob : s.ob, kind:'ob', scale: A && A.obZ < R ? 1 : A ? A.obScale : 1, z: A ? A.obZ : R, shadow: A ? A.obShadow : 1, pocket: A && A.obPocket, M: A ? A.obM : F ? F.obM : null});
   const contact = A && A.trail.ob;   // the balls have met and are diverging
   // once the balls meet: a faint mark where the object ball started, so the lines out of it start from something
   // (always yellow, like the line to the pocket: a ball's own colour can vanish on the cloth)
@@ -1359,7 +1362,8 @@ function perspDyn(cam, s, reveal){
       // the number spot is painted on the ball: it rolls with it, and turns away as you walk around
       const moved = sub(it.p, s.ob), dl = len(moved);
       let sp = s.spot || [0,0,1];
-      if(dl > 0.01) sp = rotAxis(sp, [-moved[1], moved[0], 0], dl/R);
+      if(it.M) sp = matVec(it.M, sp);                                   // turned exactly as the engine rolled it
+      else if(dl > 0.01) sp = rotAxis(sp, [-moved[1], moved[0], 0], dl/R);
       const C = [it.p[0], it.p[1], it.z ?? R], toE = norm3([cam.E[0]-C[0], cam.E[1]-C[1], cam.E[2]-C[2]]);
       const facing = sp[0]*toE[0] + sp[1]*toE[1] + sp[2]*toE[2];
       if(facing > 0.04){
@@ -1983,125 +1987,8 @@ function rayToCushion(p, dir, maxLen){
   t = Math.max(0, Math.min(t, maxLen ?? Infinity));
   return add(p, mul(dir, t));
 }
-// Ball motion on the cloth: a ball with no spin first slides (sliding friction MU_G slows it and builds forward roll),
-// and after (2/7)·v/μg it's rolling at 5/7 of its speed, then rolling resistance (A_ROLL) slows it to a stop.
-function rollOut(v0){
-  const ts = (2/7)*v0/MU_G, ds = v0*ts - MU_G*ts*ts/2, v1 = (5/7)*v0, tr = v1/A_ROLL, dr = v1*v1/(2*A_ROLL);
-  const x = t => t <= ts ? v0*t - MU_G*t*t/2 : ds + v1*Math.min(t-ts, tr) - A_ROLL*Math.min(t-ts, tr)**2/2;
-  const tFor = d => d <= ds ? (v0 - Math.sqrt(Math.max(0, v0*v0 - 2*MU_G*d)))/MU_G : ts + (v1 - Math.sqrt(Math.max(0, v1*v1 - 2*A_ROLL*(d-ds))))/A_ROLL;
-  const v = t => t <= ts ? v0 - MU_G*t : Math.max(0, v1 - A_ROLL*(t-ts));
-  return {x, tFor, v, stop: ds + dr, ts, v1};
-}
-// ---------- the cue ball, simulated: hit 2/5 of a radius above centre it rolls from the start; after contact it keeps that roll,
-// so its path bends forward off the tangent line before it rolls straight (the natural-roll path) ----------
 const CUE_TIP = [0, .4];   // where the tip strikes, in radii from centre (x right, y up): natural roll
-// cushions (approximate): the speed into the rail comes back at CUSH_E of itself; the ball keeps its speed along the rail,
-// and keeps CUSH_SPIN of its roll into the rail, so a rolling ball bends again as it comes off
-const CUSH_E = .75, CUSH_SPIN = .6;
-const I3 = [[1,0,0],[0,1,0],[0,0,1]];
-function matRot(M, k, a){   // rotation by a about unit axis k, applied after M
-  const c = Math.cos(a), sn = Math.sin(a), C = 1 - c, [x, y, z] = k;
-  const Rm = [[c+x*x*C, x*y*C-z*sn, x*z*C+y*sn],[y*x*C+z*sn, c+y*y*C, y*z*C-x*sn],[z*x*C-y*sn, z*y*C+x*sn, c+z*z*C]];
-  return Rm.map(row=>[0,1,2].map(j=>row[0]*M[0][j] + row[1]*M[1][j] + row[2]*M[2][j]));
-}
 const matVec = (M, v) => M.map(row=>row[0]*v[0] + row[1]*v[1] + row[2]*v[2]);
-function tipSpeed(Vc, d1){ return Math.sqrt(Vc*Vc + 2*A_ROLL*d1); }   // how hard it's hit so it arrives rolling at the object ball at Vc
-// One ball rolling free on the table: cloth friction, rebounds off the cushions, and the pockets.
-// Starts at p with velocity v and spin rv (the speed its surface turns at, as a table vector: rolling when rv = v).
-// The cushions as line segments: each rail's nose between two pockets, and at every pocket the two jaws, angled back
-// into the rail from the points (corner jaws open at 142°, side jaws at 104°). A ball that hits a point or a jaw rattles.
-const JAW_E = .8;   // jaws are softer than the cushions
-const SHELF = {corner: 1.5, side: 0.5}, HOLE_R = {corner: 2.3, side: 2.5};   // how far past the mouth a centre goes before it's over the hole; hole radius
-function holeOf(P){   // the hole a ball drops into: behind the mouth by the shelf
-  if(P.side){ const n = P.n; return {c: [P.c[0] + 0.6*n[0] - n[0]*(HOLE_R.side - SHELF.side), P.c[1]], r: HOLE_R.side}; }
-  const bis = norm([W/2 - P.c[0], H/2 - P.c[1]]), mouth = PK[0]/2;   // the mouth line is PK/2 in from the corner along the bisector
-  return {c: add(P.c, mul(bis, mouth - SHELF.corner - HOLE_R.corner)), r: HOLE_R.corner};
-}
-let railCache = null;
-function railGeom(){
-  const key = [W, H, PK[0], PK[1]].join();
-  if(railCache && railCache.key === key) return railCache.segs;
-  const segs = [];
-  for(const [a, b, n] of tableSegs()){
-    segs.push({a, b, jaw:false});
-    for(const [pt, other] of [[a, b], [b, a]]){
-      const away = norm(sub(other, pt)), out = mul(n, -1);
-      const corner = [[0,0],[W,0],[0,H],[W,H]].some(c=>len(sub(c, pt)) < 5), J = (corner ? 142 : 104)*RAD;
-      segs.push({a: pt, b: add(pt, mul(add(mul(away, Math.cos(J)), mul(out, Math.sin(J))), 2.2)), jaw:true, away, out, n});
-    }
-  }
-  railCache = {key, segs};
-  return segs;
-}
-function simBall(p, v, rv, t, M, dt, withSpin, pts){
-  const bounces = [];
-  let pocket = null;
-  for(let k=0; k<12000; k++){
-    const u = sub(v, rv), ul = len(u);
-    if(ul > 0.05){   // sliding: it slows and its spin catches up, until it rolls
-      const uh = mul(u, 1/ul);
-      v = sub(v, mul(uh, MU_G*dt)); rv = add(rv, mul(uh, 2.5*MU_G*dt));
-      if(dot(sub(v, rv), uh) <= 0) rv = [...v];
-    } else { const vl = len(v); v = vl <= A_ROLL*dt ? [0,0] : mul(v, (vl - A_ROLL*dt)/vl); rv = [...v]; }
-    p = add(p, mul(v, dt)); t += dt;
-    if(withSpin){ const w = [-rv[1]/R, rv[0]/R, 0], wl = Math.hypot(w[0], w[1]); if(wl > 1e-9) M = matRot(M, [w[0]/wl, w[1]/wl, 0], wl*dt); }
-    pocket = POCKETS.find(P => len(sub(p, holeOf(P).c)) < holeOf(P).r) || null;   // its centre is over the hole, past the shelf: it drops
-    if(pocket){ pts.push({t, p:[...p], M}); return {pts, bounces, pocket, v, end: pts[pts.length-1]}; }
-    if(!(p[0] > R && p[0] < W-R && p[1] > R && p[1] < H-R)) for(const sg of railGeom()){   // off the cushions, the jaws and their points (only near the edge)
-      const ab = sub(sg.b, sg.a), tq = Math.max(0, Math.min(1, dot(sub(p, sg.a), ab)/dot(ab, ab))), q = add(sg.a, mul(ab, tq));
-      const dv = sub(p, q), dl = len(dv);
-      if(dl >= R || dl < 1e-9) continue;
-      const nn = mul(dv, 1/dl), vn = dot(v, nn);
-      if(vn >= 0) continue;
-      const jaw = sg.jaw || tq <= 0 || tq >= 1, e = jaw ? JAW_E : CUSH_E;
-      p = add(q, mul(nn, R));
-      bounces.push({t, vn: -vn, jaw});
-      v = sub(v, mul(nn, (1 + e)*vn)); rv = sub(rv, mul(nn, (1 - CUSH_SPIN)*dot(rv, nn)));
-    }
-    if(p[0] < -2*R || p[0] > W+2*R || p[1] < -2*R || p[1] > H+2*R){   // deep behind the jaws: it's in the nearest pocket
-      pocket = POCKETS.reduce((a, P)=>len(sub(p, P.c)) < len(sub(p, a.c)) ? P : a);
-      pts.push({t, p:[...p], M}); return {pts, bounces, pocket, v, end: pts[pts.length-1]};
-    }
-    pts.push({t, p:[...p], M});
-    if(len(v) < 0.2) break;
-  }
-  return {pts, bounces, pocket, v, end: pts[pts.length-1]};
-}
-function simCue(s, g2, withSpin){
-  const cb0 = s.cb, n2 = norm(sub(s.ob, g2)), d1 = len(sub(g2, cb0)), dA = d1 > 1e-6 ? mul(sub(g2, cb0), 1/d1) : [0,1];
-  const Vc = contactSpeed(s), dt = withSpin ? 1/240 : 1/100;
-  const pts = [{t:0, p:[...cb0], M:I3}];
-  let M = I3, t = 0;
-  if(s.stroke === 'stun'){
-    // stun: hit below centre with just enough backspin that it has worn off at contact; it slides the whole way, then leaves
-    // along the tangent line with no spin
-    const T1 = (-Vc + Math.sqrt(Vc*Vc + 2*MU_G*d1))/MU_G, v0 = Vc + MU_G*T1, w0 = -2.5*MU_G*T1, steps = Math.max(1, Math.ceil(T1/dt));
-    s.tip = [0, Math.max(-.6, .4*w0/Math.max(1, v0))];
-    for(let k=1; k<=steps; k++){
-      const tk = T1*k/steps, x = v0*tk - MU_G*tk*tk/2, w = w0 + 2.5*MU_G*tk;
-      if(withSpin && Math.abs(w) > 1e-6) M = matRot(M, [-dA[1], dA[0], 0], w*(tk - t)/R);
-      t = tk; pts.push({t, p: add(cb0, mul(dA, Math.min(d1, x))), M});
-    }
-    pts[pts.length-1].p = [...g2]; pts[pts.length-1].hit = 1;
-    const vIn = mul(dA, Vc), v = sub(vIn, mul(n2, dot(vIn, n2)));
-    const r = simBall([...g2], v, [0,0], T1, M, dt, withSpin, pts);
-    return {pts, T1, bounces: r.bounces, pocket: r.pocket, vDrop: r.v, end: r.end};
-  }
-  s.tip = CUE_TIP;
-  const v0 = tipSpeed(Vc, d1);
-  // to the object ball: rolling in a straight line, slowing only by rolling resistance
-  const T1 = (v0 - Vc)/A_ROLL, steps = Math.max(1, Math.ceil(T1/dt));
-  for(let k=1; k<=steps; k++){
-    const tk = T1*k/steps, x = v0*tk - A_ROLL*tk*tk/2, vk = v0 - A_ROLL*tk;
-    if(withSpin) M = matRot(M, [-dA[1], dA[0], 0], (x - (v0*t - A_ROLL*t*t/2))/R);
-    t = tk; pts.push({t, p: add(cb0, mul(dA, Math.min(d1, x))), M});
-  }
-  pts[pts.length-1].p = [...g2]; pts[pts.length-1].hit = 1;
-  // the hit: the object ball takes the speed along the line of centres; the cue ball keeps its roll
-  const vIn = mul(dA, Vc), v = sub(vIn, mul(n2, dot(vIn, n2)));
-  const r = simBall([...g2], v, vIn, T1, M, dt, withSpin, pts);
-  return {pts, T1, bounces: r.bounces, pocket: r.pocket, vDrop: r.v, end: r.end};
-}
 // the object-ball speed that gets it to a pocket d inches away arriving at about POCKET_ARRIVE in/s ("pocket speed")
 function pocketSpeedFor(d){
   const va = POCKET_ARRIVE, k = 24/(98*MU_G);
@@ -2109,75 +1996,64 @@ function pocketSpeedFor(d){
   if(vRoll*vRoll*k <= d) return vRoll;
   return Math.sqrt(va*va + 2*MU_G*d);                                    // so close it arrives still sliding
 }
-// a ball that's dropped into a pocket: it drifts on a little, falls under gravity, and its shadow slips over the edge
-const G_IN = 386, FALL = Math.sqrt(2*3.2*R/G_IN);
-function dropAt(pc, vd, tau, P){   // a ball that has dropped: it drifts on toward the middle of the hole (never back out over the rail), falls under gravity, and its shadow slips over the edge
-  const toward = P ? sub(holeOf(P).c, pc) : vd, dl = len(toward), dir = dl > 1e-6 ? mul(toward, 1/dl) : [0,0];
-  const reach = P ? Math.min(1.4, dl) : 1.4;
-  return {p: add(pc, mul(dir, Math.min(Math.max(8, len(vd))*tau, reach))), z: R - G_IN*tau*tau/2, shadow: Math.max(0, 1 - tau/0.06)};
-}
 function railVol(vn){ return Math.max(.2, Math.min(1, vn/40)); }
 function animateShot(oc, done, obCol){
-  const s = shot, cb0 = s.cb, ob0 = s.ob, g2 = oc.g2;
-  const n2 = norm(sub(ob0, g2)), v2 = oc.v2;
-  // the cue ball, simulated from the tip to where it stops: rolling, the hit, its curving path, the cushions, maybe a pocket
-  const sim = simCue(s, g2, true), pts = sim.pts, T1 = sim.T1;
-  const Vc = contactSpeed(s), cosTrue = Math.cos(s.theta*RAD);
-  const mIdeal = rollOut(Vc*cosTrue);
-  // the object ball, as outcome() played it: slide, roll, cushions, jaws, and maybe a pocket (the one you called or another)
-  const free = oc.sim || outcome(s, s.theta).sim;
-  const obEnd = free.end.p;
-  const T2 = free.end.t + (free.pocket ? FALL : 0);
-  const tEnd = sim.end.t + (sim.pocket ? FALL : 0);
-  // a miss: the see-through object ball rolls the right call's path, played out the same way, into the pocket
-  const rightSim = !oc.made ? outcome(s, s.theta).sim : null;
-  const TG = rightSim ? rightSim.end.t + (rightSim.pocket ? FALL : 0) : 0;
-  const total = Math.max(T1 + T2, tEnd, T1 + TG) * 1000 + 280;   // short hold so you see where the balls stopped
-  // sounds: the contact, then the cushions and jaws either ball hits (softer the gentler; a rattle's rapid touches count once), and the pockets
-  const plan = [[T1, 'click', 1]];
-  const knocks = (bs, t0, k) => { let last = -1; bs.forEach(b=>{ if(b.vn >= 3 && t0 + b.t - last > 0.06){ plan.push([t0 + b.t, b.jaw ? 'jaw' : 'rail', k*railVol(b.vn)]); last = t0 + b.t; } }); };
-  knocks(free.bounces, T1, 1);
-  if(free.pocket) plan.push([T1 + free.end.t + FALL*0.7, 'drop', 1]);
-  knocks(sim.bounces, 0, .8);
-  if(sim.pocket) plan.push([sim.end.t + FALL*0.7, 'drop', 1]);
+  const s = shot, cb0 = s.cb;
+  // the shot, played out by the engine with both balls' paths kept: what you see is exactly what was judged
+  const run = outcome(s, oc.phiC ?? s.theta, true), sim = run.sim, Pc = sim.paths.c, Po = sim.paths.o;
+  const hit = sim.events.find(e=>e.type==='ball'), T1 = hit ? hit.t : Pc[Pc.length-1].t;
+  // the right call played out: the yellow line grows along it, and on a miss a see-through object ball rolls it
+  const isRight = Math.abs((oc.phiC ?? s.theta) - s.theta) < 1e-9;
+  const right = isRight ? run : outcome(s, s.theta, true), Pr = right.sim.paths.o;
+  const rHit = right.sim.events.find(e=>e.type==='ball'), rT1 = rHit ? rHit.t : T1;
+  const lastT = P => P[P.length-1].t;
+  const total = Math.max(lastT(Pc), lastT(Po), isRight ? 0 : lastT(Pr))*1000 + 280;   // short hold so you see where the balls stopped
+  // sounds, from the engine's events: the hit, cushions and jaws (softer the gentler; a rattle's rapid touches count once), pockets
+  const plan = [], lastAt = {};
+  for(const e of sim.events){
+    const kind = e.type === 'ball' ? 'click' : e.type === 'pocket' ? 'drop' : e.type === 'jaw' ? 'jaw' : 'rail';
+    if(kind !== 'drop' && e.speed < 3) continue;
+    const key = e.type + e.ids.join();
+    if(kind !== 'drop' && lastAt[key] != null && e.t - lastAt[key] < 0.06) continue;
+    lastAt[key] = e.t;
+    const vol = kind === 'click' ? (e === hit ? 1 : .6*railVol(e.speed)) : kind === 'drop' ? 1 : (e.ids[0] === 'c' ? .8 : 1)*railVol(e.speed);
+    plan.push([e.t + (kind === 'drop' ? 0.12 : 0), kind, vol]);
+  }
   const bus = tableSounds(plan, s.duck);
-  // the trails: thinned copies of each ball's path
-  const postPts = pts.filter((q, i)=>q.t > T1 && (i % 6 === 0 || i === pts.length-1));
-  const obPts = free.pts.filter((q, i)=>i % 3 === 0 || i === free.pts.length-1);
-  const at = (arr, t) => {   // position (and spin) at time t along a simulated path
-    let lo = 0, hi = arr.length - 1;
-    if(t >= arr[hi].t) return arr[hi];
-    while(hi - lo > 1){ const m = (lo+hi) >> 1; if(arr[m].t <= t) lo = m; else hi = m; }
-    const a = arr[lo], b = arr[hi], k = b.t > a.t ? (t - a.t)/(b.t - a.t) : 0;
-    return {p: add(a.p, mul(sub(b.p, a.p), k)), M: a.M};
+  const at = (P, t) => {   // position, height and turn at time t along a recorded path
+    let lo = 0, hi = P.length - 1;
+    if(t >= P[hi].t) return P[hi];
+    if(t <= P[0].t) return P[0];
+    while(hi - lo > 1){ const m = (lo+hi) >> 1; if(P[m].t <= t) lo = m; else hi = m; }
+    const a = P[lo], b = P[hi], k = b.t > a.t ? (t - a.t)/(b.t - a.t) : 0;
+    return {p: add(a.p, mul(sub(b.p, a.p), k)), z: a.z + (b.z - a.z)*k, M: a.M};
   };
-  const cueAt = t => {
-    if(sim.pocket && t > sim.end.t){ const d = dropAt(sim.end.p, sim.vDrop, t - sim.end.t, sim.pocket); return {p: d.z < -3*R ? null : d.p, z: d.z, shadow: d.shadow, M: sim.end.M}; }
-    return at(pts, t);
+  // how far the right path's object ball has run by time t (for the yellow line)
+  const rCum = [0]; for(let i=1;i<Pr.length;i++) rCum.push(rCum[i-1] + len(sub(Pr[i].p, Pr[i-1].p)));
+  const runAt = t => { if(t <= rT1) return 0; let lo = 0, hi = Pr.length - 1; if(t >= Pr[hi].t) return rCum[hi]; while(hi - lo > 1){ const m = (lo+hi) >> 1; if(Pr[m].t <= t) lo = m; else hi = m; } return rCum[lo]; };
+  const thin = P => P.filter((q, i)=>i % 3 === 0 || i === P.length-1);
+  const cTrail = thin(Pc), oTrail = thin(Po.filter(q=>q.t >= T1 - 1e-9));
+  const pocketOf = e => e ? POCKETS[e.pocket] : null;
+  const ballAt = (P, t, inE) => {   // a ball's drawing state; once it has dropped below the cloth it's clipped to its pocket's hole
+    const q = at(P, t), down = q.z < R - 0.02;
+    return {p: q.z > -3*R ? q.p : null, z: q.z, shadow: down ? 0 : 1, M: q.M, pocket: down ? pocketOf(inE) : null};
   };
   const t0 = performance.now();
   const frame = now => {
     if(!anim) return;
     const t = (now - t0) / 1000;
-    let ob = ob0, obScale = 1, obZ = R, obShadow = 1, obPocket = null, obTrail = null, obGhost = null;
-    if(rightSim && t >= T1){
-      const tau = t - T1;
-      if(rightSim.pocket && tau > rightSim.end.t){ const d = dropAt(rightSim.end.p, rightSim.v, tau - rightSim.end.t, rightSim.pocket); if(d.z > -3*R) obGhost = d; }
-      else obGhost = {p: at(rightSim.pts, tau).p, z: R, shadow: 1};
-    }
-    const c = cueAt(t), cb = c.p;
-    if(t >= T1){
-      const tau = t - T1;
-      if(free.pocket && tau > free.end.t){ const d = dropAt(free.end.p, free.v, tau - free.end.t, free.pocket); ob = d.p; obZ = d.z; obShadow = d.shadow; obPocket = free.pocket; if(obZ < -3*R) obScale = 0; }
-      else ob = at(free.pts, tau).p;
-      obTrail = [...obPts.filter(q=>q.t <= tau).map(q=>q.p), ob];
-    }
-    s.anim = {tHit: Math.max(0, t - T1), obGhost, cb, cbZ: c.z, cbShadow: c.shadow, cbPocket: sim.pocket, spin: {M: c.M}, ob: obScale > 0.02 ? ob : null, obScale, obZ, obShadow, obPocket, run: t < T1 ? 0 : mIdeal.x(t-T1),
-      trail: {cb: t < T1 ? [cb0, ...(cb ? [cb] : [])] : [cb0, g2, ...postPts.filter(q=>q.t <= t).map(q=>q.p), ...(cb ? [cb] : [])], ob: obTrail, obCol}};
+    const c = ballAt(Pc, t, run.cbIn), o = ballAt(Po, t, run.obIn);
+    let obGhost = null;
+    if(!isRight && t >= rT1){ const g = ballAt(Pr, t, right.obIn); if(g.p) obGhost = {p: g.p, z: g.z, shadow: g.shadow}; }
+    s.anim = {tHit: Math.max(0, t - T1), obGhost, cb: c.p, cbZ: c.z, cbShadow: c.shadow, cbPocket: c.pocket, spin: {M: c.M},
+      ob: o.p, obScale: 1, obZ: o.z, obShadow: o.shadow, obPocket: o.pocket, obM: o.M, run: runAt(t),
+      trail: {cb: [...cTrail.filter(q=>q.t <= t).map(q=>q.p), ...(c.p ? [c.p] : [])], ob: t < T1 ? null : [...oTrail.filter(q=>q.t <= t).map(q=>q.p), ...(o.p ? [o.p] : [])], obCol}};
     draw(false);
     if(now - t0 < total) anim.raf = requestAnimationFrame(frame); else finishAnim();
   };
-  s.final = {obPath: obPts.map(q=>q.p).concat([free.end.p]), cb: sim.pocket ? null : sim.end.p, spin: {M: sim.end.M}, ob: free.pocket ? null : obEnd, stop: null, trail: {cb: [cb0, g2, ...postPts.map(q=>q.p)]}};
+  const cEnd = Pc[Pc.length-1], oEnd = Po[Po.length-1];
+  s.final = {obPath: oTrail.map(q=>q.p), cb: run.cbIn ? null : cEnd.p, spin: {M: cEnd.M}, ob: run.obIn ? null : oEnd.p, obM: oEnd.M, stop: null,
+    trail: {cb: cTrail.map(q=>q.p)}};
   anim = {done, t0, total, bus, raf: requestAnimationFrame(frame)};
 }
 function finishAnim(){
@@ -2880,7 +2756,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAt, contactFor, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, simBall, railGeom, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
+if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAtContact, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, PE, engineTable, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
 deal();
 syncStreakPill();
 if(!settings.tut && !(stats.log || []).length && !baselines().length) startTut();   // first visit (no shots yet): the tutorial comes first
