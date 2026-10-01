@@ -956,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 204;   // one per commit to main
+const BUILD = 205;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -2157,6 +2157,19 @@ function perspTop(cam, s, reveal){
     const ax = VW/2+dx*k, ay = VH/2+dy*k, ang = Math.atan2(dy,dx)/RAD;
     o += `<g transform="translate(${ax.toFixed(1)} ${ay.toFixed(1)})"><g transform="rotate(${ang.toFixed(1)})"><path d="M10 0L-6 -8L-6 8Z" fill="#ffd34d"/></g>
       <text y="${ay > VH/2 ? -14 : 22}" text-anchor="middle" font-size="13" font-family="IBM Plex Sans, sans-serif" fill="#ffd34d">pocket</text></g>`;
+  }
+  // the cue ball's zone, when none of it is on screen: a pointer at the edge, the same way
+  if(s.zone && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0) && !look.k){
+    const zp = circ3(s.zone.c, s.zone.r, .03, 16).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
+    if(!zp.some(([x, y])=>x>=0 && x<=VW && y>=0 && y<=VH)){
+      const zc = cam.toCam([s.zone.c[0], s.zone.c[1], .03]);
+      let dx = zc[0], dy = -zc[1];
+      if(zc[2] <= NEAR){ dy = Math.abs(dy)+1; }
+      const k = Math.min((VW/2-30)/Math.abs(dx||1e-6), (VH/2-30)/Math.abs(dy||1e-6));
+      const ax = VW/2+dx*k, ay = VH/2+dy*k, ang = Math.atan2(dy,dx)/RAD;
+      o += `<g transform="translate(${ax.toFixed(1)} ${ay.toFixed(1)})"><g transform="rotate(${ang.toFixed(1)})"><path d="M10 0L-6 -8L-6 8Z" fill="#5be0c8"/></g>
+        <text y="${ay > VH/2 ? -14 : 22}" text-anchor="middle" font-size="13" font-family="IBM Plex Sans, sans-serif" fill="#5be0c8">zone</text></g>`;
+    }
   }
   return o;
 }
