@@ -956,7 +956,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 202;   // one per commit to main
+const BUILD = 203;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1131,15 +1131,7 @@ const STEP_STROKES = {   // the kind of stroke a step's zones are made from (the
   [SH.cushion]:s => ({tip:[0, rnd(-.2,.45)], k:[1.6, 3.2], cushion:true}),
   [SH.english]:s => ({tip:[(Math.random()<.5?-1:1)*rnd(.3,.5), rnd(-.2,.35)], k:[1.6, 3.2], cushion:true}),
 };
-// Which stroke a zone is made for: your newest one about 60% of the time, the ones you've already learned the rest;
-// at the top (Everything and up) an even mix of all five.
-function zoneStep(g){
-  if(g < SH.follow) return null;
-  const ALL = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english], have = ALL.filter(x=>x <= g);
-  if(g >= SH.all) return pick(ALL);
-  const newest = have[have.length - 1], older = have.slice(0, -1);
-  return !older.length || Math.random() < .6 ? newest : pick(older);
-}
+function zoneStep(g){ if(g < SH.follow) return null; if(g >= SH.all) return pick([SH.follow, SH.stun, SH.draw, SH.cushion, SH.english]); return g === SH.cushion ? SH.cushion : g >= SH.english ? SH.english : g; }
 // Deal a Shoot shot: any angle (the Read ladder's dealer), plus a target zone from a stroke that really gets there.
 // Room behind the cue ball, along the aim, for a bridge hand on the cloth: a forearm's length to the bridge plus the hand (about 4").
 // Closer to the cushion you'd be bridging on the rail, with the cue raised, and couldn't strike low on the ball.
