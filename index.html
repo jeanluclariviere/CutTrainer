@@ -923,7 +923,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 176;   // one per commit to main
+const BUILD = 177;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1230,7 +1230,7 @@ function cutForDir(s, dir){
 // any other call plays that fraction's contact exactly
 function takeShot(id){
   if(answered || !shot || !isShooting() || anim) return;
-  const s = shot, stroke = shotStroke(s), withCue = rigAlpha(s).a > .01, from = withCue ? rigAlpha(s).push : 0;
+  const s = shot, stroke = shotStroke(s), withCue = rigAlpha(s).a > .01;
   const needDir = aimFor(s, stroke), need = cutForDir(s, needDir), right = nearestRef(need);
   const picked = ALL.find(r=>r.id===id) || right, ok = picked.id === right.id;
   const dir = ok ? needDir : dirForCut(s, picked.deg);
@@ -1286,7 +1286,11 @@ function takeShot(id){
   // up to the full stroke (speed 10: the tip comes back to just short of the bridge hand). Same tempo every time,
   // so a longer stroke is a faster one, and the same follow-through whatever the speed.
   s.follow = FOLLOW_THROUGH;
-  const st = cueStroke = {s, t0: performance.now(), from, back: strokeBack(s), tb: 420, tp: 180, tf: 220};
+  // the call doesn't cut the practice stroke short: it finishes, the cue rests at the ball for a beat (as long as the pause at
+  // the back), then the backswing
+  const now0 = performance.now(), downAt = s.cam && s.cam.downAt, TP = 180;
+  const rest = downAt ? (1600 - (now0 - downAt) % 1600) % 1600 : 0;
+  const st = cueStroke = {s, downAt, t0: now0 + rest + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
   const tick = now => {
     if(shot !== s){ cueStroke = null; return; }
     if(now - st.t0 >= st.tb + st.tp + st.tf){ cueStroke = null; play(); return; }
@@ -1872,6 +1876,8 @@ function featherAt(t, back){
 let cueStroke = null, featherRaf = 0;
 const FOLLOW_THROUGH = 4;   // inches past the cue ball, every stroke
 function strokeAt(st, now){
+  if(now < st.t0 - st.tp) return st.downAt ? featherAt(now - st.downAt, st.back) : 0;   // the practice stroke you were in finishes
+  if(now < st.t0) return 0;                                                          // a beat at the ball
   const t = now - st.t0;
   if(t < st.tb){ const k = t/st.tb; return st.from + (-st.back - st.from)*(1 - Math.cos(Math.PI*k))/2; }
   if(t < st.tb + st.tp) return -st.back;
