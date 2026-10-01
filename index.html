@@ -423,6 +423,12 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="hand-L" data-set="hand" data-val="L">Left</button>
         </div>
       </div>
+      <div class="opt">Bridge
+        <div class="seg" role="group" aria-label="Bridge">
+          <button id="bridge-open" data-set="bridge" data-val="open">Open</button>
+          <button id="bridge-closed" data-set="bridge" data-val="closed">Closed</button>
+        </div>
+      </div>
       <div class="opt optcolor">Glove <input type="color" id="glovecolor" aria-label="Glove colour"></div>
       <div class="opt optcolor">Hand <input type="color" id="skincolor" aria-label="Hand colour"></div>
       <div class="opt">Flash: each shot shows for
@@ -923,7 +929,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 178;   // one per commit to main
+const BUILD = 179;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1938,7 +1944,7 @@ function cueRig(cam, s){
   const zv = Math.max(.9, Cp[2] + Lb*Math.tan(EL) - .3);                     // the V: just under the cue
   const L = (x, y, z) => [Bp[0] + u[0]*x + sd[0]*y, Bp[1] + u[1]*x + sd[1]*y, z];
   const V = (x, y, z) => [u[0]*x + sd[0]*y, u[1]*x + sd[1]*y, z];
-  const box = (c, ax, ay, az, col) => {   // centre and half-axes (world): the faces that face the eye
+  const box = (c, ax, ay, az, col, front) => {   // centre and half-axes (world): the faces that face the eye
     const corner = (i, j, k) => [0,1,2].map(m=>c[m] + i*ax[m] + j*ay[m] + k*az[m]);
     for(const [ax2, sgn] of [[0,1],[0,-1],[1,1],[1,-1],[2,1],[2,-1]]){
       const nrm = [ax, ay, az][ax2].map(v=>v*sgn), fc = c.map((v, m)=>v + nrm[m]);
@@ -1946,24 +1952,35 @@ function cueRig(cam, s){
       const q = ax2 === 0 ? [corner(sgn,-1,-1), corner(sgn,1,-1), corner(sgn,1,1), corner(sgn,-1,1)]
               : ax2 === 1 ? [corner(-1,sgn,-1), corner(1,sgn,-1), corner(1,sgn,1), corner(-1,sgn,1)]
               :             [corner(-1,-1,sgn), corner(1,-1,sgn), corner(1,1,sgn), corner(-1,1,sgn)];
-      faces.push([q, col]);
+      faces.push([q, col, false, front]);
     }
   };
-  const limb = (P, Q, w, h, col) => {   // a box from P to Q (local), w wide, h thick
+  const limb = (P, Q, w, h, col, front) => {   // a box from P to Q (local), w wide, h thick
     const a = L(...P), b = L(...Q), c = a.map((v, m)=>(v + b[m])/2), ax = a.map((v, m)=>(b[m] - v)/2);
     const hz = [0, 0, 1], wy = norm3(cross3(hz, ax)), up = norm3(cross3(ax, wy));
-    box(c, ax, wy.map(v=>v*w/2), up.map(v=>v*h/2), col);
+    box(c, ax, wy.map(v=>v*w/2), up.map(v=>v*h/2), col, front);
   };
   // a pool glove: palm, thumb, index and middle fingers covered, ring and little finger bare, a strap at the wrist
   const gc = isHex(settings.glove) ? settings.glove : GLOVE_DEF, sk = isHex(settings.skin) ? settings.skin : HAND_DEF;
-  limb([-3.6, 1.6, .55], [-.1, 1.5, zv - .35], 3.2, 1.0, gc);                // palm: heel on the cloth, knuckles up by the V
-  [[.4, .25], [1.2, .7], [2.0, 1.15], [2.7, 1.55]].forEach(([y, fan], i)=>limb([-.1, y, zv - .55], [2.6 - i*.25, y + fan, .3], .62, .55, i < 2 ? gc : sk));   // fingers spread on the cloth
-  limb([-1.7, -.1, zv - .85], [.8, -.2, zv - .2], .7, .6, gc);              // thumb, up against the cue: the V
+  if(settings.bridge === 'closed'){
+    // closed bridge: the cue runs through a loop of the index finger, resting on the thumb and middle finger; the other fingers spread on the cloth
+    const zc = zv + .3;   // the cue's axis here
+    limb([-3.6, 1.2, .55], [-.2, .9, zc - .75], 3.2, 1.0, gc);               // palm, a little flatter, nearer under the cue
+    [[.6, .2], [1.4, .7], [2.1, 1.1]].forEach(([y, fan], i)=>limb([-.2, y, zc - .95], [2.4 - i*.25, y + fan, .3], .62, .55, i < 1 ? gc : sk));   // middle, ring, little finger
+    limb([-1.6, -.5, zc - .8], [.6, -.3, zc - .45], .7, .6, gc);             // thumb, under the cue on its far side
+    limb([-.2, .55, zc - .2], [.15, .2, zc + .45], .55, .5, gc);              // index finger, up the near side,
+    limb([.15, .2, zc + .45], [.3, -.38, zc + .3], .5, .48, gc, true);        // over the top of the cue (drawn over it),
+    limb([.3, -.38, zc + .3], [.38, -.45, zc - .3], .45, .45, gc, true);      // and down to meet the thumb
+  } else {
+    limb([-3.6, 1.6, .55], [-.1, 1.5, zv - .35], 3.2, 1.0, gc);                // palm: heel on the cloth, knuckles up by the V
+    [[.4, .25], [1.2, .7], [2.0, 1.15], [2.7, 1.55]].forEach(([y, fan], i)=>limb([-.1, y, zv - .55], [2.6 - i*.25, y + fan, .3], .62, .55, i < 2 ? gc : sk));   // fingers spread on the cloth
+    limb([-1.7, -.1, zv - .85], [.8, -.2, zv - .2], .7, .6, gc);              // thumb, up against the cue: the V
+  }
   limb([-3.6, 1.6, .7], [-5, 1.9, 1.6], 2.6, 1.1, gc);                      // wrist, under the glove's strap
   limb([-4.1, 1.7, .85], [-4.7, 1.8, 1.3], 2.85, 1.35, strapOf(gc));   // the strap
   limb([-5, 1.9, 1.6], [-14, 5.6, 6.2], 2.9, 2.3, sk);                      // forearm, back up toward the shoulder
   // far to near, see-through
-  return faces.map(([q, col, cue])=>({q, col, cue, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>y.z - x.z)
+  return faces.map(([q, col, cue, front])=>({q, col, cue, front: front ? 1 : 0, z: q.reduce((t, P)=>t + cam.toCam(P)[2], 0)/q.length})).sort((x, y)=>(x.front - y.front) || (y.z - x.z))
     .map(({q, col, cue})=>{ const d = polyD(cam, q); return !d ? '' : cue ? `<path d="${d}" fill="${col}" fill-opacity="${ac.toFixed(3)}"/>`
       : `<path d="${d}" fill="${col}" fill-opacity="${a.toFixed(3)}" stroke="#c9d3dc" stroke-opacity="${(a*.7).toFixed(3)}" stroke-width=".5" stroke-linejoin="round"/>`; }).join('');
 }
@@ -2992,7 +3009,7 @@ function applySetting(key, val){
   if(key==='task'){ setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
-  else if(key==='view' || key==='cam' || key==='hand' || key==='glove' || key==='skin'){ if(shot) draw(answered); }   // same shot, new viewpoint
+  else if(key==='view' || key==='cam' || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
   renderStats();
@@ -3534,6 +3551,7 @@ if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
+if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
 if(!isHex(settings.glove)) settings.glove = GLOVE_DEF;
 if(!isHex(settings.skin)) settings.skin = HAND_DEF;
 $('glovecolor').value = settings.glove; $('skincolor').value = settings.skin;
