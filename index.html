@@ -949,7 +949,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 195;   // one per commit to main
+const BUILD = 196;   // one per commit to main
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<div class="buildtag">build ${BUILD}</div><button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
@@ -1315,6 +1315,9 @@ function takeShot(id){
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
   $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>${grid}`;
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
+  const hitT = (run.sim.events.find(e=>e.type==='ball') || {}).t ?? 0;
+  const obT = run.sim.events.find(e=>e.ids && e.ids[0]==='o' && e.t > hitT && (e.type==='cushion' || e.type==='jaw' || e.type==='pocket'));
+  if(obT) setTimeout(()=>{ if(shot === s) standUp(s); }, obT.t*1000 + 120);   // you come up as the object ball gets there, not when everything stops
   animateShot({made: run.made}, ms=>{   // the shot counts once it's played out (or skipped), so the last one of a session is watched too
     if(isShoot() && stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (ms||0);
     if(!jumpingAhead){ draw(true); standUp(s); }
@@ -1910,7 +1913,7 @@ function rigAlpha(s){
   if(!s.follow) return {a:0};
   if(!anim) return {a: base*down, ac: base*down, push: s.follow};   // the shot's played: cue and hand stay until you stand up
   const t = now - anim.t0, k = Math.min(1, t/150);   // contact made: follow through, and hold it there
-  return {a: base, ac: base, push: s.follow*(1 - (1 - k)*(1 - k))};
+  return {a: base*down, ac: base*down, push: s.follow*(1 - (1 - k)*(1 - k))};
 }
 // Practice strokes: as long as the stroke you're about to play, a brief hold at the back, then forward; 1.6 s a cycle.
 const strokeBack = s => (0.146*stanceIn() - 1.25 - 1.5)*strokeFrac(levelForSpeed(shotStroke(s).V));
@@ -1938,7 +1941,7 @@ function standUp(s){
   const tick = now => {
     if(shot !== s) return;
     c.k = k0*(1 - ease(Math.min(1, (now - t0)/600)));
-    draw(true);
+    if(!anim) draw(true);   // while the balls still run, their animation redraws
     if(c.k > 0) requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
