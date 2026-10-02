@@ -96,6 +96,7 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menucard .optwrap{flex-wrap:wrap}.menucard .optwrap .seg{margin-left:auto}
 .setpane{display:flex;flex-direction:column;gap:12px}.setpane[hidden]{display:none}
 .libbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.libbar i{display:block;height:100%;width:0;background:#1f6fb2}
+.showright{margin-top:8px;padding:6px 14px;font-size:13px}
 .librebuild{align-self:flex-start;padding:6px 14px;font-size:13px}
 .setnote{color:var(--muted);font-size:11px}
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
@@ -1021,7 +1022,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 271;   // one per commit to main
+const BUILD = 272;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1775,7 +1776,7 @@ function takeShot(id){
   rows.push(['Ball', ball, run.made && !run.scratch && (!s.zone || run.inZone), '']);
   const bits = [], grid = `<div class="vgrid">${rows.map(([k, v, good, right])=>`<span>${k}</span><em><i class="${good === 'also' ? 'also' : good ? 'ok' : 'no'}">${v}</i>${right ? `<span>Right</span><i class="ok">${right}</i>` : ''}</em>`).join('')}</div>`;   // a miss shows the right answer beside it
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
-  $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>${grid}`;
+  $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>${grid}` + (full ? '' : '<button class="sumdone showright" id="showright">▶ Show the right shot</button>');
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
   const hitT = (run.sim.events.find(e=>e.type==='ball') || {}).t ?? 0;
   const obT = run.sim.events.find(e=>e.ids && e.ids[0]==='o' && e.t > hitT && (e.type==='cushion' || e.type==='jaw' || e.type==='pocket'));
@@ -3262,6 +3263,17 @@ function pocketSpeedFor(d){
   return Math.sqrt(va*va + 2*MU_G*d);                                    // so close it arrives still sliding
 }
 function railVol(vn){ return Math.max(.2, Math.min(1, vn/40)); }
+// After a miss: play the shot again the right way (the right call, with the stroke and spin that land it), from where the
+// balls started. Only a picture: nothing is scored.
+function showRightShot(){
+  const s = shot; if(!s || !answered || anim || cueStroke) return;
+  const z = s.zone, st = z ? {V: STROKE_MPH[z.lvl]*MPH, tip: z.tip} : (ctrl().speed ? {V: strikeOf(s).V, tip: shotStroke(s).tip} : shotStroke(s));
+  const dir = aimFor(s, st), run = playAim(s, dir, st, true);
+  s.aimDir = dir; s.final = null; s.anim = null; s.tip = st.tip; s.follow = FOLLOW_THROUGH;
+  s.pick = {made: run.made, far: false, g2: s.gb};   // the references show the right shot now, not your call
+  const c = s.cam; if(c && c.T){ c.phase = 'down'; c.k = 0; }   // seen from behind the right line, standing
+  animateShot({made: run.made}, ()=>{ draw(true); }, '#ffd34d', run);
+}
 function animateShot(oc, done, obCol, pre){
   const s = shot, cb0 = s.cb;
   // the shot, played out by the engine with both balls' paths kept: what you see is exactly what was judged
@@ -4131,6 +4143,7 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
+$('quick').addEventListener('click', e=>{ if(e.target.closest('#showright')){ e.stopPropagation(); showRightShot(); } });
 // a cheat: type b-s-w quickly to see this shot's answer: the fraction, the speed and the spin
 let tipBeforeCheat = null;
 function revealAnswer(){
