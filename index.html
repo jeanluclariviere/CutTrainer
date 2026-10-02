@@ -463,6 +463,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="opt optrange">Shot library <span id="libstatus"></span>
         <div class="libbar"><i id="libfill"></i></div>
         <button class="sumdone librebuild" id="librebuild">Rebuild shots</button>
+        <button class="sumdone librebuild" id="libexport" hidden>Download shots.json</button>
       </div>
       <small class="setnote">What's drawn on the table once the balls move:</small>
       <div class="opt">Path to the pocket
@@ -1004,7 +1005,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 249;   // one per commit to main
+const BUILD = 250;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1263,8 +1264,11 @@ function otherWays(s, zs, lvl){
 // pocket, the zone and the strokes that land it), filled in quietly in the background and rebuilt when the physics,
 // rules or your height change. Each stored shot can also be played mirrored left-right, so it goes twice as far.
 const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 1000, LIB_RULES = 3;
-const libVer = () => [LIB_RULES, Object.values(PE.C).join(','), Object.values(STROKE_MPH).join(','), ZR_TWO, TIP_STEP.toFixed(4), Math.round(stanceIn()), W, H].join('|');
+const libVer = () => [LIB_RULES, Object.values(PE.C).join(','), Object.values(STROKE_MPH).join(','), ZR_TWO, TIP_STEP.toFixed(4), W, H].join('|');   // your height isn't in it: room for your bridge hand is checked as each shot is dealt
 let LIB = null;
+let SHIPPED = null;   // shots.json: the library worked out ahead and shipped with the site
+fetch('shots.json', {cache: 'no-cache'}).then(r=>r.ok ? r.json() : null).then(j=>{ if(j && j.steps) SHIPPED = j; renderLibStatus(); }).catch(()=>{});
+const shippedOk = () => SHIPPED && SHIPPED.ver === libVer();
 function libLoad(){
   if(LIB && LIB.ver === libVer()) return LIB;
   try{ LIB = JSON.parse(localStorage.getItem('cutreader-shotlib') || 'null'); }catch(e){ LIB = null; }
@@ -1272,7 +1276,7 @@ function libLoad(){
   return LIB;
 }
 function libSave(){ try{ localStorage.setItem('cutreader-shotlib', JSON.stringify(LIB)); }catch(e){} }
-const libCount = () => { const L = libLoad(); return LIB_STEPS.reduce((t, k)=>t + (L.steps[k] || []).length, 0); };
+const libCount = () => { const L = libLoad(); return LIB_STEPS.reduce((t, k)=>t + (L.steps[k] || []).length + (shippedOk() ? (SHIPPED.steps[k] || []).length : 0), 0); };
 const libFull = () => libCount() >= LIB_STEPS.length*LIB_PER;
 const r2 = x => Math.round(x*100)/100;
 function packLib(s){   // [cb, ob, pocket, aim point, zone centre, radius, stroke, strokes that land it, tip, fraction]
@@ -1294,7 +1298,8 @@ function unpackLib(rec, step, fx, fy){
     zone: {c: [X(zx), Y(zy)], r: zr, step, lvl, lvls, tip: (fx !== fy) ? [-tip[0], tip[1]] : tip}};
 }
 function fromLibrary(step, bucket){
-  const L = libLoad(), pool = L.steps[step] || []; if(pool.length < 200) return null;   // too few yet to avoid repeats: deal live
+  const L = libLoad(), pool = (shippedOk() ? SHIPPED.steps[step] || [] : []).concat(L.steps[step] || []);
+  if(pool.length < 200) return null;   // too few yet to avoid repeats: deal live
   const want = REFS[bucket] && REFS[bucket].id, same = pool.filter(rec=>rec[13] === want);
   const rec = pick(same.length ? same : pool);
   const s = unpackLib(rec, step, Math.random() < .5, false);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
@@ -1303,7 +1308,7 @@ function fromLibrary(step, bucket){
 // work out one more stored shot for the step that's shortest; returns false when the library is full
 const LIB_GRADE = {[SH.follow]: SH.follow, [SH.stun]: SH.stun, [SH.draw]: SH.draw, [SH.cushion]: SH.cushion, [SH.english]: SH.english, [SH.full]: SH.full};
 function libGrowOne(){
-  const L = libLoad(), have = k => (L.steps[k] || []).length, mine = GEN.g == null ? zoneStep(stats.shoot ? stats.shoot.g : 0) : null;
+  const L = libLoad(), have = k => (L.steps[k] || []).length + (shippedOk() ? (SHIPPED.steps[k] || []).length : 0), mine = GEN.g == null ? zoneStep(stats.shoot ? stats.shoot.g : 0) : null;
   // the step you're playing fills first, then whichever is shortest
   const step = mine && LIB_STEPS.includes(mine) && have(mine) < LIB_PER ? mine : LIB_STEPS.slice().sort((a, b)=>have(a) - have(b))[0];
   if((L.steps[step] || []).length >= LIB_PER) return false;
@@ -3997,6 +4002,11 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
+if(DEV){ $('libexport').hidden = false; $('libexport').addEventListener('click', ()=>{   // #dev: save the library to ship it with the site
+  const L = libLoad(), steps = {};
+  LIB_STEPS.forEach(k=>{ steps[k] = (shippedOk() ? SHIPPED.steps[k] || [] : []).concat(L.steps[k] || []); });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ver: libVer(), steps})], {type: 'application/json'})); a.download = 'shots.json'; a.click();
+}); }
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
   const i = +li.dataset.g;
