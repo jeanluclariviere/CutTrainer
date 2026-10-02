@@ -402,6 +402,11 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   .tabs{margin-top:0}
   .tabpanel{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
 }
+@media (hover:none) and (pointer:coarse){   /* phones and tablets: speed in the bottom-right corner, the eye on the left */
+  .speedbar{top:auto;bottom:10px;transform:none}
+  .lookbtn{right:auto;left:12px;top:auto;bottom:12px}
+  .practicechip{bottom:62px}
+}
 </style>
 </head>
 <body>
@@ -984,7 +989,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 233;   // one per commit to main
+const BUILD = 234;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
