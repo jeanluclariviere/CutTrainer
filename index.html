@@ -850,7 +850,7 @@ function rotAxis(v, k, a){   // rotate v about unit axis k by angle a (Rodrigues
   return [0,1,2].map(i=>v[i]*c + kx[i]*sn + k[i]*kd*(1-c));
 }
 function cueScratches(c){ return outcome(c, c.theta).scratch; }   // the right call sends the cue ball into a pocket
-function generate(){
+function generate(bucket){   // bucket: which fraction to deal (picked once per deal, so fractions that are harder to place aren't dealt less)
   const w = bucketWeights();
   const throwOn = throwNow(), phys = physOn(), speed = SHOT_SPEED, wantFlip = throwOn && !tut.on && Math.random() < 1/3;
   const lenCls = tut.on ? 'short' : Math.random() < longShare() ? 'long' : 'short';   // the grade sets the mix of short and long shots
@@ -858,7 +858,7 @@ function generate(){
   const RANGE = lenCls==='long' ? {p:[28*k,80*k], d:[30*k,70*k]} : {p:[7,34], d:[7,26]};
   let fallback = null;
   for(let i=0;i<6000;i++){
-    const phi = chooseAim(weightedIndex(w));
+    const phi = chooseAim(bucket ?? weightedIndex(w));
     const P = pick(POCKETS);
     const ob = [rnd(3,W-3), rnd(3,H-3)];
     // any angle: some shots cheat the pocket, aimed at one side of it instead of the middle (well inside what still drops)
@@ -993,7 +993,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 243;   // one per commit to main
+const BUILD = 244;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1251,8 +1251,9 @@ function shootDeal(){
   let best = null;
   const t0 = performance.now(), late = () => performance.now() - t0 > 220;   // dealing has a budget: past it, the extra checks are skipped
   const TRIES = step === SH.full ? 90 : step === SH.cushion ? 80 : 40;   // two-, three- and four-rail routes take more finding
+  const bucket = pickBucket();   // the fraction, fixed for all the tries
   for(let tries = 0; tries < TRIES; tries++){
-    const s = dealShot();   // leaning on your weak spots
+    const s = dealShot(bucket);   // leaning on your weak spots
     if(!s) continue;
     if(!handRoom(s) && tries < TRIES - 4) continue;   // your bridge hand has to fit on the cloth behind the cue ball (no rail bridges yet)
     best = best || s;
@@ -1663,10 +1664,20 @@ function weakModel(){
   }));
   return ratio;
 }
-function dealShot(){
-  if(!adaptiveOn() || leanK()===0) return generate();
+// Which fraction to deal: the usual mix, leaning toward the ones you call wrong. Chosen once per deal: before, a fraction
+// was re-drawn on every placement attempt, so thin cuts (¼, ⅛), which are rejected more often, came up much less.
+function pickBucket(){
+  let w = bucketWeights();
+  if(adaptiveOn() && leanK() > 0){
+    const model = weakModel(), k = leanK();
+    w = w.map((x, i)=>{ const id = REFS[i].id, m = [0, 1, 2].map(d=>model[id + d] || 1); return x*Math.pow(m.reduce((a, b)=>a + b, 0)/3, k); });
+  }
+  return weightedIndex(w);
+}
+function dealShot(bucket = pickBucket()){
+  if(!adaptiveOn() || leanK()===0) return generate(bucket);
   const model = weakModel(), k = leanK();
-  const cands = Array.from({length:20}, generate);
+  const cands = Array.from({length:20}, ()=>generate(bucket));
   return cands[weightedIndex(cands.map(c=>Math.pow(model[shotCell(c)]||1, k)))];
 }
 
