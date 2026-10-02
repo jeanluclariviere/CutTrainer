@@ -1020,7 +1020,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 261;   // one per commit to main
+const BUILD = 262;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -4125,6 +4125,21 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
+// a cheat: type t-i-n-c-l quickly (under half a second between letters) and every grade opens
+{ let typed = '', at = 0;
+  document.addEventListener('keydown', e=>{
+    if(e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+    const now = performance.now(); typed = (now - at < 500 ? typed : '') + e.key.toLowerCase(); at = now;
+    if(!typed.endsWith('tincl')) return;
+    typed = '';
+    const top = SHOOT_GRADES.length - 1, L = ensureShootLevel();
+    L.g = L.best = top; L.pts = 0; settings.practice = null;
+    settings.tutSeen = Object.fromEntries(Object.keys(LESSONS).map(k=>[k, 1]));   // lessons stay in the ? menu
+    saveSettings(); save(); renderBadge(true); renderProgress(); renderPracticeChip();
+    notice('🔓 All grades unlocked');
+    if(!answered && !anim) deal();
+  }, true);
+}
 $('radio').addEventListener('click', e=>{ e.stopPropagation(); applySetting('music', STATIONS[(STATIONS.indexOf(settings.music) + 1) % STATIONS.length]); });
 ['pointerdown'].forEach(t=>$('radio').addEventListener(t, e=>e.stopPropagation()));
 renderRadio();
