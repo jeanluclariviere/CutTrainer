@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 264;   // one per commit to main
+const BUILD = 265;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1233,7 +1233,8 @@ function railBehind(p, u){   // distance from p back along -u to the cushion
   for(const k of [0, 1]){ const d = -u[k], hi = k ? H : W; if(d > 1e-9) t = Math.min(t, (hi - p[k])/d); else if(d < -1e-9) t = Math.min(t, (0 - p[k])/d); }
   return t;
 }
-function handRoom(s){ return railBehind(s.cb, norm(sub(s.gbLook || s.gb, s.cb))) >= 0.146*stanceIn() - 1.25 + 4; }
+const HAND_MAX_CM = 200;   // the library is built so a bridge hand fits even at the tallest height in Settings
+function handRoom(s){ const hIn = (GEN.g != null ? HAND_MAX_CM : stanceIn()*2.54)/2.54; return railBehind(s.cb, norm(sub(s.gbLook || s.gb, s.cb))) >= 0.146*hIn - 1.25 + 4; }
 // Off two cushions: a larger zone (8") that at least two kinds of stroke, top, stun or draw, can each reach, every one
 // at least 1½" inside it. Every speed is tried with a full and half tip of top, centre, and a half and full tip of draw;
 // the closest pair of endpoints from two different kinds sets the zone, and any stroke that ends inside it counts as right.
@@ -1285,7 +1286,7 @@ function otherWays(s, zs, lvl){
 // and the tip. Each is re-checked after rounding, and can be played mirrored left-right.
 // keys: a zone step's grade (B+ to S+), or the grade itself for the grades without zones (F to B)
 const ZONE_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], BASIC_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 6, REC = 13;
+const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 7, REC = 13;
 const isZoneStep = k => ZONE_STEPS.includes(+k), LIB_PER_OF = k => isZoneStep(k) ? 1000 : 300;   // what your device builds (the shipped file has far more)
 const tableFor = k => { const g0 = GEN.g; GEN.g = +k; try{ return progTable(); } finally { GEN.g = g0; } };
 const fnv = t => { let h = 0x811c9dc5; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
@@ -1378,37 +1379,21 @@ function libSave(){
 const mineCount = k => (libLoad().steps[k] || []).length;
 const libCount = () => LIB_STEPS.reduce((t, k)=>t + mineCount(k) + shippedCount(k), 0);
 const libFull = () => LIB_STEPS.every(k=>mineCount(k) + shippedCount(k) >= LIB_PER_OF(k));
-// The stored shots your bridge hand fits, by grade and fraction: worked out once (it's only geometry) and kept until
-// your height changes, so dealing just picks from a ready list.
-let FITS = {key: null};
-function fitList(step, frac){
-  const key = [SHIPPED && SHIPPED.ver, curTable, Math.round(stanceIn())].join('|');
-  if(FITS.key !== key) FITS = {key};
-  const k = step + ':' + frac;
-  if(FITS[k]) return FITS[k];
-  const sh = shippedFor(step), mine = libLoad().steps[step] || [], need = step >= SH.down, out = [];
-  const fits = r => !need || handRoom(shotOf(r, step, false));
-  if(sh) for(const j of (frac ? sh.byFrac[frac] || [] : Array.from({length: sh.cnt}, (_, i)=>i))){ if(fits(decodeRec(sh.data, j*REC))) out.push('s' + j); }
-  mine.forEach((r, j)=>{ if((!frac || r.frac === frac) && fits(r)) out.push('m' + j); });
-  return FITS[k] = out;
-}
-const RECENT = {};   // the last 60 stored shots dealt at each grade, so none comes back soon
+// Dealing from the library just picks: every rule (zones, rails, room for the hand at any height...) was settled when
+// the shots were made. The fraction it wants comes from your adaptive mix; a shot dealt in the last 60 isn't picked again.
+const RECENT = {};
 function fromLibrary(step, bucket){
   const want = REFS[bucket] && REFS[bucket].id, sh = shippedFor(step), mine = libLoad().steps[step] || [];
   if(mine.length + (sh ? sh.cnt : 0) < 200) return null;   // too few yet to avoid repeats: deal live
-  let list = fitList(step, want);
-  if(!list.length) list = fitList(step, null);   // none of that fraction fits: any fraction
-  if(!list.length) return null;
+  const ofFrac = (sh && sh.byFrac[want] || []).map(j=>'s' + j).concat(mine.map((r, j)=>r.frac === want ? 'm' + j : null).filter(Boolean));
+  const all = () => Array.from({length: sh ? sh.cnt : 0}, (_, j)=>'s' + j).concat(mine.map((r, j)=>'m' + j));
+  const list = ofFrac.length >= 8 ? ofFrac : all();
   const recent = RECENT[step] = RECENT[step] || [];
-  // never one of the last shots dealt here: with a short list (a thin fraction in a small library) the last half of it
-  // is held back, so the same shot can't come straight back
-  const freshOf = l => { const hold = new Set(recent.slice(-Math.min(60, Math.floor(l.length/2)))); return l.filter(x=>!hold.has(x)); };
-  let fresh = freshOf(list);
-  if(fresh.length < 8){ const all = fitList(step, null), f2 = freshOf(all); if(f2.length > fresh.length) fresh = f2; }   // too few of that fraction left: any fraction rather than a repeat
-  const id = pick(fresh.length ? fresh : list);
+  let id = pick(list);
+  for(let t = 0; t < 12 && recent.includes(id); t++) id = pick(list);
   recent.push(id); if(recent.length > 60) recent.shift();
   const rec = id[0] === 's' ? decodeRec(sh.data, +id.slice(1)*REC) : mine[+id.slice(1)];
-  return rec ? shotOf(rec, step, Math.random() < .5) : null;   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
+  return rec ? shotOf(rec, step, Math.random() < .5) : null;   // mirrored left-right half the time
 }
 // work out one more shot for a step: dealt the full way, rounded to a record, re-checked
 function makeRec(step){
