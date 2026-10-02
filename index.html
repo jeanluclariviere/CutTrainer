@@ -220,7 +220,9 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .trend .xhair{position:absolute;top:0;bottom:0;border-left:1px dashed var(--muted);opacity:.6;pointer-events:none}
 .trend .tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--ink);color:var(--bg);font-size:12px;line-height:1.3;padding:5px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:2}
 .trend .tip b{font-size:13px}
-.devlvl{position:fixed;left:70px;bottom:calc(2px + env(safe-area-inset-bottom));z-index:50;font:600 11px system-ui,sans-serif;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+#fpsmeter{font-family:ui-monospace,Menlo,monospace}
+.gfxbar{display:flex;flex-wrap:wrap;gap:4px 14px;margin:4px 0 0 2px;font:600 11px system-ui,sans-serif;color:var(--ink);opacity:.7}
+.gfxbar select{font:inherit;margin-left:4px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:4px}
 .buildtag{flex:none;margin:6px 0 0 2px;font:600 11px/1 system-ui,sans-serif;color:var(--ink);opacity:.45;pointer-events:none}
 .trend .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center}
 .tabpanel .pgrid{grid-template-columns:1fr;gap:18px}
@@ -960,9 +962,27 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 227;   // one per commit to main
-document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
-if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
+const BUILD = 229;   // one per commit to main
+document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` + (DEV ? `<div class="gfxbar">
+  <label>Resolution <select id="gfx-ratio"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+  <label>Shadows <select id="gfx-shadows"><option value="soft">soft</option><option value="hard">hard</option><option value="off">off</option></select></label>
+  <label>Antialias <select id="gfx-aa"><option value="1">on</option><option value="0">off (reloads)</option></select></label>
+  <label>Arrow bob <select id="gfx-bob"><option value="30">30/s</option><option value="60">every frame</option><option value="0">still</option></select></label>
+</div>` : ''));   // under the table, lined up with its left edge; always shown, so you can tell which build is live
+// #dev: frames per second, the slowest frame, and what the drawing costs, every half second
+if(DEV){
+  let frames = 0, worst = 0, last = performance.now(), mark = last;
+  const tick = now => {
+    const dt = now - last; last = now; frames++; worst = Math.max(worst, dt);
+    if(now - mark >= 500){
+      const sec = (now - mark)/1000, el = document.getElementById('fpsmeter');
+      if(el) el.textContent = `${Math.round(frames/sec)} fps · worst ${Math.round(worst)} ms · draw ${(PERF.drawMs/Math.max(1, PERF.draws)).toFixed(1)} ms ×${Math.round(PERF.draws/sec)}/s · gl ${(PERF.glMs/Math.max(1, PERF.gls)).toFixed(1)} ms ×${Math.round(PERF.gls/sec)}/s · deal ${Math.round(PERF.dealMs)} ms (ahead ${Math.round(PERF.prepMs || 0)} ms)`;
+      frames = 0; worst = 0; mark = now; PERF.drawMs = PERF.glMs = 0; PERF.draws = PERF.gls = 0;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
 window.addEventListener('hashchange', e=>{ if(/#dev\b/.test(e.newURL) !== /#dev\b/.test(e.oldURL)) location.reload(); });
 function setGradeForTesting(i){
@@ -1468,7 +1488,7 @@ function takeShot(id){
   if(obT) setTimeout(()=>{ if(shot === s) standUp(s); }, obT.t*1000 + 120);   // you come up as the object ball gets there, not when everything stops
   animateShot({made: run.made}, ms=>{   // the shot counts once it's played out (or skipped), so the last one of a session is watched too
     if(isShoot() && stats.active && stats.active.task===settings.task) stats.active.pause = (stats.active.pause||0) + (ms||0);
-    if(!jumpingAhead){ draw(true); standUp(s); }
+    if(!jumpingAhead){ draw(true); standUp(s); setTimeout(()=>{ if(shot === s && answered && !anim) prepareNext(); }, 400); }
     if(isShoot() && !practicing()) sessionTick(full, run.made);
   }, ok ? '#ffd34d' : MISS, run);
   finishRound();
@@ -2254,7 +2274,10 @@ function dashedLine(cam, pts, col, op, dash){
   for(let k=0;k<pts.length-1;k++){ const a = pts[k], b = pts[k+1]; if(len(sub(b,a)) > 0.05) o += `<path d="${segD(cam,[a[0],a[1],.03],[b[0],b[1],.03])}" ${attrs}/>`; }
   return o;
 }
-function draw(reveal){
+// ---------- performance numbers (shown on #dev) ----------
+const PERF = {drawMs: 0, glMs: 0, draws: 0, gls: 0, dealMs: 0};
+function draw(reveal){ const t0 = performance.now(); drawInner(reveal); PERF.drawMs += performance.now() - t0; PERF.draws++; }
+function drawInner(reveal){
   const box = document.querySelector('.table-box'), svg = $('table'), v = settings.view;
   document.querySelector('.main').classList.toggle('persp', v!=='top');
   box.classList.toggle('persp', v!=='top');
@@ -2269,7 +2292,7 @@ function draw(reveal){
     const fx = $('tablefx');
     if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
-    if(G3){ arrowLast = performance.now(); $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setZone(shot && shot.zone && settings.view !== 'top' ? shot.zone : null); setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
+    if(G3){ arrowLast = performance.now(); $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setZone(shot && shot.zone && settings.view !== 'top' ? shot.zone : null); setArrows(); glRender(); arrowLoop(); }
   }
 }
 // The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
@@ -2333,12 +2356,23 @@ function setArrows(){
   G3.setArrow(placeArrow('zone', Z, Z && [Z.p[0], Z.p[1], .03]), 'zone');
 }
 let arrowRaf = 0, arrowLast = 0;
+// graphics settings (#dev): resolution, shadows, antialiasing, and how often the arrows' bob redraws
+const GFX = {ratio: ['1','1.5','2'], shadows: ['soft','hard','off'], aa: ['1','0'], bob: ['30','60','0']};
+function applyGfx(){
+  if(!GFX.ratio.includes(settings.gfxRatio)) settings.gfxRatio = '1.5';
+  if(!GFX.shadows.includes(settings.gfxShadows)) settings.gfxShadows = 'soft';
+  if(!GFX.aa.includes(settings.gfxAA)) settings.gfxAA = '1';
+  if(!GFX.bob.includes(settings.gfxBob)) settings.gfxBob = '30';
+  if(G3 && G3.setQuality) G3.setQuality({ratio: +settings.gfxRatio, shadows: settings.gfxShadows});
+}
+const bobGap = () => settings.gfxBob === '60' ? 0 : settings.gfxBob === '0' ? Infinity : 33;
+function glRender(){ const t0 = performance.now(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); PERF.glMs += performance.now() - t0; PERF.gls++; }
 function arrowLoop(){
   if(arrowRaf || !G3) return;
   const tick = now => {
     arrowRaf = 0;
     if(!G3 || !lastCam || settings.view === 'top' || document.hidden) return;
-    if(now - arrowLast >= 33){ arrowLast = now; setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); }
+    if(now - arrowLast >= bobGap()){ arrowLast = now; setArrows(); glRender(); }
     arrowRaf = requestAnimationFrame(tick);
   };
   arrowRaf = requestAnimationFrame(tick);
@@ -2429,7 +2463,17 @@ function unpackShot(o){
   delete s.tb; delete s.seenAt;
   return s;
 }
-function deal(){
+// The next shot is worked out ahead, once the current one has played out, so Next is instant.
+let nextShot0 = null;
+const prepKey = () => [settings.task, isShooting() ? shootLevel() : level(), settings.table, curTable, settings.practice ?? '', W, H].join('|');
+function prepareNext(){
+  if(tut.on || !isShooting()) return;
+  const t0 = performance.now(), key = prepKey(), keep = shot;
+  try{ nextShot0 = {key, s: shootDeal()}; } catch(e){ nextShot0 = null; }
+  shot = keep; PERF.prepMs = performance.now() - t0;
+}
+function deal(){ const t0 = performance.now(); try{ return dealInner(); } finally { PERF.dealMs = performance.now() - t0; } }
+function dealInner(){
   if(cueStroke && cueStroke.s === shot) return;   // mid-stroke: the shot goes first
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   // a new element is explained the first time you reach the grade that brings it in
@@ -2449,7 +2493,8 @@ function deal(){
   else {
     settings.table = progTable();
     if(curTable !== settings.table) setTable(settings.table, settings.pockets);
-    shot = isShooting() ? shootDeal() : dealShot(); shot.t0 = performance.now();
+    const pre = nextShot0 && nextShot0.key === prepKey() ? nextShot0.s : null; nextShot0 = null;   // dealt ahead, while the last shot played
+    shot = pre || (isShooting() ? shootDeal() : dealShot()); shot.t0 = performance.now();
     if(act){ act.pending = packShot(shot); save(); }
   }
   scheduleFades();
@@ -3748,12 +3793,6 @@ function openProg(v){ if(v) renderProgress(); $('prog').hidden = !v; if(v){ $('p
 $('badge').addEventListener('click', ()=>openProg(true));
 $('badge').addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); e.stopPropagation(); openProg(true); } });
 $('progclose').addEventListener('click', ()=>openProg(false));
-if(DEV) $('devlvl').addEventListener('click', ()=>{   // testing: level up now, as a right call would, then skip to the next shot
-  if(!stats.level || tut.on) return;
-  const from = level(); stats.level.bestBefore = bestLevel(); stats.level.pts = PTS_UP - PT_RIGHT;
-  const d = levelPoint(true); if(stats.active) stats.active.pending = null; save();
-  if(d){ showLevel(d, from); setTimeout(()=>{ if(!tut.on) deal(); }, 2900); }
-});
 document.addEventListener('keyup', e=>{ if(e.key===' ' && look.target){ e.preventDefault(); setLook(false); } });
 { const b = $('lookbtn'); b.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); setLook(true); });
   ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, e=>{ e.stopPropagation(); if(look.target) setLook(false); })); b.addEventListener('click', e=>e.stopPropagation()); }
@@ -3848,6 +3887,11 @@ if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
+applyGfx();
+if(DEV) [['gfx-ratio','gfxRatio'],['gfx-shadows','gfxShadows'],['gfx-aa','gfxAA'],['gfx-bob','gfxBob']].forEach(([id, k])=>{
+  const el = $(id); el.value = settings[k];
+  el.addEventListener('change', ()=>{ settings[k] = el.value; saveSettings(); if(k === 'gfxAA') location.reload(); else { applyGfx(); if(shot) draw(answered); } });
+});
 if(stats.shoot) stats.shoot.g = Math.max(stats.shoot.g, stats.shoot.best ?? 0);   // grades only go up now: back to your best
 $('practicechip').addEventListener('click', e=>{ e.stopPropagation(); setPractice(null); });
 renderPracticeChip();
