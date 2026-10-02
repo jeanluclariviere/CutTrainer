@@ -142,6 +142,10 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .lookbtn kbd{position:absolute;right:50%;transform:translateX(50%);bottom:-15px;font:600 9px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;white-space:nowrap}
 @media (hover:none){.lookbtn kbd{display:none}}
 .lookbtn{position:absolute;right:12px;bottom:22px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
+.radio{position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:0;cursor:pointer;color:#e6eef3;font:600 10px var(--body);letter-spacing:.04em;text-shadow:0 1px 2px #000}
+.radio svg{width:46px;height:35px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5));transition:transform .15s}
+.radio:hover svg{transform:scale(1.06)}
+.radio.off svg{opacity:.55}.radio .needle{transition:transform .3s}
 .practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
 .practicechip b{color:#ffd34d;margin-left:8px}
 .ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
@@ -567,6 +571,15 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <div class="speedchip" id="speedchip" hidden></div>
         <button class="routinechip" id="routinechip" hidden></button>
         <button class="practicechip" id="practicechip" hidden></button>
+        <button class="radio" id="radio" aria-label="Music: tap to change the station" title="Music (M)">
+          <svg viewBox="0 0 40 30" aria-hidden="true"><path d="M12 7 L27 1" stroke="#c9d3dc" stroke-width="1.4" stroke-linecap="round"/><circle cx="27" cy="1.4" r="1.4" fill="#ffd34d"/>
+            <rect x="2" y="7" width="36" height="21" rx="5" fill="#3a2618" stroke="#c9a46a" stroke-width="1.2"/>
+            <circle cx="13" cy="17.5" r="6.5" fill="#24130b" stroke="#c9a46a" stroke-width=".8"/>
+            <g stroke="#6b4a2b" stroke-width=".9"><line x1="8.5" y1="15" x2="17.5" y2="15"/><line x1="7.5" y1="17.5" x2="18.5" y2="17.5"/><line x1="8.5" y1="20" x2="17.5" y2="20"/></g>
+            <rect x="23" y="11.5" width="12" height="5" rx="1.2" fill="#10283d"/><rect class="needle" x="25" y="12" width="1.1" height="4" fill="#ff6b4a"/>
+            <circle cx="26" cy="22.5" r="2.3" fill="#c9a46a"/><circle cx="32" cy="22.5" r="2.3" fill="#c9a46a"/></svg>
+          <span id="radiolbl"></span>
+        </button>
         <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁<kbd>Space</kbd></button>
         <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd data-step="1" title="Faster (↑)">↑</kbd><kbd data-step="-1" title="Slower (↓)">↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
@@ -1004,7 +1017,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 253;   // one per commit to main
+const BUILD = 254;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1269,7 +1282,8 @@ const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 5, REC = 13;
 const isZoneStep = k => ZONE_STEPS.includes(+k), LIB_PER_OF = k => isZoneStep(k) ? 1000 : 300;   // what your device builds (the shipped file has far more)
 const tableFor = k => { const g0 = GEN.g; GEN.g = +k; try{ return progTable(); } finally { GEN.g = g0; } };
 const fnv = t => { let h = 0x811c9dc5; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
-const libVer = () => LIB_RULES + '-' + fnv(JSON.stringify([PE.C, STROKE_MPH, ZR_TWO, TIP_STEP, TABLES, String(STEP_STROKES[SH.cushion]), String(shootDeal), String(twoRailZone), String(generate)]));   // physics, strokes, zone rules and the dealer itself   // your height isn't in it: room for your bridge hand is checked as each shot is dealt
+// the version: the physics, strokes and tables it was made with; a change to the zone or dealing rules bumps LIB_RULES by hand
+const libVer = () => LIB_RULES + '-' + fnv(JSON.stringify([PE.C, STROKE_MPH, ZR_TWO, TIP_STEP, TABLES]));   // physics, strokes, zone rules and the dealer itself   // your height isn't in it: room for your bridge hand is checked as each shot is dealt
 const ZR_CODES = [5, 6, 8, 6.5], Q = 20;   // zone radii; coordinates in twentieths of an inch
 const q12 = x => Math.max(0, Math.min(4095, Math.round((x + 2)*Q))), uq12 = v => v/Q - 2;
 // a shot as a record (rounded to what's stored)
@@ -1425,7 +1439,7 @@ function shootDeal(){
   const bucket = pickBucket();   // the fraction, fixed for all the tries
   const key = step || (g <= SH.throw ? g : null);
   if(GEN.g == null && key != null && !isFree()){ const L = fromLibrary(key, bucket); if(L) return finishDeal(L); }   // a stored shot, if the library has one
-  for(let tries = 0; tries < TRIES; tries++){
+  for(let tries = 0; tries < TRIES + (step ? 40 : 0); tries++){
     const s = dealShot(bucket);   // leaning on your weak spots
     if(!s) continue;
     if(!handRoom(s) && tries < TRIES - 4) continue;   // your bridge hand has to fit on the cloth behind the cue ball (no rail bridges yet)
@@ -1443,23 +1457,28 @@ function shootDeal(){
     const spec = step === SH.cushion ? {tip:[0, rnd(-.2,.45)], k:[1.6, 3.2], rails:[1, 2]} : STEP_STROKES[step](s), V0 = strikeOf(s).V, d1 = len(sub(s.gb, s.cb));
     let want = V0*rnd(...(spec.k || [1, 1]));
     if(spec.stun){ const ug = PE.C.muSlide*PE.G; want = Math.max(V0, Math.sqrt(d1*49*ug/12))*1.05; }
-    const lvl = COARSE.find(l=>STROKE_MPH[l]*MPH >= want);
-    if(!lvl) continue;
-    const zs = {V: STROKE_MPH[lvl]*MPH, tip: snapTip(spec.tip)};
-    let r = playAim(s, idealDir(s), zs, false);
-    if(!r.made || r.scratch || !r.hit) continue;
-    if(r.cbRails < spec.rails[0] || r.cbRails > spec.rails[1]) continue;
-    r = playAim(s, aimFor(s, zs), zs, false);           // and played exactly as your right call would play it
-    if(!r.made || r.scratch || !r.hit || r.cbRails < spec.rails[0] || r.cbRails > spec.rails[1]) continue;
-    if(r.cbRails < spec.rails[0] || r.cbRails > spec.rails[1]) continue;
-    const c = r.cueEnd, zr = g >= SH.cushion ? 5 : 6;
-    if(c[0] < 3 || c[0] > W-3 || c[1] < 3 || c[1] > H-3) continue;
-    if(POCKETS.some(P=>len(sub(c, P.c)) < 7)) continue;
-    if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
-    s.zone = {c, r: zr, step, lvl, tip: zs.tip};
-    // cushion routes: the zone should take more than one stroke you can play (a different speed, or the tip half a tip
-    // another way), unless none turns up after many tries
-    if(r.cbRails >= 1 && tries < TRIES*.7 && !late() && !otherWays(s, zs, lvl)){ s.zone = null; continue; }
+    // try the speed that fits first, then the others that reach the pocket; past the normal tries the rail and
+    // second-stroke rules are eased, so a zone grade is never dealt without a zone
+    const relax = tries >= TRIES, railsOk = n => relax ? n <= 2 : n >= spec.rails[0] && n <= spec.rails[1];
+    const lvls = COARSE.filter(l=>STROKE_MPH[l]*MPH >= V0).sort((x, y)=>Math.abs(Math.log(STROKE_MPH[x]*MPH/want)) - Math.abs(Math.log(STROKE_MPH[y]*MPH/want)));
+    let found = null;
+    for(const lvl of lvls){
+      const zs = {V: STROKE_MPH[lvl]*MPH, tip: snapTip(spec.tip)};
+      let r = playAim(s, idealDir(s), zs, false);
+      if(!r.made || r.scratch || !r.hit || !railsOk(r.cbRails)) continue;
+      r = playAim(s, aimFor(s, zs), zs, false);           // and played exactly as your right call would play it
+      if(!r.made || r.scratch || !r.hit || !railsOk(r.cbRails)) continue;
+      const c = r.cueEnd;
+      if(c[0] < 3 || c[0] > W-3 || c[1] < 3 || c[1] > H-3) continue;
+      if(POCKETS.some(P=>len(sub(c, P.c)) < 7)) continue;
+      if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
+      s.zone = {c, r: g >= SH.cushion ? 5 : 6, step, lvl, tip: zs.tip};
+      // routes with a rail: the zone should take more than one stroke you can play (a different speed, or the tip half a
+      // tip another way), unless none turns up after many tries
+      if(!relax && r.cbRails >= 1 && tries < TRIES*.7 && !late() && !otherWays(s, zs, lvl)){ s.zone = null; continue; }
+      found = s; break;
+    }
+    if(!found) continue;
     return finishDeal(s);
   }
   return finishDeal(best || generate());
@@ -3576,6 +3595,15 @@ const HINTS = {
   ref: 'Every shot sits within about a degree of one reference fraction.',
   any: 'Any cut up to 66°. Call the nearest reference, then check whether it drops.',
 };
+// the little radio on the table: tap to change station (Off, Parlor, Smoke, Felt)
+const STATIONS = ['off', 'parlor', 'smoke', 'felt'], STATION_NAME = {off: 'Off', parlor: 'Parlor', smoke: 'Smoke', felt: 'Felt'};
+function renderRadio(){
+  const b = $('radio'); if(!b) return;
+  const i = STATIONS.indexOf(settings.music);
+  $('radiolbl').textContent = STATION_NAME[settings.music] || 'Off';
+  b.classList.toggle('off', settings.music === 'off');
+  const n = b.querySelector('.needle'); if(n) n.setAttribute('transform', `translate(${Math.max(0, i)*2.6} 0)`);   // the dial's needle moves along the stations
+}
 function syncPressed(){
   $('flashtime').hidden = settings.task !== 'flash';   // Flash's display time sits with Flash itself
   tableBox.classList.toggle('walkable', walkOn());
@@ -3604,7 +3632,7 @@ function applySetting(key, val){
   else if(key==='streaks') syncStreakPill();
   else if(key==='gfxAA') location.reload();
   else if(key.startsWith('gfx')){ applyGfx(); if(shot) draw(answered); }
-  else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); }
+  else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); renderRadio(); }
   else if(key==='view' || key==='cam' || key.startsWith('ref') || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
@@ -4074,6 +4102,9 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
+$('radio').addEventListener('click', e=>{ e.stopPropagation(); applySetting('music', STATIONS[(STATIONS.indexOf(settings.music) + 1) % STATIONS.length]); });
+['pointerdown'].forEach(t=>$('radio').addEventListener(t, e=>e.stopPropagation()));
+renderRadio();
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
   const i = +li.dataset.g;
@@ -4172,7 +4203,8 @@ setTimeout(()=>{ renderLibStatus(); libIdle(); }, 3000);   // start filling the 
 $('practicechip').addEventListener('click', e=>{ e.stopPropagation(); setPractice(null); });
 renderPracticeChip();
 // background music: off to start; it can only begin after a tap or key (browsers block sound before that)
-if(!['off','parlor','smoke','felt'].includes(settings.music)) settings.music = 'off';
+if(!['off','parlor','smoke','felt'].includes(settings.music) || !settings.musicV){ settings.music = 'parlor'; settings.musicV = 1; }   // music on by default (once, for everyone)
+renderRadio();
 if(!(+settings.musicVol >= 0 && +settings.musicVol <= 100)) settings.musicVol = 50;
 $('musicvol').value = settings.musicVol; $('musicvolval').textContent = settings.musicVol + '%';
 if(window.Music) Music.setVolume(settings.musicVol/100);
@@ -4211,7 +4243,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, ZONE_STEPS, tableFor, libVer, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
+if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, ZONE_STEPS, tableFor, libVer, parseShipped, fromLibrary, shippedOk, setShipped: x=>{ SHIPPED = x; }, isZoneStep, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
 if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAtContact, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, PE, engineTable, G3: ()=>G3, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
 if(!settings.stanceSet && !settings.tut && !(stats.log || []).length && !baselines().length){ $('stancecover').hidden = false; showSessIdle(); }   // a new player sets their stance first
 deal();
