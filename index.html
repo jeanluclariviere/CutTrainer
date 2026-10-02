@@ -916,7 +916,9 @@ const READ_FLASH_LEVEL = 8;
 const level = () => READ_FLASH_LEVEL;
 const bestLevel = () => READ_FLASH_LEVEL;
 const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
-const longShare = () => 0.5;   // short and long evenly: long shots aren't harder here (no cueing), so distance only comes in as a weak spot
+// Phones: a small touch screen. They get mostly shorter shots (balls easier to see) and lighter graphics by default.
+const IS_PHONE = (()=>{ try{ return matchMedia('(hover: none) and (pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600; }catch(e){ return false; } })();
+const longShare = () => IS_PHONE ? 0.2 : 0.5;   // short and long evenly: long shots aren't harder here (no cueing), so distance only comes in as a weak spot
 const leanK = () => { if(isShooting()) return 0.8 + shootLevel()*(1.2/(SHOOT_GRADES.length - 1));   // the ladder leans on your weak spots from F, harder as you climb
   const g = level(); return g===null || g < LEAN_AT ? 0 : 0.8 + (g - LEAN_AT)*(1.2/(GRADES.length-1-LEAN_AT)); };
 function aidMode(key){   // 'on', 'fade' (fades away after a delay) or 'off'; set by your grade alone
@@ -962,7 +964,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 229;   // one per commit to main
+const BUILD = 230;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` + (DEV ? `<div class="gfxbar">
   <label>Resolution <select id="gfx-ratio"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
   <label>Shadows <select id="gfx-shadows"><option value="soft">soft</option><option value="hard">hard</option><option value="off">off</option></select></label>
@@ -2359,8 +2361,9 @@ let arrowRaf = 0, arrowLast = 0;
 // graphics settings (#dev): resolution, shadows, antialiasing, and how often the arrows' bob redraws
 const GFX = {ratio: ['1','1.5','2'], shadows: ['soft','hard','off'], aa: ['1','0'], bob: ['30','60','0']};
 function applyGfx(){
-  if(!GFX.ratio.includes(settings.gfxRatio)) settings.gfxRatio = '1.5';
-  if(!GFX.shadows.includes(settings.gfxShadows)) settings.gfxShadows = 'soft';
+  if(!settings.gfxV){ if(IS_PHONE){ settings.gfxRatio = '1'; settings.gfxShadows = 'hard'; } settings.gfxV = 1; }   // once: phones move to the lighter defaults
+  if(!GFX.ratio.includes(settings.gfxRatio)) settings.gfxRatio = IS_PHONE ? '1' : '1.5';   // phones start lighter
+  if(!GFX.shadows.includes(settings.gfxShadows)) settings.gfxShadows = IS_PHONE ? 'hard' : 'soft';
   if(!GFX.aa.includes(settings.gfxAA)) settings.gfxAA = '1';
   if(!GFX.bob.includes(settings.gfxBob)) settings.gfxBob = '30';
   if(G3 && G3.setQuality) G3.setQuality({ratio: +settings.gfxRatio, shadows: settings.gfxShadows});
