@@ -463,7 +463,6 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="opt optrange">Shot library <span id="libstatus"></span>
         <div class="libbar"><i id="libfill"></i></div>
         <button class="sumdone librebuild" id="librebuild">Rebuild shots</button>
-        <button class="sumdone librebuild" id="libexport" hidden>Download shots.json</button>
       </div>
       <small class="setnote">What's drawn on the table once the balls move:</small>
       <div class="opt">Path to the pocket
@@ -1005,7 +1004,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 250;   // one per commit to main
+const BUILD = 251;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1260,65 +1259,128 @@ function otherWays(s, zs, lvl){
   });
 }
 // ---------- the shot library ----------
-// Zone shots take a lot of checking, so they're worked out ahead and stored: a few numbers per shot (the balls, the
-// pocket, the zone and the strokes that land it), filled in quietly in the background and rebuilt when the physics,
-// rules or your height change. Each stored shot can also be played mirrored left-right, so it goes twice as far.
-const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 1000, LIB_RULES = 3;
-const libVer = () => [LIB_RULES, Object.values(PE.C).join(','), Object.values(STROKE_MPH).join(','), ZR_TWO, TIP_STEP.toFixed(4), W, H].join('|');   // your height isn't in it: room for your bridge hand is checked as each shot is dealt
-let LIB = null;
-let SHIPPED = null;   // shots.json: the library worked out ahead and shipped with the site
-fetch('shots.json', {cache: 'no-cache'}).then(r=>r.ok ? r.json() : null).then(j=>{ if(j && j.steps) SHIPPED = j; renderLibStatus(); }).catch(()=>{});
-const shippedOk = () => SHIPPED && SHIPPED.ver === libVer();
-function libLoad(){
-  if(LIB && LIB.ver === libVer()) return LIB;
-  try{ LIB = JSON.parse(localStorage.getItem('cutreader-shotlib') || 'null'); }catch(e){ LIB = null; }
-  if(!LIB || LIB.ver !== libVer()) LIB = {ver: libVer(), steps: {}};
-  return LIB;
+// Zone shots take a lot of checking, so they're worked out ahead: a big library ships with the site (shots.bin, made by
+// tools/gen-shots.js), and your device can build its own on top. A shot is stored in 13 bytes: both balls and the zone
+// centre to 0.05", the aim point's offset from the pocket's centre, the pocket, the fraction, the strokes that land it
+// and the tip. Each is re-checked after rounding, and can be played mirrored left-right.
+const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 1000, LIB_RULES = 4, REC = 13;
+const fnv = t => { let h = 0x811c9dc5; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
+const libVer = () => LIB_RULES + '-' + fnv(JSON.stringify([PE.C, STROKE_MPH, ZR_TWO, TIP_STEP, W, H, String(STEP_STROKES[SH.cushion]), String(shootDeal), String(twoRailZone)]));   // physics, strokes, zone rules and the dealer itself   // your height isn't in it: room for your bridge hand is checked as each shot is dealt
+const ZR_CODES = [5, 6, 8, 6.5], Q = 20;   // zone radii; coordinates in twentieths of an inch
+const q12 = x => Math.max(0, Math.min(4095, Math.round((x + 2)*Q))), uq12 = v => v/Q - 2;
+// a shot as a record (rounded to what's stored)
+function recOf(s){
+  const z = s.zone, li = l => COARSE.indexOf(l);
+  return {cb: s.cb.map(x=>uq12(q12(x))), ob: s.ob.map(x=>uq12(q12(x))), Pi: POCKETS.indexOf(s.P), cheat: Math.max(-127, Math.min(127, Math.round((s.cheat || 0)*50)))/50,
+    zc: z.c.map(x=>uq12(q12(x))), zr: z.r, lvl: z.lvl, lvls: z.lvls || [z.lvl], tip: z.tip.map(t=>Math.round(t/TIP_STEP)*TIP_STEP), frac: s.answer.id};
 }
-function libSave(){ try{ localStorage.setItem('cutreader-shotlib', JSON.stringify(LIB)); }catch(e){} }
-const libCount = () => { const L = libLoad(); return LIB_STEPS.reduce((t, k)=>t + (L.steps[k] || []).length + (shippedOk() ? (SHIPPED.steps[k] || []).length : 0), 0); };
-const libFull = () => libCount() >= LIB_STEPS.length*LIB_PER;
-const r2 = x => Math.round(x*100)/100;
-function packLib(s){   // [cb, ob, pocket, aim point, zone centre, radius, stroke, strokes that land it, tip, fraction]
-  const z = s.zone;
-  return [r2(s.cb[0]), r2(s.cb[1]), r2(s.ob[0]), r2(s.ob[1]), POCKETS.indexOf(s.P), r2(s.T[0]), r2(s.T[1]), r2(z.c[0]), r2(z.c[1]), z.r, z.lvl, z.lvls || [z.lvl], z.tip, s.answer.id];
+function encodeRec(r, out, o){
+  const c = [...r.cb, ...r.ob, ...r.zc].map(q12);
+  for(let i = 0; i < 6; i += 2){ const a = c[i], b = c[i+1], k = o + i/2*3; out[k] = a >> 4; out[k+1] = ((a & 15) << 4) | (b >> 8); out[k+2] = b & 255; }
+  out[o+9] = (Math.round(r.cheat*50) + 256) & 255;
+  out[o+10] = (r.Pi & 7) | ((CORE.findIndex(x=>x.id === r.frac) & 7) << 3) | ((COARSE.indexOf(r.lvl) & 3) << 6);
+  out[o+11] = r.lvls.reduce((m, l)=>m | (1 << COARSE.indexOf(l)), 0) | (Math.max(0, ZR_CODES.indexOf(r.zr)) << 4);
+  out[o+12] = (Math.round(r.tip[0]/TIP_STEP) + 2) | ((Math.round(r.tip[1]/TIP_STEP) + 2) << 3);
 }
-// a stored shot as a full shot, mirrored left-right (fx) and/or end to end (fy)
-function unpackLib(rec, step, fx, fy){
-  const [cbx, cby, obx, oby, Pi, Tx, Ty, zx, zy, zr, lvl, lvls, tip] = rec;
-  const X = x => fx ? W - x : x, Y = y => fy ? H - y : y, P0 = POCKETS[Pi];
-  const P = POCKETS.find(q=>Math.abs(q.c[0] - X(P0.c[0])) < .01 && Math.abs(q.c[1] - Y(P0.c[1])) < .01) || P0;
-  const cb = [X(cbx), Y(cby)], ob = [X(obx), Y(oby)], T = [X(Tx), Y(Ty)];
+function decodeRec(b, o){
+  const c = [];
+  for(let i = 0; i < 3; i++){ const k = o + i*3; c.push((b[k] << 4) | (b[k+1] >> 4), ((b[k+1] & 15) << 8) | b[k+2]); }
+  const m = b[o+11];
+  return {cb: [uq12(c[0]), uq12(c[1])], ob: [uq12(c[2]), uq12(c[3])], zc: [uq12(c[4]), uq12(c[5])], cheat: ((b[o+9] << 24) >> 24)/50,
+    Pi: b[o+10] & 7, frac: (CORE[(b[o+10] >> 3) & 7] || CORE[0]).id, lvl: COARSE[b[o+10] >> 6], lvls: COARSE.filter((l, i)=>m & (1 << i)),
+    zr: ZR_CODES[m >> 4], tip: [((b[o+12] & 7) - 2)*TIP_STEP, (((b[o+12] >> 3) & 7) - 2)*TIP_STEP]};
+}
+const toB64 = u8 => { let s = ''; for(let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(s); };
+const fromB64 = t => Uint8Array.from(atob(t), ch=>ch.charCodeAt(0));
+// a record as a full shot, mirrored left-right if fx
+function shotOf(r, step, fx){
+  const X = x => fx ? W - x : x, P0 = POCKETS[r.Pi];
+  const P = POCKETS.find(q=>Math.abs(q.c[0] - X(P0.c[0])) < .01 && Math.abs(q.c[1] - P0.c[1]) < .01) || P0;
+  const cb = [X(r.cb[0]), r.cb[1]], ob = [X(r.ob[0]), r.ob[1]], cheat = fx ? -r.cheat : r.cheat;
+  const u0 = norm(sub(P.t, ob)), T = add(P.t, mul([-u0[1], u0[0]], cheat));
   const uC = norm(sub(T, ob)), gb = sub(ob, mul(uC, 2*R)), v = norm(sub(gb, cb)), cr = v[0]*uC[1] - v[1]*uC[0];
   const theta = Math.acos(Math.max(-1, Math.min(1, dot(v, uC))))/RAD, right = [-v[1], v[0]];
   return {any: true, phys: false, speed: SHOT_SPEED, len: len(sub(ob, cb)) > 30 ? 'long' : 'short', theta, pathDeg: theta, throwOn: false,
-    sign: cr >= 0 ? -1 : 1, P, ob, cb, gb, u: uC, v, n: uC, L: len(sub(T, ob)), tol: pocketTol(P, uC), T, uC, cheat: 0,
+    sign: cr >= 0 ? -1 : 1, P, ob, cb, gb, u: uC, v, n: uC, L: len(sub(T, ob)), tol: pocketTol(P, u0), T, uC, cheat,
     side: dot(uC, right) > 0 ? 'R' : 'L', color: pick(OB_COLORS), answer: nearestRef(theta), pick: null, spot: spotToward(sub(cb, ob)),
     stroke: 'roll', spinR: 1, throwDeg: 0, gbLook: null, strk: null,
-    zone: {c: [X(zx), Y(zy)], r: zr, step, lvl, lvls, tip: (fx !== fy) ? [-tip[0], tip[1]] : tip}};
+    zone: {c: [X(r.zc[0]), r.zc[1]], r: r.zr, step, lvl: r.lvl, lvls: r.lvls, tip: fx ? [-r.tip[0], r.tip[1]] : r.tip}};
 }
+// is a (rounded) record still good? the stroke it was made with must still pot and land in the zone, on the right rails
+function recOk(r, step){
+  const s = shotOf(r, step, false), st = {V: STROKE_MPH[r.lvl]*MPH, tip: r.tip};
+  const res = playAim(s, aimFor(s, st), st, false), rails = (STEP_STROKES[step](s).rails) || [0, 9];
+  return res.made && !res.scratch && res.inZone && res.cbRails >= (step === SH.cushion ? 2 : rails[0]) && res.cbRails <= (step === SH.cushion ? 2 : rails[1]);
+}
+// the shipped library: shots.bin
+let SHIPPED = null;
+function parseShipped(buf){
+  const b = new Uint8Array(buf); if(String.fromCharCode(...b.subarray(0, 4)) !== 'CTS1') return null;
+  const vl = b[4] | (b[5] << 8), ver = new TextDecoder().decode(b.subarray(6, 6 + vl)); let o = 6 + vl;
+  const n = b[o++], steps = {};
+  for(let i = 0; i < n; i++){
+    const st = b[o], cnt = b[o+1] | (b[o+2] << 8) | (b[o+3] << 16) | (b[o+4] << 24); o += 5;
+    const data = b.subarray(o, o + cnt*REC); o += cnt*REC;
+    const byFrac = {};   // record numbers by fraction, to deal the one that's wanted
+    for(let j = 0; j < cnt; j++){ const f = (CORE[(data[j*REC + 10] >> 3) & 7] || CORE[0]).id; (byFrac[f] = byFrac[f] || []).push(j); }
+    steps[st] = {data, cnt, byFrac};
+  }
+  return {ver, steps};
+}
+if(typeof fetch === 'function') fetch('shots.bin', {cache: 'no-cache'}).then(r=>r.ok ? r.arrayBuffer() : null).then(buf=>{ if(buf) SHIPPED = parseShipped(buf); renderLibStatus(); }).catch(()=>{});
+const shippedOk = () => !!(SHIPPED && SHIPPED.ver === libVer());
+const shippedCount = k => shippedOk() && SHIPPED.steps[k] ? SHIPPED.steps[k].cnt : 0;
+// your own: built on this device, kept in localStorage as the same 13-byte records
+let LIB = null;
+function libLoad(){
+  if(LIB && LIB.ver === libVer()) return LIB;
+  let saved = null; try{ saved = JSON.parse(localStorage.getItem('cutreader-shotlib') || 'null'); }catch(e){}
+  LIB = {ver: libVer(), steps: {}};
+  if(saved && saved.ver === libVer() && saved.fmt === 2) for(const k in saved.steps){ const u = fromB64(saved.steps[k]); LIB.steps[k] = Array.from({length: u.length/REC}, (_, i)=>decodeRec(u, i*REC)); }
+  return LIB;
+}
+function libSave(){
+  const steps = {};
+  for(const k in LIB.steps){ const u = new Uint8Array(LIB.steps[k].length*REC); LIB.steps[k].forEach((r, i)=>encodeRec(r, u, i*REC)); steps[k] = toB64(u); }
+  try{ localStorage.setItem('cutreader-shotlib', JSON.stringify({ver: LIB.ver, fmt: 2, steps})); }catch(e){}
+}
+const mineCount = k => (libLoad().steps[k] || []).length;
+const libCount = () => LIB_STEPS.reduce((t, k)=>t + mineCount(k) + shippedCount(k), 0);
+const libFull = () => LIB_STEPS.every(k=>mineCount(k) + shippedCount(k) >= LIB_PER);
 function fromLibrary(step, bucket){
-  const L = libLoad(), pool = (shippedOk() ? SHIPPED.steps[step] || [] : []).concat(L.steps[step] || []);
-  if(pool.length < 200) return null;   // too few yet to avoid repeats: deal live
-  const want = REFS[bucket] && REFS[bucket].id, same = pool.filter(rec=>rec[13] === want);
-  const rec = pick(same.length ? same : pool);
-  const s = unpackLib(rec, step, Math.random() < .5, false);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
-  return handRoom(s) ? s : null;
+  const want = REFS[bucket] && REFS[bucket].id, mine = libLoad().steps[step] || [], sh = shippedOk() ? SHIPPED.steps[step] : null;
+  if(mine.length + (sh ? sh.cnt : 0) < 200) return null;   // too few yet to avoid repeats: deal live
+  for(let t = 0; t < 6; t++){
+    let rec;
+    const shIdx = sh && sh.byFrac[want] || [], myIdx = mine.filter(r=>r.frac === want);
+    const nS = shIdx.length, nM = myIdx.length;
+    if(nS + nM){ const i = Math.floor(Math.random()*(nS + nM)); rec = i < nS ? decodeRec(sh.data, shIdx[i]*REC) : myIdx[i - nS]; }
+    else rec = sh && sh.cnt && Math.random() < sh.cnt/(sh.cnt + mine.length) ? decodeRec(sh.data, Math.floor(Math.random()*sh.cnt)*REC) : pick(mine);
+    if(!rec) return null;
+    const s = shotOf(rec, step, Math.random() < .5);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
+    if(handRoom(s)) return s;
+  }
+  return null;
 }
-// work out one more stored shot for the step that's shortest; returns false when the library is full
+// work out one more shot for a step: dealt the full way, rounded to a record, re-checked
 const LIB_GRADE = {[SH.follow]: SH.follow, [SH.stun]: SH.stun, [SH.draw]: SH.draw, [SH.cushion]: SH.cushion, [SH.english]: SH.english, [SH.full]: SH.full};
-function libGrowOne(){
-  const L = libLoad(), have = k => (L.steps[k] || []).length + (shippedOk() ? (SHIPPED.steps[k] || []).length : 0), mine = GEN.g == null ? zoneStep(stats.shoot ? stats.shoot.g : 0) : null;
-  // the step you're playing fills first, then whichever is shortest
-  const step = mine && LIB_STEPS.includes(mine) && have(mine) < LIB_PER ? mine : LIB_STEPS.slice().sort((a, b)=>have(a) - have(b))[0];
-  if((L.steps[step] || []).length >= LIB_PER) return false;
-  if(curTable !== '9') return null;   // zone grades are all on the 9 ft table: nothing to do until you're on it
+function makeRec(step){
   GEN.g = LIB_GRADE[step];
   let s = null; try{ s = shootDeal(); }catch(e){ s = null; } finally { GEN.g = null; }
-  if(s && s.zone && s.zone.step === step){ (L.steps[step] = L.steps[step] || []).push(packLib(s)); libSave(); }
+  if(!s || !s.zone || s.zone.step !== step) return null;
+  const r = recOf(s);
+  return recOk(r, step) ? r : null;
+}
+function libGrowOne(){
+  const L = libLoad(), have = k => mineCount(k) + shippedCount(k), mine = GEN.g == null ? zoneStep(stats.shoot ? stats.shoot.g : 0) : null;
+  // the step you're playing fills first, then whichever is shortest
+  const step = mine && LIB_STEPS.includes(mine) && have(mine) < LIB_PER ? mine : LIB_STEPS.slice().sort((a, b)=>have(a) - have(b))[0];
+  if(have(step) >= LIB_PER) return false;
+  if(curTable !== '9') return null;   // zone grades are all on the 9 ft table: nothing to do until you're on it
+  const r = makeRec(step);
+  if(r){ (L.steps[step] = L.steps[step] || []).push(r); libSave(); }
   return true;
 }
-// in the background: a shot at a time, only while nothing's moving
 let libTimer = 0;
 function libIdle(){
   clearTimeout(libTimer);
@@ -1329,7 +1391,7 @@ function libIdle(){
 let libBuilding = false, libWait = false;
 function libRebuild(){
   if(libBuilding) return;
-  LIB = {ver: libVer(), steps: {}}; libSave(); libBuilding = true; renderLibStatus();
+  LIB = {ver: libVer(), steps: {}}; libSave(); libBuilding = true; renderLibStatus();   // your own library starts again; the shipped one stays
   const step = () => {
     if(!libBuilding) return;
     const t0 = performance.now();
@@ -4002,11 +4064,6 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
-if(DEV){ $('libexport').hidden = false; $('libexport').addEventListener('click', ()=>{   // #dev: save the library to ship it with the site
-  const L = libLoad(), steps = {};
-  LIB_STEPS.forEach(k=>{ steps[k] = (shippedOk() ? SHIPPED.steps[k] || [] : []).concat(L.steps[k] || []); });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ver: libVer(), steps})], {type: 'application/json'})); a.download = 'shots.json'; a.click();
-}); }
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
   const i = +li.dataset.g;
@@ -4144,6 +4201,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
+if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, libVer, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
 if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAtContact, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, PE, engineTable, G3: ()=>G3, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
 if(!settings.stanceSet && !settings.tut && !(stats.log || []).length && !baselines().length){ $('stancecover').hidden = false; showSessIdle(); }   // a new player sets their stance first
 deal();
