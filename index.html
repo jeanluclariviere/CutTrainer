@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 274;   // one per commit to main
+const BUILD = 275;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1185,7 +1185,7 @@ function shotStroke(s){
   if(c.up || c.side) tip = snapTip(settings.shotTip || [0, 0], c);
   return {V, tip};
 }
-// Play the shot from the cue ball along dir with a stroke: the engine runs it. Squirt is in the engine's strike.
+// Play the shot from the cue ball along dir with a stroke: the engine runs it. Deflection (from side spin) is in the engine's strike.
 function playAim(s, dir, stroke, record){
   const cue = {id:'c', p:[...s.cb]}; PE.strike(cue, dir, stroke.V, stroke.tip);
   const sim = PE.simulate(engineTable(), [cue, {id:'o', p:[...s.ob]}], record ? {record: 3, orient: true, tMax: 16} : {tMax: 16});
@@ -1198,9 +1198,9 @@ function playAim(s, dir, stroke, record){
     cushionAfter: !!hit && sim.events.some(e=>e.ids[0]==='c' && (e.type==='cushion' || e.type==='jaw') && e.t > hit.t),
     cbRails: hit ? sim.events.filter(e=>e.ids[0]==='c' && (e.type==='cushion' || e.type==='jaw') && e.t > hit.t).length : 0};
 }
-// the aim straight at the right contact (no allowance for throw or squirt): the dealer's reference
+// the aim straight at the right contact (no allowance for throw or deflection): the dealer's reference
 const idealDir = s => norm(sub(s.gb, s.cb));
-// the aim that pots it with this stroke (allowing for its throw and squirt): searched outward from the ideal line
+// the aim that pots it with this stroke (allowing for its throw and deflection): searched outward from the ideal line
 function aimFor(s, stroke){
   const d0 = idealDir(s);
   for(let k=0; k<=40; k++){
@@ -1338,7 +1338,7 @@ function shotOf(r, step, fx){
 function recOk(r, step){
   const s = shotOf(r, step, false);
   if(!s.zone){   // no zone: the right call, played as the game would play it for you, has to pot
-    const k = strikeOf(s), st = {V: k.V*(step === SH.throw ? 1.05 : 1), tip: step === SH.throw ? [0, -.35] : [0, k.b]};
+    const k = strikeOf(s), st = step === SH.throw ? throwStroke(s) : {V: k.V, tip: [0, k.b]};
     return playAim(s, aimFor(s, st), st, false).made;
   }
   const st = {V: STROKE_MPH[r.lvl]*MPH, tip: r.tip};
@@ -1450,6 +1450,13 @@ function zoneSpotOk(s, c){
   if(s.theta < 8){ const v = norm(sub(s.ob, s.cb)), q = sub(c, s.cb); if(Math.abs(v[0]*q[1] - v[1]*q[0]) > 4) return false; }
   return true;
 }
+// the Throw grade's stroke: stun (tip half a tip low), at pocket speed for a stun shot, as one of your four strokes
+function throwStroke(s){
+  const s0 = s.stroke, k0 = s.strk; s.stroke = 'stun'; s.strk = null;
+  const V = strikeOf(s).V; s.stroke = s0; s.strk = k0;
+  const lvl = COARSE.find(l=>STROKE_MPH[l]*MPH >= V) || COARSE[COARSE.length - 1];
+  return {V: STROKE_MPH[lvl]*MPH, tip: [0, -.35]};
+}
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
   let best = null;
@@ -1465,14 +1472,11 @@ function shootDeal(){
     best = best || s;
     if(diamondsFromSpeed(strikeOf(s).V) > 24) continue;   // no shots that need a near-break stroke just to reach the pocket
     if(g === SH.throw && !isFree()){
-      // throw: soft stun, so the object ball goes a little fuller than it looks. The fraction dealt is the one that's right
-      // once throw is allowed for (the shots were coming out almost all ⅛ when the look decided it), and about half the
-      // shots are ones where the plain look would miss, so throw decides them
-      if(s.theta < 5 || s.theta > 70 || s.L < 18) continue;
-      const soft = {V: strikeOf(s).V*1.05, tip:[0, -.35]}, right = nearestRef(cutForDir(s, aimFor(s, soft)));
-      if(REFS[bucket] && right.id !== REFS[bucket].id) continue;
-      if(playAim(s, idealDir(s), soft, false).made && Math.random() < .5) continue;
-      s.answer = right;
+      // throw: struck soft with stun, so the object ball goes a little fuller than it looks. Any-angle shots as usual (the
+      // fraction mix stays even); throw simply moves some of them to a thinner call
+      if(s.L < 18) continue;
+      const soft = throwStroke(s);
+      s.answer = nearestRef(cutForDir(s, aimFor(s, soft)));
       return finishDeal(s);
     }
     if(!step) return finishDeal(s);
@@ -1541,7 +1545,7 @@ function renderRoutineChip(){
   if(!isShoot() || tut.on || answered || !c || !c.T || !standing || look.k > 0){ el.hidden = true; return; }
   el.hidden = true;   // no chip: calling a fraction is how you get down (the lesson says so)
 }
-// The aim line a call plays: the right call's is the one that pots with your stroke (throw and squirt allowed for),
+// The aim line a call plays: the right call's is the one that pots with your stroke (throw and deflection allowed for),
 // any other call's is that fraction's contact.
 function rightIdFor(s){ return nearestRef(cutForDir(s, aimFor(s, shotStroke(s)))).id; }
 function aimDirFor(s, id){
@@ -1725,7 +1729,7 @@ function cutForDir(s, dir){
   const g = add(s.cb, mul(dir, b - Math.sqrt(disc))), n = norm(sub(s.ob, g));
   return Math.acos(Math.max(-1, Math.min(1, dot(dir, n))))/RAD;
 }
-// Take the shot with the fraction you called: the right call plays the hit this stroke needs (throw and squirt allowed for),
+// Take the shot with the fraction you called: the right call plays the hit this stroke needs (throw and deflection allowed for),
 // any other call plays that fraction's contact exactly
 function takeShot(id){
   if(answered || !shot || !isShooting() || anim) return;
@@ -2444,12 +2448,15 @@ function cueRig(cam, s){
   const u = s.aimDir || norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];   // forward along the aim line you called
   const sd = settings.hand === 'L' ? n : mul(n, -1);                        // the bridge hand's side: on screen left of the cue for a right-handed player (n points to screen right)
   const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
-  const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
+  const Cp = [s.cb[0] - u[0]*dz*R + n[0]*tx*R, s.cb[1] - u[1]*dz*R + n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball (side: n is screen right, as in the engine)
+  const C0 = [s.cb[0] - u[0]*R, s.cb[1] - u[1]*R];   // the back of the ball, straight on: the bridge lines up behind it whatever the side
   // How steep the cue is: a touch more with top, a touch less with draw (you keep it level to hit low), and as steep as it
   // has to be to clear the cushion behind the cue ball (the butt has to pass over the rail).
   const t0 = railBehind(s.cb, u), rAt = d => .255 + (d/58)*(.6 - .255);
   const clear = Math.atan2(1.6 + .15 + rAt(t0) - Cp[2], t0);
-  const EL = Math.max((4 + 2*ty)*RAD, clear), f3 = [u[0]*Math.cos(EL), u[1]*Math.cos(EL), -Math.sin(EL)];
+  const EL = Math.max((4 + 2*ty)*RAD, clear);
+  const Lb = 0.146*stanceIn() - 1.25, Bq = [C0[0] - u[0]*Lb, C0[1] - u[1]*Lb, Cp[2] + Lb*Math.tan(EL)];   // the bridge: where the cue rests
+  const f3 = norm3([Cp[0] - Bq[0], Cp[1] - Bq[1], Cp[2] - Bq[2]]);   // the cue runs from the bridge to the tip: with side it pivots there (back-hand english)
   const at = (P, d) => [P[0] - f3[0]*d, P[1] - f3[1]*d, P[2] - f3[2]*d];   // d inches back along the cue from P
   const faces = [];   // [pts3, fill]
   // the cue: a tapered band facing the eye, 58" long, tip 13 mm, butt 1.2"
@@ -2467,9 +2474,8 @@ function cueRig(cam, s){
     }
   }
   // the hand: an open bridge a forearm's length (less 1¼") behind the cue ball, the cue resting in the V of thumb and index knuckle
-  const Hh = stanceIn(), Lb = 0.146*Hh - 1.25;
-  const Bp = [Cp[0] - u[0]*Lb, Cp[1] - u[1]*Lb];
-  const zv = Math.max(.9, Cp[2] + Lb*Math.tan(EL) - .3);                     // the V: just under the cue
+  const Bp = [Bq[0], Bq[1]];
+  const zv = Math.max(.9, Bq[2] - .3);                     // the V: just under the cue
   const L = (x, y, z) => [Bp[0] + u[0]*x + sd[0]*y, Bp[1] + u[1]*x + sd[1]*y, z];
   const V = (x, y, z) => [u[0]*x + sd[0]*y, u[1]*x + sd[1]*y, z];
   const box = (c, ax, ay, az, col, front) => {   // centre and half-axes (world): the faces that face the eye
@@ -3934,7 +3940,7 @@ const SL_ENGLISH = [
   {deg:35, aids:{}, play:{k:2.6, tip:[.45,0]}, next:true,
    text:'<b>English</b>: strike left or right of centre on the tip pad (<b>A</b>, <b>D</b>). Off a cushion it widens or narrows the angle.'},
   {aids:{}, play:{k:2.6, tip:[-.45,0]}, next:true, text:'The other side, the other way.'},
-  {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off line (<b>squirt</b>) and throws the object ball a little, so on some shots it changes which fraction to call.'},
+  {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off line (<b>deflection</b>) and throws the object ball a little, so on some shots it changes which fraction to call.'},
 ];
 const SL_FULL = [
   {deg:30, aids:{}, finish:true, text:'<b>Full-table position</b>: the zone now needs <b>three or four rails</b>. Pick the stroke and the spin, picture the cue ball\'s path round the table, and play it. Hold <b>Space</b> to step back and see the whole route.'},
