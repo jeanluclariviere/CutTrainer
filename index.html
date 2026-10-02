@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 268;   // one per commit to main
+const BUILD = 269;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -4131,11 +4131,24 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
+// a cheat: type b-s-w quickly to see this shot's answer: the fraction, the speed and the spin
+function revealAnswer(){
+  const s = shot; if(!s || answered) return;
+  const tipLabel = t => { const n = v => Math.round(Math.abs(v)/TIP_STEP), lab = k => k === 1 ? '½' : '1', y = n(t[1]), x = n(t[0]);
+    const p = []; if(y) p.push(`${lab(y)} ${t[1] > 0 ? 'top' : 'draw'}`); if(x) p.push(`${lab(x)} ${t[0] > 0 ? 'right' : 'left'}`); return p.join(', ') || 'center'; };
+  const z = s.zone, st = z ? {V: STROKE_MPH[z.lvl]*MPH, tip: z.tip} : shotStroke(s);
+  const frac = nearestRef(cutForDir(s, aimFor(s, st))), lab = frac.id === 'full' ? 'Full' : frac.label;
+  const bits = [lab];
+  if(ctrl().speed) bits.push(COARSE_LBL[z ? z.lvl : levelForSpeed(strikeOf(s).V)] + ' stroke');
+  if(z && (ctrl().up || ctrl().side)) bits.push(tipLabel(z.tip));
+  notice('🔍 ' + bits.join(' · '));
+}
 // a cheat: type t-i-n-c-l quickly (under half a second between letters) and every grade opens
 { let typed = '', at = 0;
   document.addEventListener('keydown', e=>{
     if(e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
     const now = performance.now(); typed = (now - at < 500 ? typed : '') + e.key.toLowerCase(); at = now;
+    if(typed.endsWith('bsw')){ typed = ''; revealAnswer(); return; }
     if(!typed.endsWith('tincl')) return;
     typed = '';
     const top = SHOOT_GRADES.length - 1, L = ensureShootLevel();
