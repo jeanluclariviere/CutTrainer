@@ -5,6 +5,7 @@
 //
 //   node tools/gen-shots.js [--per 20000] [--per-basic 5000] [--workers N] [--out shots.bin]
 //   --per: shots for each zone grade (B+ to S+), --per-basic: for each grade without zones (F to B)
+//   --only 8,9: just those grades, spliced into the existing file (the others are kept, the file restamped)
 //
 // Re-run it whenever the physics, the strokes or the zone rules change: the game only uses a library whose version
 // matches its own, and builds shots on the device until then.
@@ -63,7 +64,8 @@ if(!isMainThread){
 // ---------- the main thread ----------
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > 0 ? process.argv[i + 1] : d; };
 const PER = +arg('per', 20000), PER_BASIC = +arg('per-basic', 5000), N = Math.max(1, +arg('workers', Math.max(1, os.cpus().length - 1))), OUT = path.resolve(ROOT, arg('out', 'shots.bin'));
-const probe = loadGame(1).__lib, STEPS = probe.LIB_STEPS, VER = probe.libVer(), REC = probe.REC;
+const ONLY = arg('only', '') ? arg('only').split(',').map(Number) : null;
+const probe = loadGame(1).__lib, STEPS = ONLY || probe.LIB_STEPS, VER = probe.libVer(), REC = probe.REC;
 const target = k => probe.ZONE_STEPS.includes(k) ? PER : PER_BASIC;
 console.log(`shots: ${PER} per zone grade, ${PER_BASIC} per other grade (${STEPS.length} grades), ${N} workers\nversion: ${VER}`);
 
@@ -90,10 +92,18 @@ for(let i = 0; i < N; i++){
 }
 function finish(){
   clearInterval(timer); report(true);
-  const ver = Buffer.from(VER, 'utf8'), parts = [Buffer.from('CTS2'), Buffer.from([ver.length & 255, ver.length >> 8]), ver, Buffer.from([STEPS.length])];
-  for(const k of STEPS){
-    const n = recs[k].length, h = Buffer.alloc(6); h[0] = k; h[1] = +probe.tableFor(k); h.writeUInt32LE(n, 2);
-    parts.push(h, ...recs[k]);
+  // the sections: the ones just made, plus (with --only) every other one from the existing file
+  const sections = STEPS.map(k=>({k, table: +probe.tableFor(k), recs: recs[k]}));
+  if(ONLY && fs.existsSync(OUT)){
+    const b = fs.readFileSync(OUT), vl = b[4] | (b[5] << 8); let o = 6 + vl; const n = b[o++];
+    for(let i = 0; i < n; i++){ const k = b[o], table = b[o+1], cnt = b.readUInt32LE(o + 2); o += 6;
+      if(!ONLY.includes(k)) sections.push({k, table, recs: [b.subarray(o, o + cnt*REC)]}); o += cnt*REC; }
+    sections.sort((a, b)=>a.k - b.k);
+  }
+  const ver = Buffer.from(VER, 'utf8'), parts = [Buffer.from('CTS2'), Buffer.from([ver.length & 255, ver.length >> 8]), ver, Buffer.from([sections.length])];
+  for(const sec of sections){
+    const n = sec.recs.reduce((t, x)=>t + x.length/REC, 0), h = Buffer.alloc(6); h[0] = sec.k; h[1] = sec.table; h.writeUInt32LE(n, 2);
+    parts.push(h, ...sec.recs);
   }
   const buf = Buffer.concat(parts);
   fs.writeFileSync(OUT, buf);

@@ -164,7 +164,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .tippad svg{width:96px;height:96px;cursor:crosshair}
 .ckeys{display:flex;gap:2px}
 .speedbar .ckeys kbd{cursor:pointer}.ckeys kbd,#tipcentre kbd{font:600 10px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;border:1px solid #cfc6ae}
-@media (hover:none){.ckeys,#tipcentre kbd{display:none}}
+@media (hover:none){.ckeys,#tipcentre kbd{display:none}
+  .speedbar .ckeys{display:flex;gap:6px}.speedbar .ckeys kbd{font-size:16px;padding:4px 10px;border-radius:6px}}
 .tippad small{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .modes button{font-size:15px;padding:9px 14px}
 .quick{flex-direction:column;align-items:flex-start;gap:2px;min-height:66px}
@@ -1022,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 272;   // one per commit to main
+const BUILD = 273;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1463,10 +1464,15 @@ function shootDeal(){
     if(!handRoom(s) && tries < TRIES - 4) continue;   // your bridge hand has to fit on the cloth behind the cue ball (no rail bridges yet)
     best = best || s;
     if(diamondsFromSpeed(strikeOf(s).V) > 24) continue;   // no shots that need a near-break stroke just to reach the pocket
-    if(g === SH.throw && !isFree()){   // throw: cut shots where the plain aim, played soft with stun, misses: throw decides it
-      if(s.theta < 12 || s.theta > 55 || s.L < 18) continue;
-      const soft = {V: strikeOf(s).V*1.05, tip:[0, -.35]}, r = playAim(s, idealDir(s), soft, false);
-      if(r.made) continue;
+    if(g === SH.throw && !isFree()){
+      // throw: soft stun, so the object ball goes a little fuller than it looks. The fraction dealt is the one that's right
+      // once throw is allowed for (the shots were coming out almost all ⅛ when the look decided it), and about half the
+      // shots are ones where the plain look would miss, so throw decides them
+      if(s.theta < 5 || s.theta > 70 || s.L < 18) continue;
+      const soft = {V: strikeOf(s).V*1.05, tip:[0, -.35]}, right = nearestRef(cutForDir(s, aimFor(s, soft)));
+      if(REFS[bucket] && right.id !== REFS[bucket].id) continue;
+      if(playAim(s, idealDir(s), soft, false).made && Math.random() < .5) continue;
+      s.answer = right;
       return finishDeal(s);
     }
     if(!step) return finishDeal(s);
@@ -1735,7 +1741,8 @@ function takeShot(id){
   // full marks: the right call, it drops clean, in the zone if there is one, and (from Speed on) not much harder than it needs.
   // The right call that misses the zone or is overhit is a partial: no points either way.
   const clean = run.made && !run.scratch;
-  const speedOk = !ctrl().speed || ratio <= 2.2 || !!s.zone;
+  const pocketLvl = COARSE.find(l=>STROKE_MPH[l]*MPH >= idealV) || COARSE[COARSE.length - 1];   // pocket speed: the softest stroke that gets it there
+  const speedOk = !ctrl().speed || !!s.zone || nearestCoarse(speedLevel()) === pocketLvl;
   const zoneWin = !!s.zone && clean && run.inZone;   // potted and in the zone: a success, whatever fraction or stroke got it there
   const full = zoneWin || (ok && clean && !s.zone && speedOk);
   const partial = ok && clean && !full;
@@ -1760,7 +1767,7 @@ function takeShot(id){
   }
   const lab = r => r.id === 'full' ? 'Full' : r.label;
   // the verdict as a small table: your call and the right one, your stroke and the one it wanted, and what the balls did
-  const spd = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] : String(n), want = s.zone && s.zone.lvl ? s.zone.lvl : levelForSpeed(idealV), mine = speedLevel();
+  const spd = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] : String(n), want = s.zone && s.zone.lvl ? s.zone.lvl : pocketLvl, mine = speedLevel();
   const rows = [['Call', lab(picked), ok ? true : zoneWin ? 'also' : false, ok ? '' : lab(right)]];
   const strokeOk = s.zone && s.zone.lvls ? s.zone.lvls.some(l=>spd(l) === spd(mine)) : spd(mine) === spd(want);
   if(ctrl().speed) rows.push(['Stroke', spd(mine), strokeOk || zoneWin, strokeOk || zoneWin ? '' : spd(want)]);
@@ -2932,6 +2939,7 @@ function notice(text){   // a brief note in the pill spot, e.g. an aid locking o
 }
 function showStreak(cur, endedAt){
   const el = $('streakpill'); clearTimeout(streakTimer);
+  if(tut.on){ el.hidden = true; return; }   // lessons: nothing over the table
   if(settings.streaks === '0'){ el.hidden = true; return; }   // streaks switched off: no pill
   el.classList.remove('hot','over','pop');
   if(cur >= STREAK_HOT){
@@ -3885,7 +3893,7 @@ const SL_SPEED = [
   {aids:{}, play:{k:.45, tip:[0,.4]}, next:true, text:'Too soft and it dies short. Watch.'},
   {aids:{}, play:{k:1, tip:[0,.4]}, next:true, text:'<b>Pocket speed</b>: just enough, and it drops.'},
   {aids:{}, play:{k:3.2, tip:[0,.4]}, next:true, text:'Much harder still goes, but the pocket gets less forgiving and the cue ball runs wild.'},
-  {finish:true, aids:{}, text:'Full points from pocket speed up to about double. Harder than that scores nothing, either way. Your speed stays where you left it.'},
+  {finish:true, aids:{}, text:'Here, play every shot at <b>pocket speed</b>: the softest of your four strokes that gets the ball to the pocket. That scores; potting it harder than that scores nothing either way. Your speed stays where you left it.'},
 ];
 const SL_ANY = [
   {deg:35, aids:{stance:1, ghost:1, line:1}, next:true,
@@ -4038,6 +4046,7 @@ function runStep(){
   draw(false); scheduleFades(); updateControls();
 }
 function startTut(lesson){
+  $('streakpill').hidden = true;
   endFlash(); $('sesscover').hidden = true; $('endcover').hidden = true; $('startcover').hidden = true;
   tut.on = true; tut.i = 0; tut.lesson = LESSONS[lesson] ? lesson : 'intro';
   cancelAnimationFrame(routineRaf); renderRoutineChip(); renderShootControls();
@@ -4046,6 +4055,7 @@ function startTut(lesson){
   $('coach').scrollIntoView({block:'nearest'});
 }
 function endTut(thenBaseline){
+  setTimeout(syncStreakPill, 0);   // the streak pill comes back after the lesson
   tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf);
   if(!settings.tut){ settings.tut = 1; saveSettings(); }
   settings.tutSeen = {...(settings.tutSeen || {}), [tut.lesson]: 1}; saveSettings();
