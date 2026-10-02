@@ -95,6 +95,8 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .settabs button{padding-inline:4px}
 .menucard .optwrap{flex-wrap:wrap}.menucard .optwrap .seg{margin-left:auto}
 .setpane{display:flex;flex-direction:column;gap:12px}.setpane[hidden]{display:none}
+.libbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}.libbar i{display:block;height:100%;width:0;background:#1f6fb2}
+.librebuild{align-self:flex-start;padding:6px 14px;font-size:13px}
 .setnote{color:var(--muted);font-size:11px}
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
 .optrange span{color:var(--muted);font-weight:500;margin-left:6px}
@@ -458,6 +460,10 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       </div>
       </div>
       <div class="setpane" id="set-table" hidden>
+      <div class="opt optrange">Shot library <span id="libstatus"></span>
+        <div class="libbar"><i id="libfill"></i></div>
+        <button class="sumdone librebuild" id="librebuild">Rebuild shots</button>
+      </div>
       <small class="setnote">What's drawn on the table once the balls move:</small>
       <div class="opt">Path to the pocket
         <div class="seg" role="group" aria-label="Path to the pocket"><button data-set="refPath" data-val="0">Off</button><button data-set="refPath" data-val="1">On</button></div>
@@ -570,7 +576,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
     </div>
 
     <div class="panel">
-      <div class="seg modes" role="group" aria-label="Mode">
+      <div class="seg modes" role="group" aria-label="Mode" hidden>   <!-- Flash and Free play are off for now: only the Ladder -->
         <button id="task-sess">Ladder</button>
         <button id="task-flash" data-set="task" data-val="flash">Flash ⚡️<span class="lock" id="flashlock" aria-label="locked until your baseline" hidden> 🔒</span></button>
         <button id="task-free">Free play<span class="lock" id="freelock" hidden> 🔒</span></button>
@@ -617,7 +623,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="tabpanel" role="tabpanel" id="tab-shot"><div class="result" id="result"></div></div>
       <div class="tabpanel" role="tabpanel" id="tab-stats" hidden>
       <div class="stathead">
-        <div class="seg statmode" role="group" aria-label="Which mode's stats">
+        <div class="seg statmode" role="group" aria-label="Which mode's stats" hidden>
           <button data-stat="sess">Ladder</button>
           <button data-stat="flash">Flash ⚡️</button>
         </div>
@@ -998,7 +1004,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 245;   // one per commit to main
+const BUILD = 246;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1055,8 +1061,8 @@ const SHOOT_TEXT = [
   'Cue and hand · + ⅛', 'Your aim line',
   'Any angle · 9 ft table', 'Speed', 'Throw',
   'Center ball: follow', 'Center ball: stun', 'Center ball: draw', 'Center ball: two rails', 'English', 'Everything', 'Full table: 3–4 rails'];
-const SHOOT_UP = {1:'No path · ¾ shots', 2:'No guide line · ½ shots · 8 ft table', 3:'👻 No ghost ball · ¼ shots · ⚡️ Flash', 4:'🧍 Cue and hand · ⅛ shots', 5:'🎯 Your aim line',
-  6:'📐 Any angle · 🎱 9 ft table · Free play', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Center ball: follow', 10:'⏹️ Center ball: stun', 11:'⤵️ Center ball: draw', 12:'↩️ Center ball: two rails', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full table: 3–4 rails'};
+const SHOOT_UP = {1:'No path · ¾ shots', 2:'No guide line · ½ shots · 8 ft table', 3:'👻 No ghost ball · ¼ shots', 4:'🧍 Cue and hand · ⅛ shots', 5:'🎯 Your aim line',
+  6:'📐 Any angle · 🎱 9 ft table', 7:'🎚️ Speed', 8:'🌀 Throw', 9:'⤴️ Center ball: follow', 10:'⏹️ Center ball: stun', 11:'⤵️ Center ball: draw', 12:'↩️ Center ball: two rails', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full table: 3–4 rails'};
 const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Shoot standing again', 5:'Down on the right line again', 6:'Fraction angles only · 8 ft table', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
@@ -1073,7 +1079,8 @@ const isShooting = () => isShoot() || isFree();
 function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
 // You can go back to any grade you've passed and practise it as long as you like: those shots aren't scored.
 const practicing = () => isShoot() && settings.practice != null && stats.shoot && +settings.practice < stats.shoot.g;
-const shootLevel = () => isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : practicing() ? +settings.practice : (stats.shoot ? stats.shoot.g : 0);
+const GEN = {g: null};   // while the shot library is being built: the grade it's building for
+const shootLevel = () => GEN.g != null ? GEN.g : isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : practicing() ? +settings.practice : (stats.shoot ? stats.shoot.g : 0);
 function setPractice(i){
   const g = stats.shoot ? stats.shoot.g : 0;
   settings.practice = i != null && i < g ? i : null; saveSettings();
@@ -1251,12 +1258,94 @@ function otherWays(s, zs, lvl){
     const r = playAim(s, aimFor(s, st), st, false); return r.made && !r.scratch && r.inZone;
   });
 }
+// ---------- the shot library ----------
+// Zone shots take a lot of checking, so they're worked out ahead and stored: a few numbers per shot (the balls, the
+// pocket, the zone and the strokes that land it), filled in quietly in the background and rebuilt when the physics,
+// rules or your height change. Each stored shot can be played mirrored either way, so it goes four times as far.
+const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 150, LIB_RULES = 3;
+const libVer = () => [LIB_RULES, Object.values(PE.C).join(','), Object.values(STROKE_MPH).join(','), ZR_TWO, TIP_STEP.toFixed(4), Math.round(stanceIn()), W, H].join('|');
+let LIB = null;
+function libLoad(){
+  if(LIB && LIB.ver === libVer()) return LIB;
+  try{ LIB = JSON.parse(localStorage.getItem('cutreader-shotlib') || 'null'); }catch(e){ LIB = null; }
+  if(!LIB || LIB.ver !== libVer()) LIB = {ver: libVer(), steps: {}};
+  return LIB;
+}
+function libSave(){ try{ localStorage.setItem('cutreader-shotlib', JSON.stringify(LIB)); }catch(e){} }
+const libCount = () => { const L = libLoad(); return LIB_STEPS.reduce((t, k)=>t + (L.steps[k] || []).length, 0); };
+const libFull = () => libCount() >= LIB_STEPS.length*LIB_PER;
+const r2 = x => Math.round(x*100)/100;
+function packLib(s){   // [cb, ob, pocket, aim point, zone centre, radius, stroke, strokes that land it, tip, fraction]
+  const z = s.zone;
+  return [r2(s.cb[0]), r2(s.cb[1]), r2(s.ob[0]), r2(s.ob[1]), POCKETS.indexOf(s.P), r2(s.T[0]), r2(s.T[1]), r2(z.c[0]), r2(z.c[1]), z.r, z.lvl, z.lvls || [z.lvl], z.tip, s.answer.id];
+}
+// a stored shot as a full shot, mirrored left-right (fx) and/or end to end (fy)
+function unpackLib(rec, step, fx, fy){
+  const [cbx, cby, obx, oby, Pi, Tx, Ty, zx, zy, zr, lvl, lvls, tip] = rec;
+  const X = x => fx ? W - x : x, Y = y => fy ? H - y : y, P0 = POCKETS[Pi];
+  const P = POCKETS.find(q=>Math.abs(q.c[0] - X(P0.c[0])) < .01 && Math.abs(q.c[1] - Y(P0.c[1])) < .01) || P0;
+  const cb = [X(cbx), Y(cby)], ob = [X(obx), Y(oby)], T = [X(Tx), Y(Ty)];
+  const uC = norm(sub(T, ob)), gb = sub(ob, mul(uC, 2*R)), v = norm(sub(gb, cb)), cr = v[0]*uC[1] - v[1]*uC[0];
+  const theta = Math.acos(Math.max(-1, Math.min(1, dot(v, uC))))/RAD, right = [-v[1], v[0]];
+  return {any: true, phys: false, speed: SHOT_SPEED, len: len(sub(ob, cb)) > 30 ? 'long' : 'short', theta, pathDeg: theta, throwOn: false,
+    sign: cr >= 0 ? -1 : 1, P, ob, cb, gb, u: uC, v, n: uC, L: len(sub(T, ob)), tol: pocketTol(P, uC), T, uC, cheat: 0,
+    side: dot(uC, right) > 0 ? 'R' : 'L', color: pick(OB_COLORS), answer: nearestRef(theta), pick: null, spot: spotToward(sub(cb, ob)),
+    stroke: 'roll', spinR: 1, throwDeg: 0, gbLook: null, strk: null,
+    zone: {c: [X(zx), Y(zy)], r: zr, step, lvl, lvls, tip: (fx !== fy) ? [-tip[0], tip[1]] : tip}};
+}
+function fromLibrary(step, bucket){
+  const L = libLoad(), pool = L.steps[step] || []; if(pool.length < 12) return null;   // too few yet: deal live
+  const want = REFS[bucket] && REFS[bucket].id, same = pool.filter(rec=>rec[13] === want);
+  const rec = pick(same.length ? same : pool);
+  const s = unpackLib(rec, step, Math.random() < .5, Math.random() < .5);
+  return handRoom(s) ? s : null;
+}
+// work out one more stored shot for the step that's shortest; returns false when the library is full
+const LIB_GRADE = {[SH.follow]: SH.follow, [SH.stun]: SH.stun, [SH.draw]: SH.draw, [SH.cushion]: SH.cushion, [SH.english]: SH.english, [SH.full]: SH.full};
+function libGrowOne(){
+  const L = libLoad(), step = LIB_STEPS.slice().sort((a, b)=>(L.steps[a] || []).length - (L.steps[b] || []).length)[0];
+  if((L.steps[step] || []).length >= LIB_PER) return false;
+  if(curTable !== '9') return null;   // zone grades are all on the 9 ft table: nothing to do until you're on it
+  GEN.g = LIB_GRADE[step];
+  let s = null; try{ s = shootDeal(); }catch(e){ s = null; } finally { GEN.g = null; }
+  if(s && s.zone && s.zone.step === step){ (L.steps[step] = L.steps[step] || []).push(packLib(s)); libSave(); }
+  return true;
+}
+// in the background: a shot at a time, only while nothing's moving
+let libTimer = 0;
+function libIdle(){
+  clearTimeout(libTimer);
+  if(libFull() || libBuilding) return;
+  libTimer = setTimeout(()=>{ if(answered && !anim && !cueStroke && !look.k && !walkDrag && !tut.on){ libGrowOne(); renderLibStatus(); } libIdle(); }, 1200);   // only while you're looking over a played shot, so it never stutters an aim
+}
+// Settings: rebuild it all now, with a progress bar
+let libBuilding = false, libWait = false;
+function libRebuild(){
+  if(libBuilding) return;
+  LIB = {ver: libVer(), steps: {}}; libSave(); libBuilding = true; renderLibStatus();
+  const step = () => {
+    if(!libBuilding) return;
+    const t0 = performance.now();
+    while(performance.now() - t0 < 40){ const g = libGrowOne(); if(g === null){ libBuilding = false; libWait = true; break; } if(!g || libFull()){ libBuilding = false; break; } }
+    renderLibStatus();
+    if(libBuilding) setTimeout(step, 0); else libIdle();
+  };
+  setTimeout(step, 0);
+}
+function renderLibStatus(){
+  const el = $('libstatus'); if(!el) return;
+  const n = libCount(), all = LIB_STEPS.length*LIB_PER;
+  el.textContent = curTable !== '9' ? 'Zone shots start at B+: worked out once you\'re on the 9 ft table' : libBuilding ? `Working out shots… ${n} / ${all}` : n >= all ? `${n} shots ready` : `${n} / ${all} shots (more are worked out while you play)`;
+  $('libfill').style.width = (100*n/all).toFixed(1) + '%';
+  $('librebuild').disabled = libBuilding;
+}
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
   let best = null;
-  const t0 = performance.now(), late = () => performance.now() - t0 > 220;   // dealing has a budget: past it, the extra checks are skipped
+  const t0 = performance.now(), late = () => GEN.g == null && performance.now() - t0 > 220;   // dealing has a budget (not when building the library): past it, the extra checks are skipped
   const TRIES = step === SH.full ? 90 : step === SH.cushion ? 80 : 40;   // two-, three- and four-rail routes take more finding
   const bucket = pickBucket();   // the fraction, fixed for all the tries
+  if(GEN.g == null && step && LIB_STEPS.includes(step)){ const L = fromLibrary(step, bucket); if(L) return finishDeal(L); }   // a stored shot, if the library has one
   for(let tries = 0; tries < TRIES; tries++){
     const s = dealShot(bucket);   // leaning on your weak spots
     if(!s) continue;
@@ -3905,6 +3994,7 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   document.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed', x === b));
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
+$('librebuild').addEventListener('click', ()=>libRebuild());
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
   const i = +li.dataset.g;
@@ -3998,7 +4088,8 @@ if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
 applyGfx();
-if(stats.shoot) stats.shoot.g = Math.max(stats.shoot.g, stats.shoot.best ?? 0);   // grades only go up now: back to your best
+if(stats.shoot) stats.shoot.g = Math.max(stats.shoot.g, stats.shoot.best ?? 0);
+setTimeout(()=>{ renderLibStatus(); libIdle(); }, 3000);   // start filling the shot library once the page has settled   // grades only go up now: back to your best
 $('practicechip').addEventListener('click', e=>{ e.stopPropagation(); setPractice(null); });
 renderPracticeChip();
 // background music: off to start; it can only begin after a tap or key (browsers block sound before that)
@@ -4025,6 +4116,7 @@ if(!settings.sv) settings.sv=2;
 settings.full = '1';   // full-ball shots always come up (rarely): no longer a setting
 settings.view = 'stand';   // the view isn't a setting any more: you start standing, and the routine takes you down
 if(settings.task==='call') settings.task = 'sess';   // Freeplay and Sessions merged: Freeplay is now played in sessions
+settings.task = 'shoot'; settings.statTask = 'sess';   // Flash and Free play are off for now
 if(!['flash','shoot','free'].includes(settings.task) || (settings.task==='free' && !freeUnlocked()) || (settings.task==='flash' && !flashUnlocked())) settings.task = 'shoot';   // one ladder: Sessions are shooting
 if(!settings.sv4){ stats.log.forEach(e=>{ if((e.t||'call')==='call') e.t = 'sess'; }); settings.sv4 = 1; save(); }   // old Freeplay shots join the new Freeplay
 if(stats.log.some(e=>e.t==='aim' || e.t==='tt')){ stats.log = stats.log.filter(e=>e.t!=='aim' && e.t!=='tt'); save(); }   // Aim and Thick/Thin were tried and dropped
