@@ -1017,7 +1017,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 254;   // one per commit to main
+const BUILD = 255;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1391,6 +1391,7 @@ function makeRec(step){
   GEN.g = +step;
   let s = null; try{ s = shootDeal(); }catch(e){ s = null; } finally { GEN.g = null; }
   if(!s || (isZoneStep(step) ? !s.zone || s.zone.step !== +step : !!s.zone)) return null;
+  if(+step >= SH.down && !handRoom(s)) return null;   // only shots with room for the bridge hand get stored
   const r = recOf(s);
   return recOk(r, step) ? r : null;
 }
