@@ -126,11 +126,11 @@ function hitBalls(a, b, n){
 
 // ---------- the cue ----------
 // Struck along dir at speed V with the tip at (side a, height b), both in ball radii from the centre.
-// A level cue, no squirt or swerve: the tip height sets top/back spin, the side offset sets sidespin.
+// A level cue, no deflection or swerve: the tip height sets top/back spin, the side offset sets sidespin.
 const SQUIRT = 3.5*Math.PI/180;   // how far side spin pushes the cue ball off the aim line, per ball radius of offset (a low-deflection shaft is less)
 function strike(ball, dir, V, tip){
   const [a, b] = tip || [0, 0], d0 = v2.norm(dir);
-  // a > 0 strikes the side toward (-dy, dx); the cue ball squirts the other way
+  // a > 0 strikes the side toward (-dy, dx); the cue ball deflects the other way
   const q = -SQUIRT*a, d = [d0[0]*Math.cos(q) - d0[1]*Math.sin(q), d0[0]*Math.sin(q) + d0[1]*Math.cos(q)];
   ball.v = v2.mul(d, V);
   // rolling is surface speed = V: w = (V/R)(-dy, dx); a tip height b gives 5/2·b of that
