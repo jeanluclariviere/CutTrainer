@@ -993,7 +993,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 242;   // one per commit to main
+const BUILD = 243;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1043,19 +1043,20 @@ const LADDER_DOWN = {8:'Cuts back on the fractions', 9:'Back to cuts the plain f
 
 // ---------- the Shoot ladder ----------
 const SHOOT_GRADES = ['F','D-','D','D+','C-','C','C+','B-','B','B+','A-','A','A+','S-','S','S+'];
-const SH = {noPath:1, noLine:2, noGhost:3, down:4, any:6, speed:7, throw:8, follow:9, stun:10, draw:11, cushion:12, english:13, all:14, full:15};
+const SH = {noPath:1, noLine:2, noGhost:3, down:4, ownLine:5, any:6, speed:7, throw:8, follow:9, stun:10, draw:11, cushion:12, english:13, all:14, full:15};
+// Short names for the ladder (the lessons explain each step)
 const SHOOT_TEXT = [
-  'Aim with the ghost ball, guide line and the object ball’s path', 'Object-ball path gone', 'Guide line gone', 'Ghost ball gone: aim from your own read',
-  'Down on the shot: call a fraction to get down on its line', '9 ft table',
-  'Any angle: cuts between the fractions', 'Speed: you set it', 'Throw',
-  'Center ball, follow: land the cue ball in the zone (no rail or one)', 'Center ball, stun: stop it, or send it along the tangent line', 'Center ball, draw', 'Center ball: two cushions, with top, stun or draw', 'English: change the angle off the cushion', 'Everything: speed, spin and english', 'Full-table position: three or four rails'];
-const SHOOT_UP = {1:'Object-ball path gone', 2:'Guide line gone · 8 ft table', 3:'👻 Ghost ball gone · ⚡️ Flash unlocked', 4:'🧍 Down on the shot · your cue and hand', 5:'🎱 9 ft table',
-  6:'📐 Any angle · 🎱 Free play unlocked', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Center ball: follow · 🎯 Cue ball zones', 10:'⏹️ Center ball: stun', 11:'⤵️ Center ball: draw', 12:'↩️ Center ball: two cushions', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full-table position: 3–4 rails'};
-const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Shoot standing again', 5:'Back to the 8 ft table', 6:'Fraction angles only', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
+  'Aids: ghost ball, guide line, path', 'No path', 'No guide line', 'No ghost ball',
+  'Cue and hand', 'Your aim line',
+  'Any angle · 9 ft table', 'Speed', 'Throw',
+  'Center ball: follow', 'Center ball: stun', 'Center ball: draw', 'Center ball: two rails', 'English', 'Everything', 'Full table: 3–4 rails'];
+const SHOOT_UP = {1:'No path', 2:'No guide line · 8 ft table', 3:'👻 No ghost ball · ⚡️ Flash', 4:'🧍 Cue and hand', 5:'🎯 Your aim line',
+  6:'📐 Any angle · 🎱 9 ft table · Free play', 7:'🎚️ Speed · 0.75 s Flash', 8:'🌀 Throw', 9:'⤴️ Center ball: follow', 10:'⏹️ Center ball: stun', 11:'⤵️ Center ball: draw', 12:'↩️ Center ball: two rails', 13:'🌪️ English', 14:'🏆 Everything', 15:'👑 Full table: 3–4 rails'};
+const SHOOT_DOWN = {2:'Back to the 7 ft table', 3:'Ghost ball back', 4:'Shoot standing again', 5:'Down on the right line again', 6:'Fraction angles only · 8 ft table', 7:'Speed set for you', 9:'No more zones · tip back to centre', 11:'No more draw', 13:'No more english'};
 const READ_TOP = 11;   // finishing the Read ladder (A) opens Shoot and Free play
 const shootUnlocked = () => true;
-// the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C (Sessions by your grade; Flash and Free play by your best)
-const TABLE_AT = {'8': 2, '9': 5};
+// the table grows with you: 7 ft to start, 8 ft at D, 9 ft at C+ (with any angle) (Sessions by your grade; Flash and Free play by your best)
+const TABLE_AT = {'8': 2, '9': 6};
 const progTable = () => { const g = settings.task === 'shoot' ? shootLevel() : ladderBest(); return g >= TABLE_AT['9'] ? '9' : g >= TABLE_AT['8'] ? '8' : '7'; };
 const ladderBest = () => stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0;
 const FLASH_AT = 3, FREE_AT = SH.any, FAST_FLASH_GRADE = SH.speed;   // Flash opens at D+ (once you aim without the ghost ball), Free play with any angle (C+), 0.75 s Flash with speed (B-)
@@ -1324,6 +1325,7 @@ function renderRoutineChip(){
 }
 // The aim line a call plays: the right call's is the one that pots with your stroke (throw and squirt allowed for),
 // any other call's is that fraction's contact.
+function rightIdFor(s){ return nearestRef(cutForDir(s, aimFor(s, shotStroke(s)))).id; }
 function aimDirFor(s, id){
   const stroke = shotStroke(s), need = aimFor(s, stroke), right = nearestRef(cutForDir(s, need));
   const picked = ALL.find(r=>r.id === id);
@@ -1347,13 +1349,15 @@ function callAim(id){
   if(!c || c.moving || answered) return;
   const settled = () => { c.up = false; c.downAt = performance.now(); renderRoutineChip(); featherLoop(s); };
   const goDownOn = () => camStep(s, 'down', 0, 1, 600, settled);
+  const own = shootLevel() >= SH.ownLine;   // at C- you're put on the right line whatever you call; from C it's the line you call
   if(c.phase === 'stand'){
     if(!c.ready) return;   // still reading the shot
-    s.aimId = id; s.aimDir = aimDirFor(s, id); markAim(s);
+    s.aimId = id; s.aimDir = own ? aimDirFor(s, id) : aimDirFor(s, rightIdFor(s)); if(own) markAim(s);
     camStep(s, 'step', 0, 1, 600, goDownOn);
     return;
   }
-  if(c.phase === 'down' && c.k >= 1 && id === s.aimId) return takeShot(id);
+  if(c.phase === 'down' && c.k >= 1 && (id === s.aimId || !own)) return takeShot(id);
+  if(!own){ if(c.phase === 'down' && c.k < 1){ cancelAnimationFrame(featherRaf); camStep(s, 'down', c.k, 1, 450, settled); } return; }   // C-: back down on the same line after a look
   // a different line (or back down after stepping back): up, across, down
   cancelAnimationFrame(featherRaf);
   const across = () => {
@@ -3608,11 +3612,15 @@ const SL_DOWN = [
   {deg:30, aids:{}, next:true,
    text:'From here every shot is a routine. You start <b>standing on the ball line</b>, cue ball to object ball, to read the layout.'},
   {aids:{}, next:true,
-   text:'Then you <b>step behind your aim line</b>, the line the cue ball will travel, and <b>get down on it</b>. Down on the shot, you\'re looking along the stroke you\'ll play.'},
-  {aids:{}, next:true,
-   text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, hiding part of the view as they do at a real table. You can make them see-through in Settings.'},
+   text:'<b>Call the fraction</b> and you <b>step behind the aim line</b> and <b>get down on it</b>, your <b>cue</b> and <b>bridge hand</b> in the picture as at a real table (you can make them see-through in Settings).'},
   {finish:true, aids:{},
-   text:'<b>Call the fraction</b> to step behind its aim line and get down on it. You\'re now looking down the line you chose: if it looks wrong, call another, and you get back up, move to its line and get down again. <b>Call it again</b> to shoot.'},
+   text:'For now you\'re put on the <b>right</b> line whatever you call: get to know what it looks like from down there. <b>Call again</b> to shoot.'},
+];
+const SL_OWNLINE = [
+  {deg:30, aids:{}, next:true,
+   text:'Now you get down on the line <b>you call</b>. If it looks wrong from down there, call another fraction: you get back up, move to its line and get down again.'},
+  {finish:true, aids:{},
+   text:'<b>Call it again</b> to shoot. A wrong line should look wrong: trust what you see once you\'re down.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
@@ -3634,7 +3642,7 @@ const SL_ANY = [
   {aids:{stance:1, ghost:1}, demo:'right', next:true,
    text:'Call the <b>nearest fraction</b>, ½ here, and the shot takes the touch less ball it needs. It drops.'},
   {finish:true, aids:{},
-   text:'Always call the nearest fraction. No cut sits right between two: look again and it’s nearer one of them.'},
+   text:'Always call the nearest fraction. No cut sits right between two: look again and it’s nearer one of them. And the table is a full <b>9 ft</b> from here.'},
 ];
 const SL_STUN = [
   {deg:30, aids:{}, play:{k:2.6, tip:[0,0], stun:true}, next:true,
@@ -3676,7 +3684,8 @@ const SL_ALL = [
 const LESSONS = {
   intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
   shoot:   {name:'Shooting', at:0, track:'shoot', steps:SL_SHOOT},
-  down:    {name:'Down on the shot', at:SH.down, track:'shoot', steps:SL_DOWN},
+  down:    {name:'Cue and hand', at:SH.down, track:'shoot', steps:SL_DOWN},
+  ownline: {name:'Your aim line', at:SH.ownLine, track:'shoot', steps:SL_OWNLINE},
   any:     {name:'Any angle', at:SH.any, track:'shoot', steps:SL_ANY},
   speed:   {name:'Speed', at:SH.speed, track:'shoot', steps:SL_SPEED},
   throw:   {name:'Throw', at:SH.throw, track:'shoot', steps:TSTEPS_THROW},
