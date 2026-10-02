@@ -992,7 +992,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 239;   // one per commit to main
+const BUILD = 240;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -2158,7 +2158,7 @@ function cueRig(cam, s){
   const {a, ac, push} = rigAlpha(s);
   if(a < .01) return '';
   const u = norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];          // forward along the aim, and to its left
-  const sd = settings.hand === 'L' ? mul(n, -1) : n;                        // the bridge hand's side: left of the cue for a right-handed player
+  const sd = settings.hand === 'L' ? n : mul(n, -1);                        // the bridge hand's side: on screen left of the cue for a right-handed player (n points to screen right)
   const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
   const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
   // How steep the cue is: a touch more with top, a touch less with draw (you keep it level to hit low), and as steep as it
