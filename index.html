@@ -301,6 +301,7 @@ body.dragging{-webkit-user-select:none;user-select:none}
 .answers button span{font:500 11px var(--mono);color:var(--muted);letter-spacing:.02em}
 .answers button:hover:not(:disabled){border-color:var(--accent)}
 .answers button:disabled{cursor:default}
+.answers button.aimed{border-color:#1f6fb2;box-shadow:inset 0 0 0 1px #1f6fb2}
 .answers button.right{border-color:var(--good);background:color-mix(in srgb,var(--good) 14%,var(--surface))}
 .answers button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface))}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -992,7 +993,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 240;   // one per commit to main
+const BUILD = 241;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1299,16 +1300,17 @@ function startRoutine(){
   cancelAnimationFrame(routineRaf);
   const s = shot, T = standTime(shootLevel());
   if(!s || !isShoot() || tut.on || !T){ if(s) s.cam = {phase:'stand', k:0}; renderRoutineChip(); return; }
-  s.cam = {phase:'stand', k:0, t0: performance.now(), T};
+  s.cam = {phase:'stand', k:0, t0: performance.now(), T, ready: T >= NO_TIMER};
+  s.aimId = null; s.aimDir = null;
   const tick = now => {
     if(shot !== s || answered || !isShoot() || tut.on){ renderRoutineChip(); return; }
     const c = s.cam, el = (now - c.t0)/1000;
-    if(el < T){ c.phase = 'stand'; c.k = 0; c.left = T - el; }
-    else if(el < T + .6){ c.phase = 'step'; c.k = ease((el - T)/.6); c.left = 0; }
-    else if(el < T + 1.2){ c.phase = 'down'; c.k = ease((el - T - .6)/.6); }
-    else { c.phase = 'down'; c.k = 1; c.downAt = now; renderRoutineChip(); draw(false); featherLoop(s); return; }
-    renderRoutineChip(); if(c.phase !== 'stand') draw(false);   // standing still needs no redraw
-    routineRaf = requestAnimationFrame(tick);
+    // You read the shot from the ball line; at C- and C for a set time before you can call it. Calling a fraction
+    // takes you behind that fraction's aim line and down on it (callAim); nothing happens on its own.
+    if(c.phase !== 'stand') return;
+    c.left = Math.max(0, T - el); c.ready = c.left <= 0;
+    renderRoutineChip();
+    if(!c.ready) routineRaf = requestAnimationFrame(tick);
   };
   routineRaf = requestAnimationFrame(tick);
 }
@@ -1316,12 +1318,54 @@ const ease = u => u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
 function renderRoutineChip(){
   const el = $('routinechip'); if(!el) return;
   const c = shot && shot.cam;
-  const upAgain = c && c.up && c.phase === 'down' && c.k < 1;
-  if(!isShoot() || tut.on || answered || !c || !c.T || (c.phase !== 'stand' && !upAgain) || look.k > 0){ el.hidden = true; return; }
-  el.hidden = false; el.innerHTML = (c.T >= NO_TIMER || upAgain ? 'Get down' : `Down in ${Math.ceil(c.left)}`) + '<kbd>Enter</kbd>';
+  const standing = c && (c.phase === 'stand' || (c.up && c.phase === 'down' && c.k < 1)) && !c.moving;
+  if(!isShoot() || tut.on || answered || !c || !c.T || !standing || look.k > 0){ el.hidden = true; return; }
+  el.hidden = false; el.innerHTML = c.ready ? 'Call it to get down' : `Reading ${Math.ceil(c.left)}`;
+}
+// The aim line a call plays: the right call's is the one that pots with your stroke (throw and squirt allowed for),
+// any other call's is that fraction's contact.
+function aimDirFor(s, id){
+  const stroke = shotStroke(s), need = aimFor(s, stroke), right = nearestRef(cutForDir(s, need));
+  const picked = ALL.find(r=>r.id === id);
+  return !picked || picked.id === right.id ? need : dirForCut(s, picked.deg);
+}
+function camStep(s, phase, k0, k1, ms, done){   // move the routine's camera through one phase
+  const c = s.cam, t0 = performance.now(); c.phase = phase; c.moving = true; renderRoutineChip();
+  const tick = now => {
+    if(shot !== s || answered){ c.moving = false; return; }
+    const u = Math.min(1, (now - t0)/ms); c.k = k0 + (k1 - k0)*ease(u);
+    if(!look.k) draw(false);
+    if(u < 1) requestAnimationFrame(tick); else { c.moving = false; done && done(); }
+  };
+  requestAnimationFrame(tick);
+}
+// Calling a fraction: standing, you step behind its aim line and get down on it; call the same one again and it goes.
+// Call another while down and you get back up, step over to its line, and get down again: then call it to shoot.
+function markAim(s){ document.querySelectorAll('#answers button').forEach(b=>b.classList.toggle('aimed', b.dataset.id === s.aimId)); }   // the line you're on
+function callAim(id){
+  const s = shot, c = s && s.cam;
+  if(!c || c.moving || answered) return;
+  const settled = () => { c.up = false; c.downAt = performance.now(); renderRoutineChip(); featherLoop(s); };
+  const goDownOn = () => camStep(s, 'down', 0, 1, 600, settled);
+  if(c.phase === 'stand'){
+    if(!c.ready) return;   // still reading the shot
+    s.aimId = id; s.aimDir = aimDirFor(s, id); markAim(s);
+    camStep(s, 'step', 0, 1, 600, goDownOn);
+    return;
+  }
+  if(c.phase === 'down' && c.k >= 1 && id === s.aimId) return takeShot(id);
+  // a different line (or back down after stepping back): up, across, down
+  cancelAnimationFrame(featherRaf);
+  const across = () => {
+    if(id === s.aimId) return goDownOn();
+    c.fromAim = s.aimDir; s.aimId = id; s.aimDir = aimDirFor(s, id); markAim(s);
+    camStep(s, 'shift', 0, 1, 500, ()=>{ c.phase = 'down'; c.k = 0; goDownOn(); });
+  };
+  if(c.phase === 'down' && c.k > 0) camStep(s, 'down', c.k, 0, 450, across); else across();
 }
 // Enter (or the chip) gets you down now instead of waiting out the standing time
-function goDown(){
+function goDown(){ return false; }   // you get down by calling a fraction now
+function goDownOld(){
   const c = shot && shot.cam;
   if(!c || !c.T || answered || !isShoot() || tut.on || look.target) return false;
   if(c.phase === 'down' && c.up && c.k < 1){ c.up = false; renderRoutineChip(); riseCam(shot, 1, ()=>{ c.downAt = performance.now(); featherLoop(shot); }); return true; }   // back down after a look
@@ -1330,11 +1374,11 @@ function goDown(){
 }
 // The Shoot camera: standing on the ball line, standing behind your aim line, or down on your aim line, blended by the routine.
 function shootCam(s, view){
-  const aim = norm(sub(s.gbLook || s.gb, s.cb)), d = norm(sub(s.ob, s.cb));   // ball line, then behind the aim line, then down on it
+  const d = norm(sub(s.ob, s.cb)), aim = s.aimDir || d;   // ball line, then behind the aim line you called, then down on it
   const stand = camAlong(s, d, VIEWS.stand), standAim = camAlong(s, aim, VIEWS.stand), down = camAlong(s, aim, VIEWS.down);
   const c = s.cam || {phase:'stand', k:0};
   const mix = (A, B, k) => camFrom(A.E.map((x, i)=>x + (B.E[i]-x)*k), norm3(A.f.map((x, i)=>x + (B.f[i]-x)*k)), A.hfov + (B.hfov - A.hfov)*k);
-  const base = c.phase === 'step' ? mix(stand, standAim, c.k) : c.phase === 'down' ? mix(standAim, down, c.k) : view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
+  const base = c.phase === 'step' ? mix(stand, standAim, c.k) : c.phase === 'shift' ? mix(camAlong(s, c.fromAim || d, VIEWS.stand), standAim, c.k) : c.phase === 'down' ? mix(standAim, down, c.k) : view === 'down' && !c.T ? camAlong(s, d, VIEWS.down) : stand;
   return look.k > 0 ? mix(base, overviewCam(s), ease(look.k)) : base;
 }
 // Step back (hold Space, or the eye button): up high behind the shot, the whole table in view. Free while standing;
@@ -2157,7 +2201,7 @@ const shadeHex = (hex, k, add = 0) => '#' + [1, 3, 5].map(i=>Math.min(255, Math.
 function cueRig(cam, s){
   const {a, ac, push} = rigAlpha(s);
   if(a < .01) return '';
-  const u = norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];          // forward along the aim, and to its left
+  const u = s.aimDir || norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];   // forward along the aim line you called
   const sd = settings.hand === 'L' ? n : mul(n, -1);                        // the bridge hand's side: on screen left of the cue for a right-handed player (n points to screen right)
   const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
   const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
@@ -2881,7 +2925,7 @@ function markPend(){
 function pickFrac(id){
   if(!canCall()) return;
   const c = shot.cam;
-  if(isShoot() && c && c.T && !(c.phase === 'down' && c.k === 1)){ goDown(); return; }   // from Down on the shot: no shooting standing, a call gets you down first
+  if(isShoot() && c && c.T){ callAim(id); return; }   // from Down on the shot: no shooting standing, a call gets you down first
   if(isShooting()) return takeShot(id);   // the call is the aim: the shot goes off with the stroke you've set
   if(!shot.phys) return answer(id);
   pend.f = id; markPend();
@@ -3568,7 +3612,9 @@ const SL_DOWN = [
   {aids:{}, next:true,
    text:'Down there your <b>cue</b> and <b>bridge hand</b> are in the picture, hiding part of the view as they do at a real table. You can make them see-through in Settings.'},
   {finish:true, aids:{},
-   text:'You can’t shoot standing: press <b>Enter</b> or a fraction key to get down, then call it. Wait too long and you go down anyway: five seconds to start, then three. From <b>Any angle</b> on there\'s no timer: you get down when you\'re ready.'},
+   text:'<b>Call the fraction</b> to step behind its aim line and get down on it. You\'re now looking down the line you chose: if it looks wrong, call another, and you get back up, move to its line and get down again. <b>Call it again</b> to shoot.'},
+  {aids:{}, next:true,
+   text:'Read the shot first: five seconds standing to start, then three. From <b>Any angle</b> on there\'s no wait: call it when you\'re ready.'},
 ];
 const SL_SPEED = [
   {deg:30, aids:{}, next:true,
