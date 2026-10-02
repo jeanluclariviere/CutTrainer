@@ -9,7 +9,8 @@ const COL = {cloth:0x24609c, shelf:0x1f5689, cushion:0x2569a8, nose:0x1a4f80, ra
 function make(canvas){
   if(!T3) return null;
   let renderer;
-  try{ renderer = new T3.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'high-performance'}); }catch(e){ return null; }
+  const AA = (root.localStorage && (()=>{ try{ return JSON.parse(localStorage.getItem('cutreader-settings') || '{}').gfxAA; }catch(e){ return null; } })()) !== '0';   // antialiasing is fixed when the renderer is made
+  try{ renderer = new T3.WebGLRenderer({canvas, antialias:AA, alpha:false, powerPreference:'high-performance'}); }catch(e){ return null; }
   renderer.setPixelRatio(Math.min(1.5, root.devicePixelRatio || 1));   // 1.5× is sharp enough and far cheaper than 2× on retina screens
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T3.PCFSoftShadowMap;
@@ -242,7 +243,18 @@ function make(canvas){
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
   }
-  return {build, setBalls, setArrow, setZone, render, renderer};
+  // graphics settings: resolution (pixel ratio cap) and shadows ('soft', 'hard' or 'off')
+  function setQuality(q){
+    if(q.ratio) renderer.setPixelRatio(Math.min(q.ratio, root.devicePixelRatio || 1));
+    if(q.shadows){
+      renderer.shadowMap.enabled = q.shadows !== 'off';
+      renderer.shadowMap.type = q.shadows === 'hard' ? T3.BasicShadowMap : T3.PCFSoftShadowMap;
+      sun.castShadow = q.shadows !== 'off';
+      scene.traverse(o=>{ if(o.material){ (Array.isArray(o.material) ? o.material : [o.material]).forEach(m=>m.needsUpdate = true); } });
+      renderer.shadowMap.needsUpdate = true;
+    }
+  }
+  return {build, setBalls, setArrow, setZone, setQuality, render, renderer};
 }
 root.Table3D = {make};
 })(typeof window !== 'undefined' ? window : this);
