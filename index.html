@@ -993,7 +993,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 243;   // one per commit to main
+const BUILD = 252;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1309,7 +1309,7 @@ function startRoutine(){
     // You read the shot from the ball line; at C- and C for a set time before you can call it. Calling a fraction
     // takes you behind that fraction's aim line and down on it (callAim); nothing happens on its own.
     if(c.phase !== 'stand') return;
-    c.left = Math.max(0, T - el); c.ready = c.left <= 0;
+    c.left = Math.max(0, T - el); c.ready = T >= NO_TIMER || c.left <= 0;   // no timer: ready at once
     renderRoutineChip();
     if(!c.ready) routineRaf = requestAnimationFrame(tick);
   };
