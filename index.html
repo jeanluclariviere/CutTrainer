@@ -91,6 +91,9 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menuhead{display:flex;justify-content:space-between;align-items:center;font:700 20px var(--display)}
 .menuclose{background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer;padding:4px 6px}
 .menucard .opt{justify-content:space-between}
+.settabs{align-self:stretch;display:grid;grid-template-columns:1fr 1fr}
+.setpane{display:flex;flex-direction:column;gap:12px}.setpane[hidden]{display:none}
+.setnote{color:var(--muted);font-size:11px}
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
 .optrange span{color:var(--muted);font-weight:500;margin-left:6px}
 .optrange input{width:100%;accent-color:#1f6fb2}
@@ -134,7 +137,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
 .lookbtn kbd{position:absolute;right:50%;transform:translateX(50%);bottom:-15px;font:600 9px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;white-space:nowrap}
 @media (hover:none){.lookbtn kbd{display:none}}
-.lookbtn{position:absolute;right:12px;bottom:22px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
+.lookbtn{position:absolute;right:12px;top:12px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
 .practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
 .practicechip b{color:#ffd34d;margin-left:8px}
 .ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
@@ -221,8 +224,6 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .trend .tip{position:absolute;top:-6px;transform:translate(-50%,-100%);background:var(--ink);color:var(--bg);font-size:12px;line-height:1.3;padding:5px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:2}
 .trend .tip b{font-size:13px}
 #fpsmeter{font-family:ui-monospace,Menlo,monospace}
-.gfxbar{display:flex;flex-wrap:wrap;gap:4px 14px;margin:4px 0 0 2px;font:600 11px system-ui,sans-serif;color:var(--ink);opacity:.7}
-.gfxbar select{font:inherit;margin-left:4px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:4px}
 .buildtag{flex:none;margin:6px 0 0 2px;font:600 11px/1 system-ui,sans-serif;color:var(--ink);opacity:.45;pointer-events:none}
 .trend .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center}
 .tabpanel .pgrid{grid-template-columns:1fr;gap:18px}
@@ -426,6 +427,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   <div class="menu" id="menu" hidden>
     <div class="menucard" role="dialog" aria-label="Settings">
       <div class="menuhead"><span>Settings</span><button class="menuclose" id="menuclose" aria-label="Close">✕</button></div>
+      <div class="seg settabs" role="tablist" aria-label="Settings sections"><button data-stab="game" aria-pressed="true">Game</button><button data-stab="gfx" aria-pressed="false">Graphics</button></div>
+      <div class="setpane" id="set-game">
       <div class="opt optrange">Your height <span id="heightval"></span>
         <input type="range" id="heightrange" min="150" max="200" step="1" aria-label="Your height, cm">
       </div>
@@ -483,6 +486,22 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
           <button id="sound-0" data-set="sound" data-val="0">Off</button>
           <button id="sound-1" data-set="sound" data-val="1">On</button>
         </div>
+      </div>
+      </div>
+      <div class="setpane" id="set-gfx" hidden>
+      <div class="opt">Resolution
+        <div class="seg" role="group" aria-label="Resolution"><button data-set="gfxRatio" data-val="1">1×</button><button data-set="gfxRatio" data-val="1.5">1.5×</button><button data-set="gfxRatio" data-val="2">2×</button></div>
+      </div>
+      <div class="opt">Shadows
+        <div class="seg" role="group" aria-label="Shadows"><button data-set="gfxShadows" data-val="soft">Soft</button><button data-set="gfxShadows" data-val="hard">Hard</button><button data-set="gfxShadows" data-val="off">Off</button></div>
+      </div>
+      <div class="opt">Antialiasing
+        <div class="seg" role="group" aria-label="Antialiasing"><button data-set="gfxAA" data-val="1">On</button><button data-set="gfxAA" data-val="0">Off</button></div>
+      </div>
+      <div class="opt">Arrow motion
+        <div class="seg" role="group" aria-label="Arrow motion"><button data-set="gfxBob" data-val="30">Smooth</button><button data-set="gfxBob" data-val="60">Every frame</button><button data-set="gfxBob" data-val="0">Still</button></div>
+      </div>
+        <small class="setnote">Lower resolution and simpler shadows run faster. Antialiasing reloads the page.</small>
       </div>
     </div>
   </div>
@@ -916,7 +935,9 @@ const READ_FLASH_LEVEL = 8;
 const level = () => READ_FLASH_LEVEL;
 const bestLevel = () => READ_FLASH_LEVEL;
 const gradeFor = p => GRADE_FROM.reduce((g, t, i)=>p >= t ? i : g, 0);
-const longShare = () => 0.5;   // short and long evenly: long shots aren't harder here (no cueing), so distance only comes in as a weak spot
+// Phones: a small touch screen. They get mostly shorter shots (balls easier to see) and lighter graphics by default.
+const IS_PHONE = (()=>{ try{ return matchMedia('(hover: none) and (pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600; }catch(e){ return false; } })();
+const longShare = () => IS_PHONE ? 0.2 : 0.5;   // short and long evenly: long shots aren't harder here (no cueing), so distance only comes in as a weak spot
 const leanK = () => { if(isShooting()) return 0.8 + shootLevel()*(1.2/(SHOOT_GRADES.length - 1));   // the ladder leans on your weak spots from F, harder as you climb
   const g = level(); return g===null || g < LEAN_AT ? 0 : 0.8 + (g - LEAN_AT)*(1.2/(GRADES.length-1-LEAN_AT)); };
 function aidMode(key){   // 'on', 'fade' (fades away after a delay) or 'off'; set by your grade alone
@@ -962,13 +983,8 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 229;   // one per commit to main
-document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` + (DEV ? `<div class="gfxbar">
-  <label>Resolution <select id="gfx-ratio"><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
-  <label>Shadows <select id="gfx-shadows"><option value="soft">soft</option><option value="hard">hard</option><option value="off">off</option></select></label>
-  <label>Antialias <select id="gfx-aa"><option value="1">on</option><option value="0">off (reloads)</option></select></label>
-  <label>Arrow bob <select id="gfx-bob"><option value="30">30/s</option><option value="60">every frame</option><option value="0">still</option></select></label>
-</div>` : ''));   // under the table, lined up with its left edge; always shown, so you can tell which build is live
+const BUILD = 232;   // one per commit to main
+document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
   let frames = 0, worst = 0, last = performance.now(), mark = last;
@@ -2359,8 +2375,9 @@ let arrowRaf = 0, arrowLast = 0;
 // graphics settings (#dev): resolution, shadows, antialiasing, and how often the arrows' bob redraws
 const GFX = {ratio: ['1','1.5','2'], shadows: ['soft','hard','off'], aa: ['1','0'], bob: ['30','60','0']};
 function applyGfx(){
-  if(!GFX.ratio.includes(settings.gfxRatio)) settings.gfxRatio = '1.5';
-  if(!GFX.shadows.includes(settings.gfxShadows)) settings.gfxShadows = 'soft';
+  if(!settings.gfxV){ if(IS_PHONE){ settings.gfxRatio = '1'; settings.gfxShadows = 'hard'; } settings.gfxV = 1; }   // once: phones move to the lighter defaults
+  if(!GFX.ratio.includes(settings.gfxRatio)) settings.gfxRatio = IS_PHONE ? '1' : '1.5';   // phones start lighter
+  if(!GFX.shadows.includes(settings.gfxShadows)) settings.gfxShadows = IS_PHONE ? 'hard' : 'soft';
   if(!GFX.aa.includes(settings.gfxAA)) settings.gfxAA = '1';
   if(!GFX.bob.includes(settings.gfxBob)) settings.gfxBob = '30';
   if(G3 && G3.setQuality) G3.setQuality({ratio: +settings.gfxRatio, shadows: settings.gfxShadows});
@@ -3336,6 +3353,8 @@ function applySetting(key, val){
   if(key==='task'){ setTimeout(renderPracticeChip, 0); setTimeout(syncStreakPill, 0); flashArmed = false; $('startcover').hidden = true; $('sesscover').hidden = true; renderBadge(); renderSession(); }
   if(key==='ghost' || key==='line'){ if(shot) draw(answered); }
   else if(key==='streaks') syncStreakPill();
+  else if(key==='gfxAA') location.reload();
+  else if(key.startsWith('gfx')){ applyGfx(); if(shot) draw(answered); }
   else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); }
   else if(key==='view' || key==='cam' || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
@@ -3796,6 +3815,10 @@ $('progclose').addEventListener('click', ()=>openProg(false));
 document.addEventListener('keyup', e=>{ if(e.key===' ' && look.target){ e.preventDefault(); setLook(false); } });
 { const b = $('lookbtn'); b.addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); setLook(true); });
   ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, e=>{ e.stopPropagation(); if(look.target) setLook(false); })); b.addEventListener('click', e=>e.stopPropagation()); }
+document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', ()=>{
+  document.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed', x === b));
+  $('set-game').hidden = b.dataset.stab !== 'game'; $('set-gfx').hidden = b.dataset.stab !== 'gfx';
+}));
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
   const i = +li.dataset.g;
@@ -3888,10 +3911,6 @@ if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
 applyGfx();
-if(DEV) [['gfx-ratio','gfxRatio'],['gfx-shadows','gfxShadows'],['gfx-aa','gfxAA'],['gfx-bob','gfxBob']].forEach(([id, k])=>{
-  const el = $(id); el.value = settings[k];
-  el.addEventListener('change', ()=>{ settings[k] = el.value; saveSettings(); if(k === 'gfxAA') location.reload(); else { applyGfx(); if(shot) draw(answered); } });
-});
 if(stats.shoot) stats.shoot.g = Math.max(stats.shoot.g, stats.shoot.best ?? 0);   // grades only go up now: back to your best
 $('practicechip').addEventListener('click', e=>{ e.stopPropagation(); setPractice(null); });
 renderPracticeChip();
