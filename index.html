@@ -137,13 +137,13 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .routinechip{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;background:rgba(16,40,61,.85);color:#fff;font:600 13px var(--body);padding:5px 12px;border-radius:999px;border:0;cursor:pointer}
 .lookbtn kbd{position:absolute;right:50%;transform:translateX(50%);bottom:-15px;font:600 9px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;white-space:nowrap}
 @media (hover:none){.lookbtn kbd{display:none}}
-.lookbtn{position:absolute;right:12px;top:12px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
+.lookbtn{position:absolute;right:12px;bottom:22px;z-index:5;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(16,40,61,.75);font-size:18px;cursor:pointer;touch-action:none}
 .practicechip{position:absolute;left:12px;bottom:12px;z-index:5;background:rgba(16,40,61,.88);color:#e6eef3;font:600 12px var(--body);padding:6px 12px;border-radius:999px;border:1px solid #ffd34d;cursor:pointer}
 .practicechip b{color:#ffd34d;margin-left:8px}
 .ladder li.pick{cursor:pointer}.ladder li.practice .node{outline:2px dashed #ffd34d;outline-offset:2px}
 .routinechip kbd{font:600 10px var(--body);padding:0 4px;margin-left:6px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d}
 @media (hover:none){.routinechip kbd{display:none}}
-.speedbar{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:none;cursor:ns-resize;user-select:none}
+.speedbar{position:absolute;right:10px;bottom:84px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:6px;touch-action:none;cursor:ns-resize;user-select:none}
 .speedtrack{position:relative;width:16px;height:min(60%,180px);min-height:120px;border-radius:9px;background:rgba(255,255,255,.18);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
 .speedtrack i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#ffd34d,#f08a24)}
 .speedbar b{font:700 13px var(--body);color:#fff;text-shadow:0 1px 2px #000}
@@ -989,7 +989,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 235;   // one per commit to main
+const BUILD = 236;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
