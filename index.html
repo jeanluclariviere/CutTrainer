@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 269;   // one per commit to main
+const BUILD = 270;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -4132,6 +4132,7 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
 // a cheat: type b-s-w quickly to see this shot's answer: the fraction, the speed and the spin
+let tipBeforeCheat = null;
 function revealAnswer(){
   const s = shot; if(!s || answered) return;
   const tipLabel = t => { const n = v => Math.round(Math.abs(v)/TIP_STEP), lab = k => k === 1 ? '½' : '1', y = n(t[1]), x = n(t[0]);
@@ -4148,7 +4149,8 @@ function revealAnswer(){
   document.addEventListener('keydown', e=>{
     if(e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
     const now = performance.now(); typed = (now - at < 500 ? typed : '') + e.key.toLowerCase(); at = now;
-    if(typed.endsWith('bsw')){ typed = ''; revealAnswer(); return; }
+    if(e.key.toLowerCase() === 'b') tipBeforeCheat = settings.shotTip && settings.shotTip.slice();
+    if(typed.endsWith('bsw')){ typed = ''; if(tipBeforeCheat){ settings.shotTip = tipBeforeCheat; saveSettings(); renderShootControls(); } revealAnswer(); return; }   // S and W moved the tip: put it back
     if(!typed.endsWith('tincl')) return;
     typed = '';
     const top = SHOOT_GRADES.length - 1, L = ensureShootLevel();
