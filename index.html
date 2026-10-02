@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 275;   // one per commit to main
+const BUILD = 276;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1145,21 +1145,53 @@ const levelForSpeed = V => coarseSpeed() ? COARSE.reduce((b, c)=>Math.abs(Math.l
 const levelForSpeedFine = V => { const d = diamondsFromSpeed(V); let best = 1; SPEED_LEVELS.forEach((x, i)=>{ if(Math.abs(Math.log(x/d)) < Math.abs(Math.log(SPEED_LEVELS[best-1]/d))) best = i + 1; }); return best; };
 // The tip moves in half-tip steps: half a 12.5 mm tip is 6.25 mm, about 0.22 of the ball's radius. Two steps (a full tip)
 // each way, and never past half the radius from the centre (Dr. Dave's miscue limit).
+// The tip, as a pool player says it: how many pips out from centre (a pip is half a 12.5 mm tip, 6.25 mm), and where
+// on the clock face of the cue ball (12 at the top, 3 to the right, 6 at the bottom). 1 pip at each hour, 2 pips at each
+// half hour (1:30 between 1 and 2). 2 pips is a full tip: inside Dr. Dave's miscue limit of half the radius.
+// Before side spin is yours, only 12 (top) and 6 (bottom), as far as you've unlocked them.
 const TIP_STEP = 6.25/28.575, TIP_STEPS = 2, TIP_MAX = .5 + 1e-6;
-function snapTip(t, c = {up:true, down:true, side:true}){
-  let nx = c.side ? Math.max(-TIP_STEPS, Math.min(TIP_STEPS, Math.round((t[0] || 0)/TIP_STEP))) : 0;
-  let ny = Math.max(c.down ? -TIP_STEPS : 0, Math.min(c.up ? TIP_STEPS : 0, Math.round((t[1] || 0)/TIP_STEP)));
-  while(Math.hypot(nx, ny)*TIP_STEP > TIP_MAX){ if(Math.abs(nx) >= Math.abs(ny)) nx -= Math.sign(nx); else ny -= Math.sign(ny); }
-  return [+(nx*TIP_STEP).toFixed(4), +(ny*TIP_STEP).toFixed(4)];
+const clockSteps = pips => pips >= 2 ? 24 : 12;   // positions round the clock at that many pips
+const tipXY = (pips, k) => { const n = clockSteps(pips), a = k/n*2*Math.PI; return [+(pips*TIP_STEP*Math.sin(a)).toFixed(4), +(pips*TIP_STEP*Math.cos(a)).toFixed(4)]; };
+function tipPolar(t){   // [pips, clock index] nearest to a tip
+  const pips = Math.max(0, Math.min(TIP_STEPS, Math.round(Math.hypot(t[0] || 0, t[1] || 0)/TIP_STEP)));
+  if(!pips) return [0, 0];
+  const n = clockSteps(pips), a = Math.atan2(t[0] || 0, t[1] || 0);
+  return [pips, ((Math.round(a/(2*Math.PI)*n) % n) + n) % n];
 }
-function nudgeTip(k){   // W up, S down, A left, D right (half a tip each), X back to centre; within what you've unlocked
+function tipAllowed(pips, k, c){
+  if(!pips) return true;
+  const n = clockSteps(pips);
+  if(c.side) return true;
+  return (k === 0 && c.up) || (k === n/2 && c.down);   // 12 o'clock, 6 o'clock
+}
+function snapTip(t, c = {up:true, down:true, side:true}){
+  const [p, k] = tipPolar(t);
+  if(tipAllowed(p, k, c)) return p ? tipXY(p, k) : [0, 0];
+  // the nearest allowed point
+  let best = [0, 0], bd = Infinity;
+  for(const q of tipPoints(c)){ const d = Math.hypot(q[0] - (t[0] || 0), q[1] - (t[1] || 0)); if(d < bd){ bd = d; best = q; } }
+  return best;
+}
+function tipPoints(c){   // every point you can strike, centre first
+  const out = [[0, 0]];
+  for(let p = 1; p <= TIP_STEPS; p++) for(let k = 0; k < clockSteps(p); k++) if(tipAllowed(p, k, c)) out.push(tipXY(p, k));
+  return out;
+}
+// "Center", "1 pip at 12", "2 pips at 1:30"
+function tipName(t){
+  const [p, k] = tipPolar(t); if(!p) return 'Center';
+  const n = clockSteps(p), hrs = k*12/n, h = Math.floor(hrs), half = hrs - h > .25;
+  return `${p} pip${p > 1 ? 's' : ''} at ${h === 0 ? 12 : h}${half ? ':30' : ''}`;
+}
+function nudgeTip(k){   // W a pip out (from centre: toward 12), S a pip in (from centre: toward 6), A/D round the clock; X centre
   const c = ctrl(); if(!(c.up || c.side)) return;
-  let [x, y] = snapTip(settings.shotTip || [0, 0], c);
-  if(k === 'x'){ x = 0; y = 0; }
-  if(k === 'w') y += TIP_STEP; if(k === 's') y -= TIP_STEP; if(k === 'a') x -= TIP_STEP; if(k === 'd') x += TIP_STEP;
-  const n = snapTip([x, y], c);
-  if(Math.hypot(...n) > TIP_MAX) return;
-  settings.shotTip = n; saveSettings(); renderShootControls();
+  let [p, i] = tipPolar(snapTip(settings.shotTip || [0, 0], c));
+  if(k === 'x'){ p = 0; i = 0; }
+  else if(k === 'w'){ if(!p){ p = 1; i = 0; } else if(!c.side && i !== 0){ p--; } else if(p < TIP_STEPS){ const n0 = clockSteps(p); p++; i = Math.round(i*clockSteps(p)/n0) % clockSteps(p); } }
+  else if(k === 's'){ if(!p){ p = 1; i = clockSteps(1)/2; } else if(!c.side && i === 0){ p--; } else if(!c.side){ if(p < TIP_STEPS){ p++; i = clockSteps(p)/2; } } else { const n0 = clockSteps(p); p--; if(p) i = Math.round(i*clockSteps(p)/n0) % clockSteps(p); } }
+  else if((k === 'a' || k === 'd') && c.side && p){ const n = clockSteps(p); i = (i + (k === 'd' ? 1 : -1) + n) % n; }
+  if(!tipAllowed(p, i, c)) return;
+  settings.shotTip = p ? tipXY(p, i) : [0, 0]; saveSettings(); renderShootControls();
 }
 // Speed is four strokes: ¼, ½, ¾ and the full stroke (the finer 1–10 is off for now).
 const COARSE = [3, 5, 8, 10], COARSE_F = {3:.25, 5:.5, 8:.75, 10:1}, COARSE_LBL = {3:'¼', 5:'½', 8:'¾', 10:'Full'};
@@ -1288,7 +1320,7 @@ function otherWays(s, zs, lvl){
 // and the tip. Each is re-checked after rounding, and can be played mirrored left-right.
 // keys: a zone step's grade (B+ to S+), or the grade itself for the grades without zones (F to B)
 const ZONE_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], BASIC_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 7, REC = 13;
+const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 8, REC = 13;
 const isZoneStep = k => ZONE_STEPS.includes(+k), LIB_PER_OF = k => isZoneStep(k) ? 1000 : 300;   // what your device builds (the shipped file has far more)
 const tableFor = k => { const g0 = GEN.g; GEN.g = +k; try{ return progTable(); } finally { GEN.g = g0; } };
 const fnv = t => { let h = 0x811c9dc5; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
@@ -1300,7 +1332,7 @@ const q12 = x => Math.max(0, Math.min(4095, Math.round((x + 2)*Q))), uq12 = v =>
 function recOf(s){
   const z = s.zone || {c: [0, 0], r: 5, lvl: COARSE[0], lvls: [], tip: [0, 0]};
   return {cb: s.cb.map(x=>uq12(q12(x))), ob: s.ob.map(x=>uq12(q12(x))), Pi: POCKETS.indexOf(s.P), cheat: Math.max(-127, Math.min(127, Math.round((s.cheat || 0)*50)))/50,
-    zc: z.c.map(x=>uq12(q12(x))), zr: z.r, lvl: z.lvl, lvls: s.zone ? z.lvls || [z.lvl] : [], tip: z.tip.map(t=>Math.round(t/TIP_STEP)*TIP_STEP), frac: s.answer.id};
+    zc: z.c.map(x=>uq12(q12(x))), zr: z.r, lvl: z.lvl, lvls: s.zone ? z.lvls || [z.lvl] : [], tip: snapTip(z.tip), frac: s.answer.id};
 }
 function encodeRec(r, out, o){
   const c = [...r.cb, ...r.ob, ...r.zc].map(q12);
@@ -1308,7 +1340,7 @@ function encodeRec(r, out, o){
   out[o+9] = (Math.round(r.cheat*50) + 256) & 255;
   out[o+10] = (r.Pi & 7) | ((CORE.findIndex(x=>x.id === r.frac) & 7) << 3) | ((COARSE.indexOf(r.lvl) & 3) << 6);
   out[o+11] = r.lvls.reduce((m, l)=>m | (1 << COARSE.indexOf(l)), 0) | (Math.max(0, ZR_CODES.indexOf(r.zr)) << 4);
-  out[o+12] = (Math.round(r.tip[0]/TIP_STEP) + 2) | ((Math.round(r.tip[1]/TIP_STEP) + 2) << 3);
+  const [tp, tk] = tipPolar(r.tip); out[o+12] = tp | (tk << 2);   // pips (0–2) and the clock position (0–23)
 }
 function decodeRec(b, o){
   const c = [];
@@ -1316,7 +1348,7 @@ function decodeRec(b, o){
   const m = b[o+11];
   return {cb: [uq12(c[0]), uq12(c[1])], ob: [uq12(c[2]), uq12(c[3])], zc: [uq12(c[4]), uq12(c[5])], cheat: ((b[o+9] << 24) >> 24)/50,
     Pi: b[o+10] & 7, frac: (CORE[(b[o+10] >> 3) & 7] || CORE[0]).id, lvl: COARSE[b[o+10] >> 6], lvls: COARSE.filter((l, i)=>m & (1 << i)),
-    zr: ZR_CODES[m >> 4], tip: [((b[o+12] & 7) - 2)*TIP_STEP, (((b[o+12] >> 3) & 7) - 2)*TIP_STEP]};
+    zr: ZR_CODES[m >> 4], tip: (b[o+12] & 3) ? tipXY(b[o+12] & 3, b[o+12] >> 2) : [0, 0]};
 }
 const toB64 = u8 => { let s = ''; for(let i = 0; i < u8.length; i += 8192) s += String.fromCharCode.apply(null, u8.subarray(i, i + 8192)); return btoa(s); };
 const fromB64 = t => Uint8Array.from(atob(t), ch=>ch.charCodeAt(0));
@@ -1680,14 +1712,8 @@ function renderShootControls(){
     $('tipkeys').innerHTML = [c.up && 'W', c.side && 'A', c.down && 'S', c.side && 'D'].filter(Boolean).map(k=>`<kbd>${k}</kbd>`).join('');
   }
 }
-function tipLimitPath(c){   // the points you can strike: one dot per half-tip step you've unlocked
-  let d = '';
-  for(let i = -TIP_STEPS; i <= TIP_STEPS; i++) for(let j = -TIP_STEPS; j <= TIP_STEPS; j++){
-    const [x, y] = snapTip([i*TIP_STEP, j*TIP_STEP], c);
-    if(Math.abs(x - i*TIP_STEP) > 1e-3 || Math.abs(y - j*TIP_STEP) > 1e-3) continue;
-    d += `M${(x - .035).toFixed(3)} ${(-y).toFixed(3)}a.035 .035 0 1 0 .07 0a.035 .035 0 1 0 -.07 0`;
-  }
-  return d;
+function tipLimitPath(c){   // a dot at every point you can strike: the centre, then rings round the clock
+  return tipPoints(c).map(([x, y])=>`M${(x - .035).toFixed(3)} ${(-y).toFixed(3)}a.035 .035 0 1 0 .07 0a.035 .035 0 1 0 -.07 0`).join('');
 }
 function wireShootControls(){
   $('routinechip').addEventListener('click', ()=>goDown());
@@ -1777,8 +1803,6 @@ function takeShot(id){
   if(ctrl().speed) rows.push(['Stroke', spd(mine), strokeOk || zoneWin, strokeOk || zoneWin ? '' : spd(want)]);
   // the spin: your tip against the one that makes the zone (in half-tip steps: "½ top", "1 draw", "½ left"...)
   if(s.zone && (ctrl().up || ctrl().side)){
-    const tipName = t => { const n = v => Math.round(Math.abs(v)/TIP_STEP), lab = k => k === 1 ? '½' : '1', y = n(t[1]), x = n(t[0]);
-      const parts = []; if(y) parts.push(`${lab(y)} ${t[1] > 0 ? 'top' : 'draw'}`); if(x) parts.push(`${lab(x)} ${t[0] > 0 ? 'right' : 'left'}`); return parts.join(', ') || 'Center'; };
     const mineTip = snapTip(stroke.tip || [0, 0]), zoneTip = s.zone.tip || [0, 0], same = tipName(mineTip) === tipName(zoneTip);
     rows.push(['Spin', tipName(mineTip), same || zoneWin, same || zoneWin ? '' : tipName(zoneTip)]);
   }
@@ -3938,7 +3962,7 @@ const SL_CUSHION = [
 ];
 const SL_ENGLISH = [
   {deg:35, aids:{}, play:{k:2.6, tip:[.45,0]}, next:true,
-   text:'<b>English</b>: strike left or right of centre on the tip pad (<b>A</b>, <b>D</b>). Off a cushion it widens or narrows the angle.'},
+   text:'<b>English</b>: strike left or right of centre. On the tip pad that\'s the clock: <b>A</b> and <b>D</b> go round it, <b>W</b> and <b>S</b> add or take away a pip. 3 o\'clock is right english, 9 o\'clock left. Off a cushion it widens or narrows the angle.'},
   {aids:{}, play:{k:2.6, tip:[-.45,0]}, next:true, text:'The other side, the other way.'},
   {finish:true, aids:{}, text:'Side also pushes the cue ball slightly off line (<b>deflection</b>) and throws the object ball a little, so on some shots it changes which fraction to call.'},
 ];
@@ -4164,8 +4188,7 @@ $('quick').addEventListener('click', e=>{ if(e.target.closest('#showright')){ e.
 let tipBeforeCheat = null;
 function revealAnswer(){
   const s = shot; if(!s || answered) return;
-  const tipLabel = t => { const n = v => Math.round(Math.abs(v)/TIP_STEP), lab = k => k === 1 ? '½' : '1', y = n(t[1]), x = n(t[0]);
-    const p = []; if(y) p.push(`${lab(y)} ${t[1] > 0 ? 'top' : 'draw'}`); if(x) p.push(`${lab(x)} ${t[0] > 0 ? 'right' : 'left'}`); return p.join(', ') || 'center'; };
+  const tipLabel = tipName;
   const z = s.zone, st = z ? {V: STROKE_MPH[z.lvl]*MPH, tip: z.tip} : shotStroke(s);
   const frac = nearestRef(cutForDir(s, aimFor(s, st))), lab = frac.id === 'full' ? 'Full' : frac.label;
   const bits = [lab];
