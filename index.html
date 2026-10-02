@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 265;   // one per commit to main
+const BUILD = 266;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -4281,7 +4281,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, ZONE_STEPS, tableFor, libVer, parseShipped, fromLibrary, shippedOk, setShipped: x=>{ SHIPPED = x; }, isZoneStep, shotOf, zoneSpotOk, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
+if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, ZONE_STEPS, tableFor, libVer, parseShipped, fromLibrary, shippedOk, setShipped: x=>{ SHIPPED = x; }, isZoneStep, shotOf, zoneSpotOk, handRoomMax: s=>{ const g0 = GEN.g; GEN.g = 0; try{ return handRoom(s); } finally { GEN.g = g0; } }, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
 if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAtContact, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, PE, engineTable, G3: ()=>G3, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
 if(!settings.stanceSet && !settings.tut && !(stats.log || []).length && !baselines().length){ $('stancecover').hidden = false; showSessIdle(); }   // a new player sets their stance first
 deal();

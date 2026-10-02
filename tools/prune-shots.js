@@ -19,9 +19,10 @@ for(let i = 0; i < n; i++){
   L.setTable(String(table));
   for(let j = 0; j < cnt; j++){
     const rec = b.subarray(o + j*REC, o + (j + 1)*REC);
-    if(!L.isZoneStep(st)){ keep.push(rec); continue; }
     const s = L.shotOf(L.decodeRec(rec, 0), st, false);
-    if(L.zoneSpotOk(s, s.zone.c)) keep.push(Buffer.from(rec));
+    if(st >= 4 && !L.handRoomMax(s)) continue;               // room for the bridge hand at the tallest height
+    if(L.isZoneStep(st) && !L.zoneSpotOk(s, s.zone.c)) continue;
+    keep.push(Buffer.from(rec));
   }
   o += cnt*REC;
   const h = Buffer.alloc(6); h[0] = st; h[1] = table; h.writeUInt32LE(keep.length, 2); parts.push(h, ...keep);
