@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 267;   // one per commit to main
+const BUILD = 268;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1763,6 +1763,13 @@ function takeShot(id){
   const rows = [['Call', lab(picked), ok ? true : zoneWin ? 'also' : false, ok ? '' : lab(right)]];
   const strokeOk = s.zone && s.zone.lvls ? s.zone.lvls.some(l=>spd(l) === spd(mine)) : spd(mine) === spd(want);
   if(ctrl().speed) rows.push(['Stroke', spd(mine), strokeOk || zoneWin, strokeOk || zoneWin ? '' : spd(want)]);
+  // the spin: your tip against the one that makes the zone (in half-tip steps: "½ top", "1 draw", "½ left"...)
+  if(s.zone && (ctrl().up || ctrl().side)){
+    const tipName = t => { const n = v => Math.round(Math.abs(v)/TIP_STEP), lab = k => k === 1 ? '½' : '1', y = n(t[1]), x = n(t[0]);
+      const parts = []; if(y) parts.push(`${lab(y)} ${t[1] > 0 ? 'top' : 'draw'}`); if(x) parts.push(`${lab(x)} ${t[0] > 0 ? 'right' : 'left'}`); return parts.join(', ') || 'Center'; };
+    const mineTip = snapTip(stroke.tip || [0, 0]), zoneTip = s.zone.tip || [0, 0], same = tipName(mineTip) === tipName(zoneTip);
+    rows.push(['Spin', tipName(mineTip), same || zoneWin, same || zoneWin ? '' : tipName(zoneTip)]);
+  }
   const ball = run.scratch ? 'Scratch: the cue ball went in' : !run.hit ? 'Missed the object ball' : !run.made ? (run.obIn ? 'Wrong pocket' : 'Missed the pocket')
     : s.zone ? (run.inZone ? 'Pocketed, in the zone' : `Pocketed, missed the zone by ${run.zoneMiss.toFixed(1)}″`) : 'Pocketed';
   rows.push(['Ball', ball, run.made && !run.scratch && (!s.zone || run.inZone), '']);
