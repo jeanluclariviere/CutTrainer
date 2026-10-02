@@ -626,7 +626,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="shootctl" id="shootctl" hidden>
         <div class="tippad" id="tippad" hidden><small>Tip</small>
           <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".45"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
-          <span class="ckeys" id="tipkeys"></span><button class="link" id="tipcentre">Centre <kbd>X</kbd></button>
+          <span class="ckeys" id="tipkeys"></span>
         </div>
         <div class="freebtns" id="freebtns" hidden><button class="sumdone" id="freereset">Reset balls</button><button class="sumdone" id="freenew">New layout</button><small>Drag a ball to move it · tap a pocket to aim for it</small></div>
       </div>
@@ -1020,7 +1020,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 257;   // one per commit to main
+const BUILD = 258;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1690,7 +1690,6 @@ function wireShootControls(){
   pad.addEventListener('pointerdown', ev=>{ if(answered) return; tDrag = true; try{ pad.setPointerCapture(ev.pointerId); }catch(e){} setTipFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
   pad.addEventListener('pointermove', ev=>{ if(tDrag) setTipFrom(ev); });
   ['pointerup','pointercancel'].forEach(t=>pad.addEventListener(t, ()=>{ tDrag = false; }));
-  $('tipcentre').addEventListener('click', ()=>{ settings.shotTip = [0, 0]; saveSettings(); renderShootControls(); });
   $('freereset').addEventListener('click', ()=>{ if(anim) finishAnim(); freeReset(); $('quick').innerHTML = ''; $('result').innerHTML = ''; tableBox.classList.remove('tappable'); });
   $('freenew').addEventListener('click', ()=>{ if(anim) finishAnim(); deal(); });
 }
