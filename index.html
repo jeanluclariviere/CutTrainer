@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 266;   // one per commit to main
+const BUILD = 267;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1722,7 +1722,7 @@ function cutForDir(s, dir){
 // any other call plays that fraction's contact exactly
 function takeShot(id){
   if(answered || !shot || !isShooting() || anim) return;
-  const s = shot, stroke = shotStroke(s), withCue = rigAlpha(s).a > .01;
+  const s = shot, stroke = shotStroke(s), rig0 = rigAlpha(s), withCue = rig0.a > .01, feather0 = rig0.push || 0;   // where the practice stroke is right now, read before anything changes
   const needDir = aimFor(s, stroke), need = cutForDir(s, needDir), right = nearestRef(need);
   const picked = ALL.find(r=>r.id===id) || right, ok = picked.id === right.id;
   const dir = ok ? needDir : dirForCut(s, picked.deg);
@@ -1787,7 +1787,7 @@ function takeShot(id){
   s.follow = FOLLOW_THROUGH;
   // the call doesn't cut the practice stroke short: it finishes, the cue rests at the ball for a beat (as long as the pause at
   // the back), then the backswing
-  const now0 = performance.now(), TP = 180, x0 = rigAlpha(s).push || 0, fb = Math.max(.1, (s.cam && s.cam.fBack) || strokeBack(s));
+  const now0 = performance.now(), TP = 180, x0 = feather0, fb = Math.max(.1, (s.cam && s.cam.fBack) || strokeBack(s));
   const ft = x0 < -.05 ? Math.max(120, 520*Math.abs(x0)/fb) : 0;   // the practice stroke comes forward to the ball from where it is
   const st = cueStroke = {s, x0, t1: now0, ft, t0: now0 + ft + TP, from: 0, back: strokeBack(s), tb: 420, tp: TP, tf: 220};
   const tick = now => {
