@@ -1004,7 +1004,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 248;   // one per commit to main
+const BUILD = 249;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1294,7 +1294,7 @@ function unpackLib(rec, step, fx, fy){
     zone: {c: [X(zx), Y(zy)], r: zr, step, lvl, lvls, tip: (fx !== fy) ? [-tip[0], tip[1]] : tip}};
 }
 function fromLibrary(step, bucket){
-  const L = libLoad(), pool = L.steps[step] || []; if(pool.length < 12) return null;   // too few yet: deal live
+  const L = libLoad(), pool = L.steps[step] || []; if(pool.length < 200) return null;   // too few yet to avoid repeats: deal live
   const want = REFS[bucket] && REFS[bucket].id, same = pool.filter(rec=>rec[13] === want);
   const rec = pick(same.length ? same : pool);
   const s = unpackLib(rec, step, Math.random() < .5, false);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
@@ -1318,7 +1318,7 @@ let libTimer = 0;
 function libIdle(){
   clearTimeout(libTimer);
   if(libFull() || libBuilding) return;
-  libTimer = setTimeout(()=>{ if(answered && !anim && !cueStroke && !look.k && !walkDrag && !tut.on){ libGrowOne(); renderLibStatus(); } libIdle(); }, 1200);   // only while you're looking over a played shot, so it never stutters an aim
+  libTimer = setTimeout(()=>{ if(answered && !anim && !cueStroke && !look.k && !walkDrag && !tut.on){ libGrowOne(); renderLibStatus(); } libIdle(); }, 600);   // only while you're looking over a played shot, so it never stutters an aim
 }
 // Settings: rebuild it all now, with a progress bar
 let libBuilding = false, libWait = false;
