@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 273;   // one per commit to main
+const BUILD = 274;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
