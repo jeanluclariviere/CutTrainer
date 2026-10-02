@@ -91,7 +91,9 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .menuhead{display:flex;justify-content:space-between;align-items:center;font:700 20px var(--display)}
 .menuclose{background:none;border:0;font-size:18px;color:var(--muted);cursor:pointer;padding:4px 6px}
 .menucard .opt{justify-content:space-between}
-.settabs{align-self:stretch;display:grid;grid-template-columns:1fr 1fr}
+.settabs{align-self:stretch;display:grid;grid-template-columns:repeat(4,1fr)}
+.settabs button{padding-inline:4px}
+.menucard .optwrap{flex-wrap:wrap}.menucard .optwrap .seg{margin-left:auto}
 .setpane{display:flex;flex-direction:column;gap:12px}.setpane[hidden]{display:none}
 .setnote{color:var(--muted);font-size:11px}
 .menucard .optrange{flex-direction:column;align-items:stretch;gap:6px}
@@ -434,8 +436,8 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   <div class="menu" id="menu" hidden>
     <div class="menucard" role="dialog" aria-label="Settings">
       <div class="menuhead"><span>Settings</span><button class="menuclose" id="menuclose" aria-label="Close">✕</button></div>
-      <div class="seg settabs" role="tablist" aria-label="Settings sections"><button data-stab="game" aria-pressed="true">Game</button><button data-stab="gfx" aria-pressed="false">Graphics</button></div>
-      <div class="setpane" id="set-game">
+      <div class="seg settabs" role="tablist" aria-label="Settings sections"><button data-stab="you" aria-pressed="true">You</button><button data-stab="table" aria-pressed="false">Table</button><button data-stab="sound" aria-pressed="false">Sound</button><button data-stab="gfx" aria-pressed="false">Graphics</button></div>
+      <div class="setpane" id="set-you">
       <div class="opt optrange">Your height <span id="heightval"></span>
         <input type="range" id="heightrange" min="150" max="200" step="1" aria-label="Your height, cm">
       </div>
@@ -443,56 +445,50 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <input type="range" id="backrange" min="24" max="48" step="1" aria-label="How far you stand behind the cue ball, inches">
       </div>
       <div class="opt">Shooting hand
-        <div class="seg" role="group" aria-label="Shooting hand">
-          <button id="hand-R" data-set="hand" data-val="R">Right</button>
-          <button id="hand-L" data-set="hand" data-val="L">Left</button>
-        </div>
-      </div>
-      <div class="opt optrange">Cue and hand opacity <span id="rigopval"></span>
-        <input type="range" id="rigoprange" min="50" max="100" step="5" aria-label="Cue and hand opacity, percent">
+        <div class="seg" role="group" aria-label="Shooting hand"><button data-set="hand" data-val="R">Right</button><button data-set="hand" data-val="L">Left</button></div>
       </div>
       <div class="opt">Bridge
-        <div class="seg" role="group" aria-label="Bridge">
-          <button id="bridge-open" data-set="bridge" data-val="open">Open</button>
-          <button id="bridge-closed" data-set="bridge" data-val="closed">Closed</button>
-        </div>
+        <div class="seg" role="group" aria-label="Bridge"><button data-set="bridge" data-val="open">Open</button><button data-set="bridge" data-val="closed">Closed</button></div>
       </div>
       <div class="opt optcolor">Glove <input type="color" id="glovecolor" aria-label="Glove colour"></div>
       <div class="opt optcolor">Hand <input type="color" id="skincolor" aria-label="Hand colour"></div>
-      <div class="opt">Music <small class="muted">(M to switch)</small>
-        <div class="seg" role="group" aria-label="Music">
-          <button id="music-off" data-set="music" data-val="off">Off</button>
-          <button id="music-parlor" data-set="music" data-val="parlor">Parlor</button>
-          <button id="music-smoke" data-set="music" data-val="smoke">Smoke</button>
-          <button id="music-felt" data-set="music" data-val="felt">Felt</button>
-        </div>
+      <div class="opt optrange">Cue and hand opacity <span id="rigopval"></span>
+        <input type="range" id="rigoprange" min="50" max="100" step="5" aria-label="Cue and hand opacity, percent">
+      </div>
+      </div>
+      <div class="setpane" id="set-table" hidden>
+      <small class="setnote">What's drawn on the table once the balls move:</small>
+      <div class="opt">Path to the pocket
+        <div class="seg" role="group" aria-label="Path to the pocket"><button data-set="refPath" data-val="0">Off</button><button data-set="refPath" data-val="1">On</button></div>
+      </div>
+      <div class="opt">Ball trails
+        <div class="seg" role="group" aria-label="Ball trails"><button data-set="refTrail" data-val="0">Off</button><button data-set="refTrail" data-val="1">On</button></div>
+      </div>
+      <div class="opt">Where you hit it
+        <div class="seg" role="group" aria-label="The ghost ball and aim line of your call"><button data-set="refGhost" data-val="0">Off</button><button data-set="refGhost" data-val="1">On</button></div>
+      </div>
+      <div class="opt">Right path on a miss
+        <div class="seg" role="group" aria-label="See-through ball rolling the right path"><button data-set="refMiss" data-val="0">Off</button><button data-set="refMiss" data-val="1">On</button></div>
+      </div>
+      <div class="opt">Where the balls started
+        <div class="seg" role="group" aria-label="Where the balls started"><button data-set="refStart" data-val="0">Off</button><button data-set="refStart" data-val="1">On</button></div>
+      </div>
+      <div class="opt">Streaks
+        <div class="seg" role="group" aria-label="Streaks"><button data-set="streaks" data-val="0">Off</button><button data-set="streaks" data-val="1">On</button></div>
+      </div>
+      <div class="opt">Shot animation
+        <div class="seg" role="group" aria-label="Shot animation"><button data-set="animate" data-val="0">Off</button><button data-set="animate" data-val="1">On</button></div>
+      </div>
+      </div>
+      <div class="setpane" id="set-sound" hidden>
+      <div class="opt">Sound
+        <div class="seg" role="group" aria-label="Sound"><button data-set="sound" data-val="0">Off</button><button data-set="sound" data-val="1">On</button></div>
+      </div>
+      <div class="opt optwrap">Music <small class="muted">M switches</small>
+        <div class="seg" role="group" aria-label="Music"><button data-set="music" data-val="off">Off</button><button data-set="music" data-val="parlor">Parlor</button><button data-set="music" data-val="smoke">Smoke</button><button data-set="music" data-val="felt">Felt</button></div>
       </div>
       <div class="opt optrange">Music volume <span id="musicvolval"></span>
         <input type="range" id="musicvol" min="0" max="100" step="5" aria-label="Music volume, percent">
-      </div>
-      <div class="opt">Shot references
-        <div class="seg" role="group" aria-label="Lines and reference balls after the shot">
-          <button id="refs-0" data-set="refs" data-val="0">Off</button>
-          <button id="refs-1" data-set="refs" data-val="1">On</button>
-        </div>
-      </div>
-      <div class="opt">Streaks
-        <div class="seg" role="group" aria-label="Streaks">
-          <button id="streaks-0" data-set="streaks" data-val="0">Off</button>
-          <button id="streaks-1" data-set="streaks" data-val="1">On</button>
-        </div>
-      </div>
-      <div class="opt">Shot animation
-        <div class="seg" role="group" aria-label="Shot animation">
-          <button id="animate-0" data-set="animate" data-val="0">Off</button>
-          <button id="animate-1" data-set="animate" data-val="1">On</button>
-        </div>
-      </div>
-      <div class="opt">Sound
-        <div class="seg" role="group" aria-label="Sound">
-          <button id="sound-0" data-set="sound" data-val="0">Off</button>
-          <button id="sound-1" data-set="sound" data-val="1">On</button>
-        </div>
       </div>
       </div>
       <div class="setpane" id="set-gfx" hidden>
@@ -996,7 +992,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 238;   // one per commit to main
+const BUILD = 240;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1960,7 +1956,8 @@ function perspBack(cam, s, reveal, segs, ring){
 
   return o;
 }
-const refsOn = () => settings.refs !== '0';   // the after-shot references: paths, trails, ghost and start markers (Settings)
+// the after-shot references, each its own switch in Settings (Table)
+const refOn = k => settings[k] !== '0';
 function perspDyn(cam, s, reveal){
   let o = '';
   // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
@@ -1970,12 +1967,12 @@ function perspDyn(cam, s, reveal){
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
   // the correct path to the pocket draws itself from contact on, as if the object ball were rolling along it
-  if(refsOn() && (reveal || (s.anim && s.anim.run > 0))){
+  if(refOn('refPath') && (reveal || (s.anim && s.anim.run > 0))){
     const pe = pocketEdge(s.ob, s.P, s.T), full = len(sub(pe, s.ob)), k = reveal && !s.anim ? 1 : Math.min(1, s.anim.run/full);   // grows at the object ball's speed, stops at the hole's edge
     const end = add(s.ob, mul(sub(pe, s.ob), k));
     if(k > 0.002) o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[end[0],end[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
-  if(reveal && refsOn()){
+  if(reveal && refOn('refGhost')){
     if(s.pick && s.pick.far){
       const pk = s.pick, col = pk.made ? NEAR_MISS_OK : MISS, stop = s.final && s.final.stop;
       const into = pk.u2 ? dot(sub(s.P.t, s.ob), pk.u2) : 0;   // lines end at the cushion, or in the pocket if it drops
@@ -1993,7 +1990,7 @@ function perspDyn(cam, s, reveal){
   }
   // trails: where the balls have travelled (during the animation, and the cue ball's path afterwards)
   const trail = s.anim ? s.anim.trail : (reveal && s.final ? s.final.trail : null);
-  if(trail && refsOn()){
+  if(trail && refOn('refTrail')){
     o += dashedLine(cam, trail.cb, '#f4efe0', .6, '2 4');
     if(trail.ob && trail.obCol !== '#ffd34d') o += dashedLine(cam, trail.ob, trail.obCol, .9, '3 4');   // on a right call the yellow line already grows along it
   }
@@ -2011,16 +2008,16 @@ function perspDyn(cam, s, reveal){
   // (always yellow, like the line to the pocket: a ball's own colour can vanish on the cloth)
   const obNow = A ? A.ob : F ? F.ob : null;
   const refA = A ? Math.max(0, Math.min(1, (A.tHit ?? 0)/REF_FADE)) : 1;   // the reference balls fade in just after the hit
-  if(refsOn() && (contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: refA});
+  if(refOn('refStart') && (contact || F) && !(obNow && len(sub(obNow, s.ob)) < 2*R)) items.push({p: s.ob, kind:'obmark', a: refA});
   // where the cue ball started, once it has left: shown as you stand back up (down on the shot it would only be under your cue)
   const cbNow = A ? A.cb : F ? F.cb : null, sc = s.cam, upK = sc && sc.T && sc.phase === 'down' ? 1 - sc.k : 1;
-  if(refsOn() && isShooting() && (contact || F) && upK > .01 && !(cbNow && len(sub(cbNow, s.cb)) < 2*R)) items.push({p: s.cb, kind:'refcb', a: refA*upK});
+  if(refOn('refStart') && isShooting() && (contact || F) && upK > .01 && !(cbNow && len(sub(cbNow, s.cb)) < 2*R)) items.push({p: s.cb, kind:'refcb', a: refA*upK});
   // on a miss, a see-through object ball rolls the path the right call would have sent it on, into the pocket
-  if(refsOn() && A && A.obGhost) items.push({p: A.obGhost.p, kind:'ob', ghost: true, z: A.obGhost.z, shadow: A.obGhost.shadow, pocket: s.P});
+  if(refOn('refMiss') && A && A.obGhost) items.push({p: A.obGhost.p, kind:'ob', ghost: true, z: A.obGhost.z, shadow: A.obGhost.shadow, pocket: s.P});
   const gA = aidAlpha('ghost');   // the ghost-ball aid, before you answer (it may be fading away)
   // once the balls meet, the ghost ball shows where your call actually made contact (on a miss that's not the ideal spot)
   const hit = (A && contact) || (reveal && !A), yours = hit && s.pick && s.pick.far;
-  if(refsOn() ? (A ? (contact || gA > 0) : (reveal || gA > 0)) : (!A && !reveal && gA > 0)) items.push({p: yours ? s.pick.g2 : hit ? s.gb : (s.gbLook || s.gb), kind:'ghost', a: hit ? Math.max(refA, yours ? 0 : gA) : gA});
+  if(refOn('refGhost') ? (A ? (contact || gA > 0) : (reveal || gA > 0)) : (!A && !reveal && gA > 0)) items.push({p: yours ? s.pick.g2 : hit ? s.gb : (s.gbLook || s.gb), kind:'ghost', a: hit ? Math.max(refA, yours ? 0 : gA) : gA});
   if(!reveal && s.place) items.push({p:s.place, kind:'user'});
   items.forEach(it=>{it.c = cam.toCam([it.p[0],it.p[1],it.z ?? R]);});
   items.sort((a,b)=>b.c[2]-a.c[2]);
@@ -2161,7 +2158,7 @@ function cueRig(cam, s){
   const {a, ac, push} = rigAlpha(s);
   if(a < .01) return '';
   const u = norm(sub(s.gbLook || s.gb, s.cb)), n = [-u[1], u[0]];          // forward along the aim, and to its left
-  const sd = settings.hand === 'L' ? mul(n, -1) : n;                        // the bridge hand's side: left of the cue for a right-handed player
+  const sd = settings.hand === 'L' ? n : mul(n, -1);                        // the bridge hand's side: on screen left of the cue for a right-handed player (n points to screen right)
   const tip = shotStroke(s).tip || [0, 0], tx = tip[0], ty = tip[1], dz = Math.sqrt(Math.max(0, 1 - tx*tx - ty*ty));
   const Cp = [s.cb[0] - u[0]*dz*R - n[0]*tx*R, s.cb[1] - u[1]*dz*R - n[1]*tx*R, R + ty*R];   // where the tip meets the cue ball
   // How steep the cue is: a touch more with top, a touch less with draw (you keep it level to hit low), and as steep as it
@@ -3376,7 +3373,7 @@ function applySetting(key, val){
   else if(key==='gfxAA') location.reload();
   else if(key.startsWith('gfx')){ applyGfx(); if(shot) draw(answered); }
   else if(key==='music'){ if(window.Music) val === 'off' ? Music.stop() : Music.play(val); }
-  else if(key==='view' || key==='cam' || key==='refs' || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
+  else if(key==='view' || key==='cam' || key.startsWith('ref') || key==='hand' || key==='glove' || key==='skin' || key==='bridge'){ if(shot) draw(answered); }   // same shot, new viewpoint
   else if(key==='table' || key==='pockets'){ const keep = stats.active && stats.active.pending && !answered; if(!keep){ setTable(settings.table, settings.pockets); deal(); } }   // mid-shot in a session: applies from the next shot
   else if(key==='mode' || key==='len' || key==='throw' || key==='full' || key==='task' || (key==='flash' && settings.task==='flash')) deal();   // a kept session shot stays (deal restores it)
   renderStats();
@@ -3837,7 +3834,7 @@ document.addEventListener('keyup', e=>{ if(e.key===' ' && look.target){ e.preven
   ['pointerup','pointercancel','pointerleave'].forEach(t=>b.addEventListener(t, e=>{ e.stopPropagation(); if(look.target) setLook(false); })); b.addEventListener('click', e=>e.stopPropagation()); }
 document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', ()=>{
   document.querySelectorAll('[data-stab]').forEach(x=>x.setAttribute('aria-pressed', x === b));
-  $('set-game').hidden = b.dataset.stab !== 'game'; $('set-gfx').hidden = b.dataset.stab !== 'gfx';
+  ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('ladder').addEventListener('click', e=>{
   const li = e.target.closest('li[data-g]'); if(!li) return;
@@ -3928,7 +3925,7 @@ $('stancedone').addEventListener('click', e=>{ e.stopPropagation(); closeStance(
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
-if(!['0','1'].includes(settings.refs)) settings.refs='1';
+['refPath','refTrail','refGhost','refMiss','refStart'].forEach(k=>{ if(!['0','1'].includes(settings[k])) settings[k] = settings.refs === '0' ? '0' : '1'; });   // all off if you'd switched them all off before
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
 applyGfx();
