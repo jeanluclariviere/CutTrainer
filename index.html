@@ -1020,7 +1020,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 259;   // one per commit to main
+const BUILD = 260;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1377,6 +1377,7 @@ function libSave(){
 const mineCount = k => (libLoad().steps[k] || []).length;
 const libCount = () => LIB_STEPS.reduce((t, k)=>t + mineCount(k) + shippedCount(k), 0);
 const libFull = () => LIB_STEPS.every(k=>mineCount(k) + shippedCount(k) >= LIB_PER_OF(k));
+const RECENT = {};   // the last 60 stored shots dealt at each grade, so none comes back soon
 function fromLibrary(step, bucket){
   const want = REFS[bucket] && REFS[bucket].id, mine = libLoad().steps[step] || [], sh = shippedFor(step);
   if(mine.length + (sh ? sh.cnt : 0) < 200) return null;   // too few yet to avoid repeats: deal live
@@ -1384,9 +1385,14 @@ function fromLibrary(step, bucket){
     let rec;
     const w = t < 12 ? want : null, shIdx = w ? sh && sh.byFrac[w] || [] : [], myIdx = w ? mine.filter(r=>r.frac === w) : [];
     const nS = shIdx.length, nM = myIdx.length;
-    if(nS + nM){ const i = Math.floor(Math.random()*(nS + nM)); rec = i < nS ? decodeRec(sh.data, shIdx[i]*REC) : myIdx[i - nS]; }
-    else rec = sh && sh.cnt && Math.random() < sh.cnt/(sh.cnt + mine.length) ? decodeRec(sh.data, Math.floor(Math.random()*sh.cnt)*REC) : pick(mine);
+    let id = null;
+    if(nS + nM){ const i = Math.floor(Math.random()*(nS + nM)); id = i < nS ? 's' + shIdx[i] : 'm' + mine.indexOf(myIdx[i - nS]); rec = i < nS ? decodeRec(sh.data, shIdx[i]*REC) : myIdx[i - nS]; }
+    else if(sh && sh.cnt && Math.random() < sh.cnt/(sh.cnt + mine.length)){ const j = Math.floor(Math.random()*sh.cnt); id = 's' + j; rec = decodeRec(sh.data, j*REC); }
+    else if(mine.length){ const j = Math.floor(Math.random()*mine.length); id = 'm' + j; rec = mine[j]; }
     if(!rec) return null;
+    const recent = RECENT[step] = RECENT[step] || [];
+    if(recent.includes(id) && t < 20) continue;   // dealt recently: pick another
+    recent.push(id); if(recent.length > 60) recent.shift();
     const s = shotOf(rec, step, Math.random() < .5);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
     if(step < SH.down || handRoom(s)) return s;   // room for your bridge hand, once it's in the picture
   }
