@@ -1004,7 +1004,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 246;   // one per commit to main
+const BUILD = 247;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1261,7 +1261,7 @@ function otherWays(s, zs, lvl){
 // ---------- the shot library ----------
 // Zone shots take a lot of checking, so they're worked out ahead and stored: a few numbers per shot (the balls, the
 // pocket, the zone and the strokes that land it), filled in quietly in the background and rebuilt when the physics,
-// rules or your height change. Each stored shot can be played mirrored either way, so it goes four times as far.
+// rules or your height change. Each stored shot can also be played mirrored left-right, so it goes twice as far.
 const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 150, LIB_RULES = 3;
 const libVer = () => [LIB_RULES, Object.values(PE.C).join(','), Object.values(STROKE_MPH).join(','), ZR_TWO, TIP_STEP.toFixed(4), Math.round(stanceIn()), W, H].join('|');
 let LIB = null;
@@ -1297,7 +1297,7 @@ function fromLibrary(step, bucket){
   const L = libLoad(), pool = L.steps[step] || []; if(pool.length < 12) return null;   // too few yet: deal live
   const want = REFS[bucket] && REFS[bucket].id, same = pool.filter(rec=>rec[13] === want);
   const rec = pick(same.length ? same : pool);
-  const s = unpackLib(rec, step, Math.random() < .5, Math.random() < .5);
+  const s = unpackLib(rec, step, Math.random() < .5, false);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
   return handRoom(s) ? s : null;
 }
 // work out one more stored shot for the step that's shortest; returns false when the library is full
