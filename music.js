@@ -12,7 +12,10 @@ function ensure(){
   ctx = new AC();
   out = ctx.createGain(); out.gain.value = 0;
   const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 5200;   // a little warm and dull, like a radio in the corner
-  out.connect(lp); lp.connect(ctx.destination);
+  // a limiter before the speaker: many voices at once were clipping, which small phone speakers turn into buzz
+  const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 55;   // nothing below what a phone can play
+  const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -18; lim.knee.value = 6; lim.ratio.value = 12; lim.attack.value = .003; lim.release.value = .25;
+  out.connect(hp); hp.connect(lp); lp.connect(lim); lim.connect(ctx.destination);
   noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = noise.getChannelData(0); for(let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
   return true;
@@ -129,7 +132,7 @@ function play(id){
   setTimeout(()=>{
     if(tok !== playTok) return;
     track = id; step = 0; nextT = ctx.currentTime + .08;
-    out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(vol*.6, ctx.currentTime, .4);
+    out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(vol*.35, ctx.currentTime, .4);
     timer = setInterval(schedule, 60); schedule();
   }, wait);
 }
@@ -138,7 +141,7 @@ function stop(){
   track = null; playTok++; clearInterval(timer); timer = 0;
   out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0, ctx.currentTime, .15);
 }
-function setVolume(v){ vol = Math.max(0, Math.min(1, v)); if(ctx && track) out.gain.setTargetAtTime(vol*.6, ctx.currentTime, .1); }
+function setVolume(v){ vol = Math.max(0, Math.min(1, v)); if(ctx && track) out.gain.setTargetAtTime(vol*.35, ctx.currentTime, .1); }
 function resume(){ if(ctx && ctx.state === 'suspended') ctx.resume(); }
 root.Music = {play, stop, setVolume, resume, tracks: Object.fromEntries(Object.entries(TRACKS).map(([k, T])=>[k, T.name])), playing: ()=>track};
 })(typeof window !== 'undefined' ? window : this);
