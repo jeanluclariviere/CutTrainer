@@ -626,7 +626,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="shootctl" id="shootctl" hidden>
         <div class="tippad" id="tippad" hidden><small>Tip</small>
           <svg id="tipsvg" viewBox="-1.15 -1.15 2.3 2.3" aria-label="Where the cue tip strikes: tap to set"><circle r="1" fill="#f4efe0" stroke="#cfc6ae" stroke-width=".04"/><path id="tiplimit" d="" fill="#1b6fd1" fill-opacity=".45"/><line x1="-1" y1="0" x2="1" y2="0" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><line x1="0" y1="-1" x2="0" y2="1" stroke="#10283d" stroke-opacity=".2" stroke-width=".02"/><circle id="tipdot" r=".14" fill="#1b6fd1" stroke="#fff" stroke-width=".04"/></svg>
-          <span class="ckeys" id="tipkeys"></span><button class="link" id="tipcentre">Centre <kbd>X</kbd></button>
+          <span class="ckeys" id="tipkeys"></span>
         </div>
         <div class="freebtns" id="freebtns" hidden><button class="sumdone" id="freereset">Reset balls</button><button class="sumdone" id="freenew">New layout</button><small>Drag a ball to move it · tap a pocket to aim for it</small></div>
       </div>
@@ -1020,7 +1020,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 257;   // one per commit to main
+const BUILD = 262;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1377,20 +1377,33 @@ function libSave(){
 const mineCount = k => (libLoad().steps[k] || []).length;
 const libCount = () => LIB_STEPS.reduce((t, k)=>t + mineCount(k) + shippedCount(k), 0);
 const libFull = () => LIB_STEPS.every(k=>mineCount(k) + shippedCount(k) >= LIB_PER_OF(k));
+// The stored shots your bridge hand fits, by grade and fraction: worked out once (it's only geometry) and kept until
+// your height changes, so dealing just picks from a ready list.
+let FITS = {key: null};
+function fitList(step, frac){
+  const key = [SHIPPED && SHIPPED.ver, curTable, Math.round(stanceIn()), mineCount(step)].join('|');
+  if(FITS.key !== key) FITS = {key};
+  const k = step + ':' + frac;
+  if(FITS[k]) return FITS[k];
+  const sh = shippedFor(step), mine = libLoad().steps[step] || [], need = step >= SH.down, out = [];
+  const fits = r => !need || handRoom(shotOf(r, step, false));
+  if(sh) for(const j of (frac ? sh.byFrac[frac] || [] : Array.from({length: sh.cnt}, (_, i)=>i))){ if(fits(decodeRec(sh.data, j*REC))) out.push('s' + j); }
+  mine.forEach((r, j)=>{ if((!frac || r.frac === frac) && fits(r)) out.push('m' + j); });
+  return FITS[k] = out;
+}
+const RECENT = {};   // the last 60 stored shots dealt at each grade, so none comes back soon
 function fromLibrary(step, bucket){
-  const want = REFS[bucket] && REFS[bucket].id, mine = libLoad().steps[step] || [], sh = shippedFor(step);
+  const want = REFS[bucket] && REFS[bucket].id, sh = shippedFor(step), mine = libLoad().steps[step] || [];
   if(mine.length + (sh ? sh.cnt : 0) < 200) return null;   // too few yet to avoid repeats: deal live
-  for(let t = 0; t < 6; t++){
-    let rec;
-    const shIdx = sh && sh.byFrac[want] || [], myIdx = mine.filter(r=>r.frac === want);
-    const nS = shIdx.length, nM = myIdx.length;
-    if(nS + nM){ const i = Math.floor(Math.random()*(nS + nM)); rec = i < nS ? decodeRec(sh.data, shIdx[i]*REC) : myIdx[i - nS]; }
-    else rec = sh && sh.cnt && Math.random() < sh.cnt/(sh.cnt + mine.length) ? decodeRec(sh.data, Math.floor(Math.random()*sh.cnt)*REC) : pick(mine);
-    if(!rec) return null;
-    const s = shotOf(rec, step, Math.random() < .5);   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
-    if(step < SH.down || handRoom(s)) return s;   // room for your bridge hand, once it's in the picture
-  }
-  return null;
+  let list = fitList(step, want);
+  if(!list.length) list = fitList(step, null);   // none of that fraction fits: any fraction
+  if(!list.length) return null;
+  const recent = RECENT[step] = RECENT[step] || [];
+  let id = pick(list);
+  for(let t = 0; t < 20 && recent.includes(id) && list.length > recent.length; t++) id = pick(list);   // not one dealt recently
+  recent.push(id); if(recent.length > 60) recent.shift();
+  const rec = id[0] === 's' ? decodeRec(sh.data, +id.slice(1)*REC) : mine[+id.slice(1)];
+  return rec ? shotOf(rec, step, Math.random() < .5) : null;   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
 }
 // work out one more shot for a step: dealt the full way, rounded to a record, re-checked
 function makeRec(step){
@@ -1690,7 +1703,6 @@ function wireShootControls(){
   pad.addEventListener('pointerdown', ev=>{ if(answered) return; tDrag = true; try{ pad.setPointerCapture(ev.pointerId); }catch(e){} setTipFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
   pad.addEventListener('pointermove', ev=>{ if(tDrag) setTipFrom(ev); });
   ['pointerup','pointercancel'].forEach(t=>pad.addEventListener(t, ()=>{ tDrag = false; }));
-  $('tipcentre').addEventListener('click', ()=>{ settings.shotTip = [0, 0]; saveSettings(); renderShootControls(); });
   $('freereset').addEventListener('click', ()=>{ if(anim) finishAnim(); freeReset(); $('quick').innerHTML = ''; $('result').innerHTML = ''; tableBox.classList.remove('tappable'); });
   $('freenew').addEventListener('click', ()=>{ if(anim) finishAnim(); deal(); });
 }
@@ -3669,6 +3681,10 @@ $('nudge-r').addEventListener('click', ()=>nudge(1));
 let jumpingAhead = false;
 // Next shot: a quick blink through the dark room, not a hard cut (about 0.35 s)
 let dipping = false;
+function nextDeal(){
+  if(!(nextShot0 && nextShot0.key === prepKey())) prepareNext();   // not worked out ahead: do it now, before the fade, not during it
+  dip(deal);
+}
 function dip(fn){
   const el = $('dip');
   if(dipping) return;
@@ -3680,7 +3696,7 @@ function nextShot(){
   if(tut.on){ tutNext(); return; }
   if(!answered || !$('endcover').hidden || cueStroke) return;
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
-  if($('sesscover').hidden) dip(deal);
+  if($('sesscover').hidden) nextDeal();
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) (isShooting() ? takeShot() : shoot()); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
@@ -3719,7 +3735,7 @@ function walkRelease(){
 }
 svgEl.addEventListener('pointerup', walkRelease);
 svgEl.addEventListener('pointercancel', walkRelease);
-tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) dip(deal); });
+tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) nextDeal(); });
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
 const MAX_REPLAYS = 5, REPLAY_WINDOW = 50;   // replays per 50 Flash shots
 function replaysLeft(){   // a rolling budget: 5 over your last 50 Flash shots (this one included)
@@ -4109,6 +4125,21 @@ document.querySelectorAll('[data-stab]').forEach(b=>b.addEventListener('click', 
   ['you','table','sound','gfx'].forEach(k=>{ $('set-' + k).hidden = b.dataset.stab !== k; });
 }));
 $('librebuild').addEventListener('click', ()=>libRebuild());
+// a cheat: type t-i-n-c-l quickly (under half a second between letters) and every grade opens
+{ let typed = '', at = 0;
+  document.addEventListener('keydown', e=>{
+    if(e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+    const now = performance.now(); typed = (now - at < 500 ? typed : '') + e.key.toLowerCase(); at = now;
+    if(!typed.endsWith('tincl')) return;
+    typed = '';
+    const top = SHOOT_GRADES.length - 1, L = ensureShootLevel();
+    L.g = L.best = top; L.pts = 0; settings.practice = null;
+    settings.tutSeen = Object.fromEntries(Object.keys(LESSONS).map(k=>[k, 1]));   // lessons stay in the ? menu
+    saveSettings(); save(); renderBadge(true); renderProgress(); renderPracticeChip();
+    notice('🔓 All grades unlocked');
+    if(!answered && !anim) deal();
+  }, true);
+}
 $('radio').addEventListener('click', e=>{ e.stopPropagation(); applySetting('music', STATIONS[(STATIONS.indexOf(settings.music) + 1) % STATIONS.length]); });
 ['pointerdown'].forEach(t=>$('radio').addEventListener(t, e=>e.stopPropagation()));
 renderRadio();
@@ -4153,7 +4184,7 @@ document.addEventListener('keydown', e=>{
   else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1, e.shiftKey ? 6 : 1); e.preventDefault(); }
   else if(isShooting() && !answered && ctrl().speed && (e.key==='ArrowUp' || e.key==='ArrowDown')){ setSpeedLevel(speedLevel() + (e.key==='ArrowUp' ? 1 : -1)); e.preventDefault(); }
   else if(isShooting() && !answered && /^[wasdx]$/i.test(e.key) && !e.metaKey && !e.ctrlKey){ nudgeTip(e.key.toLowerCase()); e.preventDefault(); }
-  else if(e.key==='Enter'){ if(answered){ dip(deal); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ if(answered){ nextDeal(); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
 if(!['stand','down'].includes(settings.view)) settings.view='stand';
