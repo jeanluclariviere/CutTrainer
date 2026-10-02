@@ -1004,7 +1004,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 247;   // one per commit to main
+const BUILD = 248;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1262,7 +1262,7 @@ function otherWays(s, zs, lvl){
 // Zone shots take a lot of checking, so they're worked out ahead and stored: a few numbers per shot (the balls, the
 // pocket, the zone and the strokes that land it), filled in quietly in the background and rebuilt when the physics,
 // rules or your height change. Each stored shot can also be played mirrored left-right, so it goes twice as far.
-const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 150, LIB_RULES = 3;
+const LIB_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], LIB_PER = 1000, LIB_RULES = 3;
 const libVer = () => [LIB_RULES, Object.values(PE.C).join(','), Object.values(STROKE_MPH).join(','), ZR_TWO, TIP_STEP.toFixed(4), Math.round(stanceIn()), W, H].join('|');
 let LIB = null;
 function libLoad(){
@@ -1303,7 +1303,9 @@ function fromLibrary(step, bucket){
 // work out one more stored shot for the step that's shortest; returns false when the library is full
 const LIB_GRADE = {[SH.follow]: SH.follow, [SH.stun]: SH.stun, [SH.draw]: SH.draw, [SH.cushion]: SH.cushion, [SH.english]: SH.english, [SH.full]: SH.full};
 function libGrowOne(){
-  const L = libLoad(), step = LIB_STEPS.slice().sort((a, b)=>(L.steps[a] || []).length - (L.steps[b] || []).length)[0];
+  const L = libLoad(), have = k => (L.steps[k] || []).length, mine = GEN.g == null ? zoneStep(stats.shoot ? stats.shoot.g : 0) : null;
+  // the step you're playing fills first, then whichever is shortest
+  const step = mine && LIB_STEPS.includes(mine) && have(mine) < LIB_PER ? mine : LIB_STEPS.slice().sort((a, b)=>have(a) - have(b))[0];
   if((L.steps[step] || []).length >= LIB_PER) return false;
   if(curTable !== '9') return null;   // zone grades are all on the 9 ft table: nothing to do until you're on it
   GEN.g = LIB_GRADE[step];
