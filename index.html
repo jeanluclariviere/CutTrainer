@@ -515,6 +515,9 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="opt">Arrow motion
         <div class="seg" role="group" aria-label="Arrow motion"><button data-set="gfxBob" data-val="30">Smooth</button><button data-set="gfxBob" data-val="60">Every frame</button><button data-set="gfxBob" data-val="0">Still</button></div>
       </div>
+      <div class="opt">Show FPS
+        <div class="seg" role="group" aria-label="Show frames per second"><button data-set="fps" data-val="0">Off</button><button data-set="fps" data-val="1">On</button></div>
+      </div>
         <small class="setnote">Lower resolution and simpler shadows run faster. Antialiasing reloads the page.</small>
       </div>
     </div>
@@ -1017,16 +1020,19 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 256;   // one per commit to main
-document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
+const BUILD = 257;   // one per commit to main
+document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
-if(DEV){
+// FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
+const fpsOn = () => DEV || (typeof settings !== 'undefined' && settings.fps === '1');
+{
   let frames = 0, worst = 0, last = performance.now(), mark = last;
   const tick = now => {
+    if(!fpsOn()){ const el = document.getElementById('fpsmeter'); if(el && el.textContent) el.textContent = ''; last = mark = now; frames = 0; worst = 0; requestAnimationFrame(tick); return; }
     const dt = now - last; last = now; frames++; worst = Math.max(worst, dt);
     if(now - mark >= 500){
       const sec = (now - mark)/1000, el = document.getElementById('fpsmeter');
-      if(el) el.textContent = `${Math.round(frames/sec)} fps · worst ${Math.round(worst)} ms · draw ${(PERF.drawMs/Math.max(1, PERF.draws)).toFixed(1)} ms ×${Math.round(PERF.draws/sec)}/s · gl ${(PERF.glMs/Math.max(1, PERF.gls)).toFixed(1)} ms ×${Math.round(PERF.gls/sec)}/s · deal ${Math.round(PERF.dealMs)} ms (ahead ${Math.round(PERF.prepMs || 0)} ms)`;
+      if(el) el.textContent = ` · ${Math.round(frames/sec)} fps · worst ${Math.round(worst)} ms · draw ${(PERF.drawMs/Math.max(1, PERF.draws)).toFixed(1)} ms ×${Math.round(PERF.draws/sec)}/s · gl ${(PERF.glMs/Math.max(1, PERF.gls)).toFixed(1)} ms ×${Math.round(PERF.gls/sec)}/s · deal ${Math.round(PERF.dealMs)} ms (ahead ${Math.round(PERF.prepMs || 0)} ms)`;
       frames = 0; worst = 0; mark = now; PERF.drawMs = PERF.glMs = 0; PERF.draws = PERF.gls = 0;
     }
     requestAnimationFrame(tick);
@@ -4195,6 +4201,7 @@ $('stancedone').addEventListener('click', e=>{ e.stopPropagation(); closeStance(
 if(!['0','1'].includes(settings.sound)) settings.sound='1';
 if(!['0','1'].includes(settings.animate)) settings.animate='1';
 if(!['0','1'].includes(settings.streaks)) settings.streaks='1';
+if(!['0','1'].includes(settings.fps)) settings.fps='0';
 ['refPath','refTrail','refGhost','refMiss','refStart'].forEach(k=>{ if(!['0','1'].includes(settings[k])) settings[k] = settings.refs === '0' ? '0' : '1'; });   // all off if you'd switched them all off before
 if(!['R','L'].includes(settings.hand)) settings.hand='R';
 if(!['open','closed'].includes(settings.bridge)) settings.bridge = 'open';
