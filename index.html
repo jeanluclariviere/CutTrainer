@@ -960,7 +960,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 226;   // one per commit to main
+const BUILD = 227;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}</div>`);   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 if(DEV) document.body.insertAdjacentHTML('beforeend', `<button class="devlvl" id="devlvl">Level up</button>`);
 // adding or removing #dev on an open page doesn't reload it by itself: reload so the switch takes effect
@@ -1193,11 +1193,16 @@ function otherWays(s, zs, lvl){
     const t = snapTip([zs.tip[0] + i*TIP_STEP, zs.tip[1] + j*TIP_STEP], c);
     if(Math.abs(t[0] - zs.tip[0]) + Math.abs(t[1] - zs.tip[1]) > 1e-3) alts.push({V: zs.V, tip: t});
   });
-  return alts.some(st=>{ const r = playAim(s, aimFor(s, st), st, false); return r.made && !r.scratch && r.inZone; });
+  return alts.some(st=>{
+    const q = playAim(s, idealDir(s), st, false);   // a quick look with the plain aim; only a likely one gets the full aim search
+    if(!(q.made && !q.scratch && q.inZone)) return false;
+    const r = playAim(s, aimFor(s, st), st, false); return r.made && !r.scratch && r.inZone;
+  });
 }
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
   let best = null;
+  const t0 = performance.now(), late = () => performance.now() - t0 > 220;   // dealing has a budget: past it, the extra checks are skipped
   const TRIES = step === SH.full ? 90 : step === SH.cushion ? 80 : 40;   // two-, three- and four-rail routes take more finding
   for(let tries = 0; tries < TRIES; tries++){
     const s = dealShot();   // leaning on your weak spots
@@ -1212,7 +1217,7 @@ function shootDeal(){
       return finishDeal(s);
     }
     if(!step) return finishDeal(s);
-    if(step === SH.cushion && tries < TRIES - 20){ const z = twoRailZone(s); if(!z) continue; s.zone = z; return finishDeal(s); }   // the last tries fall back to a plainer cushion zone below
+    if(step === SH.cushion && tries < TRIES - 20 && !late()){ const z = twoRailZone(s); if(!z) continue; s.zone = z; return finishDeal(s); }   // the last tries fall back to a plainer cushion zone below
     // the zone is made with a stroke you can actually play: one of your four speeds, and a tip on the pad's half-tip steps
     const spec = step === SH.cushion ? {tip:[0, rnd(-.2,.45)], k:[1.6, 3.2], rails:[1, 2]} : STEP_STROKES[step](s), V0 = strikeOf(s).V, d1 = len(sub(s.gb, s.cb));
     let want = V0*rnd(...(spec.k || [1, 1]));
@@ -1233,7 +1238,7 @@ function shootDeal(){
     s.zone = {c, r: zr, step, lvl, tip: zs.tip};
     // cushion routes: the zone should take more than one stroke you can play (a different speed, or the tip half a tip
     // another way), unless none turns up after many tries
-    if(r.cbRails >= 1 && tries < TRIES*.7 && !otherWays(s, zs, lvl)){ s.zone = null; continue; }
+    if(r.cbRails >= 1 && tries < TRIES*.7 && !late() && !otherWays(s, zs, lvl)){ s.zone = null; continue; }
     return finishDeal(s);
   }
   return finishDeal(best || generate());
@@ -2264,7 +2269,7 @@ function draw(reveal){
     const fx = $('tablefx');
     if(fx.getAttribute('viewBox') !== vb) fx.setAttribute('viewBox', vb);
     if(layerHTML.fx !== L.fx){ fx.innerHTML = L.fx; layerHTML.fx = L.fx; }
-    if(G3){ $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setZone(shot && shot.zone && settings.view !== 'top' ? shot.zone : null); setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
+    if(G3){ arrowLast = performance.now(); $('table3d').style.display = ''; G3.build(engineTable()); G3.setBalls(G3BALLS, R); G3.setZone(shot && shot.zone && settings.view !== 'top' ? shot.zone : null); setArrows(); G3.render(lastCam, VW, VH, boxPx[0], boxPx[1]); arrowLoop(); }
   }
 }
 // The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
