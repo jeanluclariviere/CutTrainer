@@ -153,7 +153,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .shootctl{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;align-items:center;margin:8px 0}
 .tippad{display:flex;flex-direction:column;align-items:center;gap:4px;touch-action:none}
 .tippad svg{width:96px;height:96px;cursor:crosshair}
-.ckeys{display:flex;gap:2px}.ckeys kbd,#tipcentre kbd{font:600 10px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;border:1px solid #cfc6ae}
+.ckeys{display:flex;gap:2px}
+.speedbar .ckeys kbd{cursor:pointer}.ckeys kbd,#tipcentre kbd{font:600 10px var(--body);padding:0 4px;border-radius:3px;background:rgba(255,255,255,.85);color:#10283d;border:1px solid #cfc6ae}
 @media (hover:none){.ckeys,#tipcentre kbd{display:none}}
 .tippad small{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
 .modes button{font-size:15px;padding:9px 14px}
@@ -558,7 +559,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
         <button class="routinechip" id="routinechip" hidden></button>
         <button class="practicechip" id="practicechip" hidden></button>
         <button class="lookbtn" id="lookbtn" aria-label="Step back: hold to see the whole table" title="Step back (hold Space)">👁<kbd>Space</kbd></button>
-        <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd>↑</kbd><kbd>↓</kbd></span></div>
+        <div class="speedbar" id="speedbar" hidden aria-label="Speed: drag up or down"><small>Speed</small><div class="speedtrack" id="speedtrack"><i id="speedfill"></i></div><b id="speedval"></b><span class="ckeys"><kbd data-step="1" title="Faster (↑)">↑</kbd><kbd data-step="-1" title="Slower (↓)">↓</kbd></span></div>
         <div class="lvlcard" id="lvlcard" hidden aria-live="polite"><small id="lvlhead"></small><b id="lvlgrade"></b><span id="lvlnote"></span></div>
         <div class="cover" id="startcover" hidden><button class="startbtn" id="startbtn">Start</button><small id="starthint"></small></div>
       </div>
@@ -983,7 +984,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 232;   // one per commit to main
+const BUILD = 233;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}${DEV ? ' · <span id="fpsmeter"></span>' : ''}</div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 if(DEV){
@@ -1418,7 +1419,10 @@ function wireShootControls(){
     setSpeedLevel(Math.max(1, Math.ceil(f*10)));
   };
   let sDrag = false;
-  bar.addEventListener('pointerdown', ev=>{ if(answered) return; sDrag = true; try{ bar.setPointerCapture(ev.pointerId); }catch(e){} setSpeedFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
+  bar.addEventListener('pointerdown', ev=>{ if(answered) return;
+    const stepBtn = ev.target.closest('[data-step]');
+    if(stepBtn){ ev.preventDefault(); ev.stopPropagation(); setSpeedLevel(speedLevel() + +stepBtn.dataset.step); return; }   // the ↑ ↓ under the bar work as buttons too
+    sDrag = true; try{ bar.setPointerCapture(ev.pointerId); }catch(e){} setSpeedFrom(ev); ev.preventDefault(); ev.stopPropagation(); });
   bar.addEventListener('pointermove', ev=>{ if(sDrag) setSpeedFrom(ev); });
   ['pointerup','pointercancel'].forEach(t=>bar.addEventListener(t, ()=>{ sDrag = false; }));
   const setTipFrom = ev => {
