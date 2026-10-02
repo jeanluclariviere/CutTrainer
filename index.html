@@ -825,7 +825,7 @@ function nearestRef(theta){
   return best;
 }
 
-const FULL_SHARE = .4, FULL_SHARE_LATE = .12;   // full-ball shots come up less than the cuts (about 1 in 11), and rarely after B (about 1 in 34)
+const FULL_SHARE = 1, FULL_SHARE_LATE = 1;   // full-ball shots come up as often as each cut
 function bucketWeights(){
   if(forceFrac) return REFS.map(r=>r.id===forceFrac ? 1 : 0);
   const w = REFS.map(()=>1);
@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 277;   // one per commit to main
+const BUILD = 311;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1101,7 +1101,7 @@ const isShooting = () => isShoot() || isFree();
 function ensureShootLevel(){ if(!stats.shoot) stats.shoot = {g:0, best:0, pts:0, v:1}; return stats.shoot; }
 // You can go back to any grade you've passed and practise it as long as you like: those shots aren't scored.
 const practicing = () => isShoot() && settings.practice != null && stats.shoot && +settings.practice < stats.shoot.g;
-const GEN = {g: null};   // while the shot library is being built: the grade it's building for
+const GEN = {g: null, bucket: null};   // while the shot library is being built: the grade it's building for
 const shootLevel = () => GEN.g != null ? GEN.g : isFree() ? (stats.shoot ? Math.max(stats.shoot.g, stats.shoot.best ?? 0) : 0) : practicing() ? +settings.practice : (stats.shoot ? stats.shoot.g : 0);
 function setPractice(i){
   const g = stats.shoot ? stats.shoot.g : 0;
@@ -1246,7 +1246,7 @@ function aimFor(s, stroke){
 const STEP_STROKES = {   // the kind of stroke a step's zones are made from (the player can use any stroke they have)
   // rails: how many cushions the cue ball uses on its way to the zone. Spin steps: none or one; off a cushion: two;
   // english: one or two; full-table position: three or four.
-  [SH.stun]:   s => ({tip:[0,0], stun:true, rails:[0, 1]}),
+  [SH.stun]:   s => ({tip:[0,0], stun:true, rails:[0, 2]}),
   [SH.follow]: s => ({tip:[0, rnd(.3,.55)], k:[1.1, 2.2], rails:[0, 1]}),
   [SH.draw]:   s => ({tip:[0, -rnd(.35,.6)], k:[1.6, 3.2], rails:[0, 1]}),
   [SH.cushion]:s => ({tip:[0, .44], k:[1.6, 3.2], rails:[2, 2]}),   // built its own way: see twoRailZone
@@ -1273,6 +1273,18 @@ function handRoom(s){ const hIn = (GEN.g != null ? HAND_MAX_CM : stanceIn()*2.54
 // at least 1½" inside it. Every speed is tried with a full and half tip of top, centre, and a half and full tip of draw;
 // the closest pair of endpoints from two different kinds sets the zone, and any stroke that ends inside it counts as right.
 const ZR_TWO = 8;
+const STUN_SPIN = 0.2;
+const shuffled = a => { a = [...a]; for(let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random()*(i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// does a centre-ball stroke that arrives with real topspin (any speed) also pot and land in the zone?
+function rollsIn(s, d1){
+  return COARSE.some(l=>{
+    const st = {V: STROKE_MPH[l]*MPH, tip: [0, 0]};
+    if(PE.arrive(st.V, 0, d1).spin <= .5) return false;
+    const q = playAim(s, idealDir(s), st, false);
+    if(!(q.made && !q.scratch && q.inZone)) return false;
+    const r = playAim(s, aimFor(s, st), st, false); return r.made && !r.scratch && r.inZone;
+  });
+}
 function twoRailZone(s){
   const c = ctrl(), V0 = strikeOf(s).V, ends = [];
   for(const l of COARSE){
@@ -1320,7 +1332,7 @@ function otherWays(s, zs, lvl){
 // and the tip. Each is re-checked after rounding, and can be played mirrored left-right.
 // keys: a zone step's grade (B+ to S+), or the grade itself for the grades without zones (F to B)
 const ZONE_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], BASIC_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 8, REC = 13;
+const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 9, REC = 13;
 const isZoneStep = k => ZONE_STEPS.includes(+k), LIB_PER_OF = k => isZoneStep(k) ? 1000 : 300;   // what your device builds (the shipped file has far more)
 const tableFor = k => { const g0 = GEN.g; GEN.g = +k; try{ return progTable(); } finally { GEN.g = g0; } };
 const fnv = t => { let h = 0x811c9dc5; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
@@ -1430,9 +1442,9 @@ function fromLibrary(step, bucket){
   return rec ? shotOf(rec, step, Math.random() < .5) : null;   // mirrored left-right half the time
 }
 // work out one more shot for a step: dealt the full way, rounded to a record, re-checked
-function makeRec(step){
-  GEN.g = +step;
-  let s = null; try{ s = shootDeal(); }catch(e){ s = null; } finally { GEN.g = null; }
+function makeRec(step, bucket){
+  GEN.g = +step; GEN.bucket = bucket ?? null;
+  let s = null; try{ s = shootDeal(); }catch(e){ s = null; } finally { GEN.g = null; GEN.bucket = null; }
   if(!s || (isZoneStep(step) ? !s.zone || s.zone.step !== +step : !!s.zone)) return null;
   if(+step >= SH.down && !handRoom(s)) return null;   // only shots with room for the bridge hand get stored
   const r = recOf(s);
@@ -1494,7 +1506,7 @@ function shootDeal(){
   let best = null;
   const t0 = performance.now(), late = () => GEN.g == null && performance.now() - t0 > 220;   // dealing has a budget (not when building the library): past it, the extra checks are skipped
   const TRIES = step === SH.full ? 90 : step === SH.cushion ? 80 : 40;   // two-, three- and four-rail routes take more finding
-  const bucket = pickBucket();   // the fraction, fixed for all the tries
+  const bucket = GEN.bucket != null ? GEN.bucket : pickBucket();   // the fraction, fixed for all the tries (the library builder asks for each in turn)
   const key = step || (g <= SH.throw ? g : null);
   if(GEN.g == null && key != null && !isFree()){ const L = fromLibrary(key, bucket); if(L) return finishDeal(L); }   // a stored shot, if the library has one
   for(let tries = 0; tries < TRIES + (step ? 40 : 0); tries++){
@@ -1515,15 +1527,16 @@ function shootDeal(){
     if(step === SH.cushion && tries < TRIES - 20 && !late()){ const z = twoRailZone(s); if(!z) continue; s.zone = z; return finishDeal(s); }   // the last tries fall back to a plainer cushion zone below
     // the zone is made with a stroke you can actually play: one of your four speeds, and a tip on the pad's half-tip steps
     const spec = step === SH.cushion ? {tip:[0, rnd(-.2,.45)], k:[1.6, 3.2], rails:[1, 2]} : STEP_STROKES[step](s), V0 = strikeOf(s).V, d1 = len(sub(s.gb, s.cb));
-    let want = V0*rnd(...(spec.k || [1, 1]));
-    if(spec.stun){ const ug = PE.C.muSlide*PE.G; want = Math.max(V0, Math.sqrt(d1*49*ug/12))*1.05; }
-    // try the speed that fits first, then the others that reach the pocket; past the normal tries the rail and
-    // second-stroke rules are eased, so a zone grade is never dealt without a zone
+    // every stroke that reaches the pocket, in random order, so the zones use the ¾ and full strokes as often as ½;
+    // past the normal tries the rail and second-stroke rules are eased, so a zone grade is never dealt without a zone
     const relax = tries >= TRIES, railsOk = n => relax ? n <= 2 : n >= spec.rails[0] && n <= spec.rails[1];
-    const lvls = COARSE.filter(l=>STROKE_MPH[l]*MPH >= V0).sort((x, y)=>Math.abs(Math.log(STROKE_MPH[x]*MPH/want)) - Math.abs(Math.log(STROKE_MPH[y]*MPH/want)));
+    const lvls = shuffled(COARSE.filter(l=>STROKE_MPH[l]*MPH >= V0));
     let found = null;
     for(const lvl of lvls){
       const zs = {V: STROKE_MPH[lvl]*MPH, tip: snapTip(spec.tip)};
+      // stun: centre ball, and only a stroke with the pace to still be sliding at contact (spin under a fifth of
+      // rolling), so it leaves along the tangent line. Fuller hits and longer shots need the ¾ or full stroke for that.
+      if(spec.stun && Math.abs(PE.arrive(zs.V, 0, d1).spin) > STUN_SPIN) continue;
       let r = playAim(s, idealDir(s), zs, false);
       if(!r.made || r.scratch || !r.hit || !railsOk(r.cbRails)) continue;
       r = playAim(s, aimFor(s, zs), zs, false);           // and played exactly as your right call would play it
@@ -1534,6 +1547,7 @@ function shootDeal(){
       if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
       if(!relax && !zoneSpotOk(s, c)) continue;
       s.zone = {c, r: g >= SH.cushion ? 5 : 6, step, lvl, tip: zs.tip};
+      if(spec.stun && rollsIn(s, d1)){ s.zone = null; continue; }   // a stun zone a rolling cue ball also reaches teaches nothing
       // routes with a rail: the zone should take more than one stroke you can play (a different speed, or the tip half a
       // tip another way), unless none turns up after many tries
       if(!relax && r.cbRails >= 1 && tries < TRIES*.7 && !late() && !otherWays(s, zs, lvl)){ s.zone = null; continue; }

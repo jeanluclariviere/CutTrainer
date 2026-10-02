@@ -48,13 +48,19 @@ if(!isMainThread){
   const want = workerData.want;   // {step: count}
   const steps = Object.keys(want).map(Number);
   const done = Object.fromEntries(steps.map(k=>[k, 0]));
-  while(steps.some(k=>done[k] < want[k])){
+  // the fractions are asked for in turn (the one with fewest shots next), so each grade gets an even mix of them;
+  // a fraction that keeps failing for a grade (stun on a thin cut, follow on a full hit...) is dropped for that grade
+  const NF = 5, MISS_CAP = 30;
+  const per = Object.fromEntries(steps.map(k=>[k, {n: Array(NF).fill(0), miss: Array(NF).fill(0), dead: Array(NF).fill(false)}]));
+  const open = k => done[k] < want[k] && per[k].dead.some(d=>!d);
+  while(steps.some(open)){
     for(const k of steps){
-      if(done[k] >= want[k]) continue;
+      if(!open(k)) continue;
       if(L.curTable() !== L.tableFor(k)) L.setTable(L.tableFor(k));   // each grade's shots on its own table
-      const r = L.makeRec(k);
-      if(r){ const out = new Uint8Array(L.REC); L.encodeRec(r, out, 0); done[k]++; parentPort.postMessage({step: k, rec: out}); }
-      else parentPort.postMessage({step: k, miss: 1});
+      const f = per[k], b = [...Array(NF).keys()].filter(i=>!f.dead[i]).sort((x, y)=>f.n[x] - f.n[y])[0];
+      const r = L.makeRec(k, b);
+      if(r){ const out = new Uint8Array(L.REC); L.encodeRec(r, out, 0); done[k]++; f.n[b]++; f.miss[b] = 0; parentPort.postMessage({step: k, rec: out}); }
+      else { if(++f.miss[b] >= MISS_CAP){ f.dead[b] = true; parentPort.postMessage({step: k, dropped: b}); } parentPort.postMessage({step: k, miss: 1}); }
     }
   }
   parentPort.postMessage({finished: true});
@@ -86,6 +92,7 @@ for(let i = 0; i < N; i++){
     if(m.ver && m.ver !== VER){ console.error('\nversion mismatch between workers'); process.exit(1); }
     if(m.rec && recs[m.step].length < target(m.step)) recs[m.step].push(Buffer.from(m.rec));
     if(m.miss) miss[m.step]++;
+    if(m.dropped != null) process.stdout.write(`\n(grade ${m.step}: fraction ${m.dropped} dropped by a worker)\n`);
     if(m.finished && --live === 0) finish();
   });
   wk.on('error', e=>{ console.error('\nworker failed:', e); process.exit(1); });
