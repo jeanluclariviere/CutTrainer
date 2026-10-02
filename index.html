@@ -1020,7 +1020,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 258;   // one per commit to main
+const BUILD = 259;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1380,9 +1380,9 @@ const libFull = () => LIB_STEPS.every(k=>mineCount(k) + shippedCount(k) >= LIB_P
 function fromLibrary(step, bucket){
   const want = REFS[bucket] && REFS[bucket].id, mine = libLoad().steps[step] || [], sh = shippedFor(step);
   if(mine.length + (sh ? sh.cnt : 0) < 200) return null;   // too few yet to avoid repeats: deal live
-  for(let t = 0; t < 6; t++){
+  for(let t = 0; t < 24; t++){   // the fraction that's wanted first; after a dozen misses (no room for your hand), any
     let rec;
-    const shIdx = sh && sh.byFrac[want] || [], myIdx = mine.filter(r=>r.frac === want);
+    const w = t < 12 ? want : null, shIdx = w ? sh && sh.byFrac[w] || [] : [], myIdx = w ? mine.filter(r=>r.frac === w) : [];
     const nS = shIdx.length, nM = myIdx.length;
     if(nS + nM){ const i = Math.floor(Math.random()*(nS + nM)); rec = i < nS ? decodeRec(sh.data, shIdx[i]*REC) : myIdx[i - nS]; }
     else rec = sh && sh.cnt && Math.random() < sh.cnt/(sh.cnt + mine.length) ? decodeRec(sh.data, Math.floor(Math.random()*sh.cnt)*REC) : pick(mine);
@@ -3668,6 +3668,10 @@ $('nudge-r').addEventListener('click', ()=>nudge(1));
 let jumpingAhead = false;
 // Next shot: a quick blink through the dark room, not a hard cut (about 0.35 s)
 let dipping = false;
+function nextDeal(){
+  if(!(nextShot0 && nextShot0.key === prepKey())) prepareNext();   // not worked out ahead: do it now, before the fade, not during it
+  dip(deal);
+}
 function dip(fn){
   const el = $('dip');
   if(dipping) return;
@@ -3679,7 +3683,7 @@ function nextShot(){
   if(tut.on){ tutNext(); return; }
   if(!answered || !$('endcover').hidden || cueStroke) return;
   if(anim){ jumpingAhead = true; try{ finishAnim(); } finally { jumpingAhead = false; } }
-  if($('sesscover').hidden) dip(deal);
+  if($('sesscover').hidden) nextDeal();
 }
 $('next').addEventListener('click', ()=>{ if(isPlace() && !answered) (isShooting() ? takeShot() : shoot()); else nextShot(); });
 let walkDrag = null, walkRaf = 0, walkEndedAt = 0;
@@ -3718,7 +3722,7 @@ function walkRelease(){
 }
 svgEl.addEventListener('pointerup', walkRelease);
 svgEl.addEventListener('pointercancel', walkRelease);
-tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) dip(deal); });
+tableBox.addEventListener('click', ()=>{ if(anim) return; if(tut.on) return; if(performance.now() - walkEndedAt < 300) return; if(answered && $('sesscover').hidden) nextDeal(); });
 $('startbtn').addEventListener('click', e=>{ e.stopPropagation(); startFlashMode(); });
 const MAX_REPLAYS = 5, REPLAY_WINDOW = 50;   // replays per 50 Flash shots
 function replaysLeft(){   // a rolling budget: 5 over your last 50 Flash shots (this one included)
@@ -4152,7 +4156,7 @@ document.addEventListener('keydown', e=>{
   else if(isPlace() && !answered && (e.key==='ArrowLeft' || e.key==='ArrowRight')){ nudge(e.key==='ArrowLeft'?-1:1, e.shiftKey ? 6 : 1); e.preventDefault(); }
   else if(isShooting() && !answered && ctrl().speed && (e.key==='ArrowUp' || e.key==='ArrowDown')){ setSpeedLevel(speedLevel() + (e.key==='ArrowUp' ? 1 : -1)); e.preventDefault(); }
   else if(isShooting() && !answered && /^[wasdx]$/i.test(e.key) && !e.metaKey && !e.ctrlKey){ nudgeTip(e.key.toLowerCase()); e.preventDefault(); }
-  else if(e.key==='Enter'){ if(answered){ dip(deal); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
+  else if(e.key==='Enter'){ if(answered){ nextDeal(); e.preventDefault(); } else if(goDown()) e.preventDefault(); else if(isPlace() && shot && shot.place){ isShooting() ? takeShot() : shoot(); e.preventDefault(); } }
 });
 
 if(!['stand','down'].includes(settings.view)) settings.view='stand';
