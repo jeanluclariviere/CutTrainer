@@ -242,7 +242,7 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .quick .ql.tap{font-size:13px}
 .quick .vgrid{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:baseline;width:100%;margin-top:4px;font-size:13px}
 .quick .vgrid>span{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px;font-weight:600}
-.quick .vgrid i{font-style:normal;font-weight:600;color:var(--ink)} .quick .vgrid i.ok{color:var(--good)} .quick .vgrid i.no{color:var(--bad)}
+.quick .vgrid i{font-style:normal;font-weight:600;color:var(--ink)} .quick .vgrid i.ok{color:var(--good)} .quick .vgrid i.no{color:var(--bad)} .quick .vgrid i.also{color:var(--accent)}
 .quick .vgrid em{font-style:normal;display:flex;align-items:baseline;gap:12px}
 .quick .vgrid em>span{color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-size:11px;font-weight:600}
 .nudge{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -1021,7 +1021,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 263;   // one per commit to main
+const BUILD = 264;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1261,7 +1261,7 @@ function twoRailZone(s){
   }
   if(len(sub(best.a.p, best.b.p)) > 2*(ZR_TWO - 1.5)) return null;
   const zc = mul(add(best.a.p, best.b.p), .5);
-  if(zc[0] < 3 || zc[0] > W-3 || zc[1] < 3 || zc[1] > H-3 || POCKETS.some(P=>len(sub(zc, P.c)) < 8) || len(sub(zc, s.cb)) < 6) return null;
+  if(zc[0] < 3 || zc[0] > W-3 || zc[1] < 3 || zc[1] > H-3 || POCKETS.some(P=>len(sub(zc, P.c)) < 8) || len(sub(zc, s.cb)) < 6 || !zoneSpotOk(s, zc)) return null;
   const inside = ends.filter(e=>len(sub(e.p, zc)) <= ZR_TWO - 1.5);
   return {c: zc, r: ZR_TWO, step: SH.cushion, lvl: best.a.l, lvls: [...new Set(inside.map(e=>e.l))], tip: best.a.tip};
 }
@@ -1285,7 +1285,7 @@ function otherWays(s, zs, lvl){
 // and the tip. Each is re-checked after rounding, and can be played mirrored left-right.
 // keys: a zone step's grade (B+ to S+), or the grade itself for the grades without zones (F to B)
 const ZONE_STEPS = [SH.follow, SH.stun, SH.draw, SH.cushion, SH.english, SH.full], BASIC_STEPS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 5, REC = 13;
+const LIB_STEPS = [...BASIC_STEPS, ...ZONE_STEPS], LIB_RULES = 6, REC = 13;
 const isZoneStep = k => ZONE_STEPS.includes(+k), LIB_PER_OF = k => isZoneStep(k) ? 1000 : 300;   // what your device builds (the shipped file has far more)
 const tableFor = k => { const g0 = GEN.g; GEN.g = +k; try{ return progTable(); } finally { GEN.g = g0; } };
 const fnv = t => { let h = 0x811c9dc5; for(let i = 0; i < t.length; i++){ h ^= t.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
@@ -1382,7 +1382,7 @@ const libFull = () => LIB_STEPS.every(k=>mineCount(k) + shippedCount(k) >= LIB_P
 // your height changes, so dealing just picks from a ready list.
 let FITS = {key: null};
 function fitList(step, frac){
-  const key = [SHIPPED && SHIPPED.ver, curTable, Math.round(stanceIn()), mineCount(step)].join('|');
+  const key = [SHIPPED && SHIPPED.ver, curTable, Math.round(stanceIn())].join('|');
   if(FITS.key !== key) FITS = {key};
   const k = step + ':' + frac;
   if(FITS[k]) return FITS[k];
@@ -1400,8 +1400,12 @@ function fromLibrary(step, bucket){
   if(!list.length) list = fitList(step, null);   // none of that fraction fits: any fraction
   if(!list.length) return null;
   const recent = RECENT[step] = RECENT[step] || [];
-  let id = pick(list);
-  for(let t = 0; t < 20 && recent.includes(id) && list.length > recent.length; t++) id = pick(list);   // not one dealt recently
+  // never one of the last shots dealt here: with a short list (a thin fraction in a small library) the last half of it
+  // is held back, so the same shot can't come straight back
+  const freshOf = l => { const hold = new Set(recent.slice(-Math.min(60, Math.floor(l.length/2)))); return l.filter(x=>!hold.has(x)); };
+  let fresh = freshOf(list);
+  if(fresh.length < 8){ const all = fitList(step, null), f2 = freshOf(all); if(f2.length > fresh.length) fresh = f2; }   // too few of that fraction left: any fraction rather than a repeat
+  const id = pick(fresh.length ? fresh : list);
   recent.push(id); if(recent.length > 60) recent.shift();
   const rec = id[0] === 's' ? decodeRec(sh.data, +id.slice(1)*REC) : mine[+id.slice(1)];
   return rec ? shotOf(rec, step, Math.random() < .5) : null;   // mirrored left-right half the time (end to end looks the same from behind the cue ball)
@@ -1428,7 +1432,7 @@ function libGrowOne(){
 let libTimer = 0;
 function libIdle(){
   clearTimeout(libTimer);
-  if(libFull() || libBuilding) return;
+  if(libFull() || libBuilding || shippedOk()) return;   // the shipped library is enough: building more here would hold up the page
   libTimer = setTimeout(()=>{ if(answered && !anim && !cueStroke && !look.k && !walkDrag && !tut.on){ libGrowOne(); renderLibStatus(); } libIdle(); }, 600);   // only while you're looking over a played shot, so it never stutters an aim
 }
 // Settings: rebuild it all now, with a progress bar
@@ -1451,6 +1455,13 @@ function renderLibStatus(){
   el.textContent = libBuilding ? `Working out shots… ${n} / ${all}` : n >= all ? `${n} shots ready` : `${n} / ${all} shots (more are worked out while you play)`;
   $('libfill').style.width = (100*n/all).toFixed(1) + '%';
   $('librebuild').disabled = libBuilding;
+}
+// where a zone may go: at least 12" from the pocket the object ball goes in, off the object ball's starting spot, and on a
+// near-straight shot (under 8°) along the line of the shot, forward or back, not off to the side
+function zoneSpotOk(s, c){
+  if(len(sub(c, s.P.c)) < 12 || len(sub(c, s.ob)) < 5) return false;
+  if(s.theta < 8){ const v = norm(sub(s.ob, s.cb)), q = sub(c, s.cb); if(Math.abs(v[0]*q[1] - v[1]*q[0]) > 4) return false; }
+  return true;
 }
 function shootDeal(){
   const g = shootLevel(), step = isFree() ? null : zoneStep(g);
@@ -1493,6 +1504,7 @@ function shootDeal(){
       if(c[0] < 3 || c[0] > W-3 || c[1] < 3 || c[1] > H-3) continue;
       if(POCKETS.some(P=>len(sub(c, P.c)) < 7)) continue;
       if(len(sub(c, s.cb)) < 6) continue;                 // a zone where the cue ball started is no test
+      if(!relax && !zoneSpotOk(s, c)) continue;
       s.zone = {c, r: g >= SH.cushion ? 5 : 6, step, lvl, tip: zs.tip};
       // routes with a rail: the zone should take more than one stroke you can play (a different speed, or the tip half a
       // tip another way), unless none turns up after many tries
@@ -1738,7 +1750,8 @@ function takeShot(id){
   // The right call that misses the zone or is overhit is a partial: no points either way.
   const clean = run.made && !run.scratch;
   const speedOk = !ctrl().speed || ratio <= 2.2 || !!s.zone;
-  const full = ok && clean && (s.zone ? run.inZone : true) && speedOk;
+  const zoneWin = !!s.zone && clean && run.inZone;   // potted and in the zone: a success, whatever fraction or stroke got it there
+  const full = zoneWin || (ok && clean && !s.zone && speedOk);
   const partial = ok && clean && !full;
   const q = sub(s.ob, s.cb), qb = dot(q, dir), disc = qb*qb - dot(q, q) + 4*R*R;   // where the cue ball meets the object ball on your call
   s.pick = {made: run.made, far: !ok, g2: disc >= 0 ? add(s.cb, mul(dir, qb - Math.sqrt(disc))) : s.gb, id};
@@ -1762,13 +1775,13 @@ function takeShot(id){
   const lab = r => r.id === 'full' ? 'Full' : r.label;
   // the verdict as a small table: your call and the right one, your stroke and the one it wanted, and what the balls did
   const spd = n => coarseSpeed() ? COARSE_LBL[nearestCoarse(n)] : String(n), want = s.zone && s.zone.lvl ? s.zone.lvl : levelForSpeed(idealV), mine = speedLevel();
-  const rows = [['Call', lab(picked), ok, ok ? '' : lab(right)]];
+  const rows = [['Call', lab(picked), ok ? true : zoneWin ? 'also' : false, ok ? '' : lab(right)]];
   const strokeOk = s.zone && s.zone.lvls ? s.zone.lvls.some(l=>spd(l) === spd(mine)) : spd(mine) === spd(want);
-  if(ctrl().speed) rows.push(['Stroke', spd(mine), strokeOk, strokeOk ? '' : spd(want)]);
+  if(ctrl().speed) rows.push(['Stroke', spd(mine), strokeOk || zoneWin, strokeOk || zoneWin ? '' : spd(want)]);
   const ball = run.scratch ? 'Scratch: the cue ball went in' : !run.hit ? 'Missed the object ball' : !run.made ? (run.obIn ? 'Wrong pocket' : 'Missed the pocket')
     : s.zone ? (run.inZone ? 'Pocketed, in the zone' : `Pocketed, missed the zone by ${run.zoneMiss.toFixed(1)}″`) : 'Pocketed';
   rows.push(['Ball', ball, run.made && !run.scratch && (!s.zone || run.inZone), '']);
-  const bits = [], grid = `<div class="vgrid">${rows.map(([k, v, good, right])=>`<span>${k}</span><em><i class="${good ? 'ok' : 'no'}">${v}</i>${right ? `<span>Right</span><i class="ok">${right}</i>` : ''}</em>`).join('')}</div>`;   // a miss shows the right answer beside it
+  const bits = [], grid = `<div class="vgrid">${rows.map(([k, v, good, right])=>`<span>${k}</span><em><i class="${good === 'also' ? 'also' : good ? 'ok' : 'no'}">${v}</i>${right ? `<span>Right</span><i class="ok">${right}</i>` : ''}</em>`).join('')}</div>`;   // a miss shows the right answer beside it
   const head = full ? 'Good shot' : partial ? 'Pocketed' : ok ? 'Missed' : run.made ? 'Wrong call, but it drops' : 'Missed';
   $('quick').innerHTML = `<div class="ql"><b class="${full ? 'ok' : partial || (run.made && !ok) ? 'also' : 'no'}">${head}</b>${bits.map(b=>`<span>${b}</span>`).join('')}</div>${grid}`;
   $('result').innerHTML = `<div class="resultpair">${overlapSVG(s)}${tipSVG(s)}</div>`;
@@ -4283,7 +4296,7 @@ saveSettings();
 syncPressed();
 renderStats();
 sizeTable();
-if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, ZONE_STEPS, tableFor, libVer, parseShipped, fromLibrary, shippedOk, setShipped: x=>{ SHIPPED = x; }, isZoneStep, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
+if(location.hash === '#test' || DEV) window.__lib = {LIB_STEPS, ZONE_STEPS, tableFor, libVer, parseShipped, fromLibrary, shippedOk, setShipped: x=>{ SHIPPED = x; }, isZoneStep, shotOf, zoneSpotOk, makeRec, encodeRec, decodeRec, recOk, REC, setTable: (t)=>{ setTable(t, settings.pockets); }, curTable: ()=>curTable};
 if(location.hash === '#test' || DEV) window.__ct = {draw: r=>draw(r), renderSfx: async kind=>{ const ctx = new OfflineAudioContext(1, 44100*0.6, 44100), saved = actx; actx = ctx; noiseBuf = null; const g = ctx.createGain(); g.connect(ctx.destination); SFX[kind](g, 0, 1); actx = saved; noiseBuf = null; const d = (await ctx.startRendering()).getChannelData(0); let pk = 0, last = 0; for(let i=0;i<d.length;i++){ const a = Math.abs(d[i]); if(a > pk) pk = a; if(a > 0.01) last = i; } return {peak: +pk.toFixed(2), ms: Math.round(last/44.1)}; }, generate, dealShot, weakModel, leanK, cur: ()=>shot, anyOn, physOn, aidMode, aidAlpha, practiceAid, throwAtContact, refs: ()=>REFS, levelPoint, showLevel, stats: ()=>stats, cueScratches, cuePathEnd, setTable, outcome, REFS, PE, engineTable, G3: ()=>G3, setShot: s=>{ shot = s; s.t0 = performance.now(); answered = false; draw(false); updateControls(); }, POCKETS: ()=>POCKETS, dims: ()=>[W,H]};   // hooks for automated checks only
 if(!settings.stanceSet && !settings.tut && !(stats.log || []).length && !baselines().length){ $('stancecover').hidden = false; showSessIdle(); }   // a new player sets their stance first
 deal();
