@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 318;   // one per commit to main
+const BUILD = 319;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -2274,7 +2274,7 @@ function perspDyn(cam, s, reveal){
   let o = '';
   // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
   if(s.zone && !G3) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
-  if(isShooting() && !reveal && !s.anim && shootAid('path') && !(tut.on && (tstep().ghostAt || tstep().noPocket))){   // not in the close-ups, where the ghost ball is moved off this pocket's contact
+  if(isShooting() && !reveal && !s.anim && (tut.on ? tutAid('path') : shootAid('path'))){   // in a lesson, the step says (not your grade)   // not in the close-ups, where the ghost ball is moved off this pocket's contact
     const pe = pocketEdge(s.ob, s.P, s.T);
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
@@ -3887,7 +3887,7 @@ const SL_SHOOT = [
    text:'A quarter covered: a <b>¼-ball</b> hit. The cut is getting thin.'},
   {noPocket:true, ghostAt:'18', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'Just an eighth, barely touching: a <b>⅛-ball</b> hit, the thinnest you’ll call.'},
-  {shot:'34', aids:{ghost:1, line:1}, labels:['pocket'], ask:'34',
+  {shot:'34', aids:{ghost:1, line:1, path:1}, labels:['pocket'], ask:'34',
    text:'Now with a <b>pocket</b>, marked in gold; the yellow line is the object ball’s path into it. <b>Your call takes the shot</b>: the cue ball is sent to that fraction’s contact, so the right call drops. Call this one with the buttons, or keys <b>1</b>–<b>5</b>.'},
   {finish:true, aids:{},
    text:'That’s the whole game: picture the ghost ball, read how much it covers, call it. You can see this again under <b>?</b>.'},
