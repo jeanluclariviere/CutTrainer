@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 315;   // one per commit to main
+const BUILD = 316;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -3876,7 +3876,7 @@ const SL_SHOOT = [
   {shot:'12', aids:{}, labels:['cb','ob','pocket'], next:true,
    text:'Every shot has a <b>cue ball</b>, an <b>object ball</b> and a <b>pocket</b>, marked in gold. The cue ball hits the object ball into the pocket. The question is always the same: <b>how full</b> do you hit it?'},
   {aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
-   text:'The <b>ghost ball</b> is where the cue ball has to be when it touches: right behind the object ball, in line with the pocket. The dotted <b>guide line</b> is the cue ball’s path to it, the yellow line the object ball’s path in.'},
+   text:'The <b>ghost ball</b> shows where the cue ball must be when it hits the object ball. The dotted <b>guide line</b> is the cue ball’s path. The yellow line is the object ball’s path to the pocket.'},
   {ghostAt:'full', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'From behind the cue ball, the ghost ball <b>overlaps</b> the object ball. <b>How much it covers is the fraction</b>, and that’s what you call. Here it covers all of it: a <b>full</b> hit, right through the middle.'},
   {ghostAt:'34', aids:{ghost:1}, zoom:true, overlap:true, next:true,
