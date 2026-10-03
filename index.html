@@ -261,6 +261,8 @@ h1{font-family:var(--display);font-weight:700;font-size:40px;line-height:1;lette
 .dip.out{transition:opacity .2s ease-out}
 .table-box{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.dragging{-webkit-user-select:none;user-select:none}
+.tutfade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:6;transition:opacity .25s ease}
+.tutfade.on{opacity:1}
 .table-box{position:relative;background:#1b120b;border-radius:12px;overflow:hidden;aspect-ratio:4/5;width:min(100%, 62vh);max-width:100%;margin-inline:auto}
 .table-box.persp{aspect-ratio:3/2;width:100%}
 @media (max-width:760px){.main,.main.persp{grid-template-columns:1fr}.table-box{width:min(100%, 46vh)}.table-box.persp{width:100%}}
@@ -538,6 +540,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
   <div class="main">
     <div class="tablecol">
       <div class="table-box">
+        <div class="tutfade" id="tutfade" aria-hidden="true"></div>
         <canvas id="table3d" aria-hidden="true"></canvas>
         <div class="dip" id="dip" aria-hidden="true"></div>
         <svg id="table" viewBox="0 0 40 50" preserveAspectRatio="xMidYMid meet" aria-label="Pool table shot layout"></svg>
@@ -1020,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 313;   // one per commit to main
+const BUILD = 314;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -4033,7 +4036,17 @@ function zoomTo(target){
   };
   tut.zRaf = requestAnimationFrame(step);
 }
+// a lesson step that brings a new shot fades the table to black and back, as a new shot would
 function runStep(back){
+  const st = tstep(), want = back ? tut.shots[tut.i] : null;
+  const fresh = tut.started && (back ? want && want !== shot : st.shot || st.deg != null);
+  clearTimeout(tut.fadeT);
+  if(!fresh){ $('tutfade').classList.remove('on'); return runStepNow(back); }
+  $('tutfade').classList.add('on');
+  tut.fadeT = setTimeout(()=>{ if(tut.on){ cancelAnimationFrame(tut.zRaf); tut.zb = tut.zt = tstep().zoom ? 1 : 0; runStepNow(back); } $('tutfade').classList.remove('on'); }, 260);   // the new shot comes in already at its step's view
+}
+function runStepNow(back){
+  tut.started = true;
   const st = tstep();
   if(back && tut.shots[tut.i]){ if(anim){ cancelAnimationFrame(anim.raf); anim = null; } shot = tut.shots[tut.i]; }   // going back: the same shot that step had
   else {
@@ -4072,7 +4085,7 @@ function runStep(back){
 function startTut(lesson){
   $('streakpill').hidden = true;
   endFlash(); $('sesscover').hidden = true; $('endcover').hidden = true; $('startcover').hidden = true;
-  tut.on = true; tut.i = 0; tut.shots = []; tut.lesson = LESSONS[lesson] ? lesson : 'shoot';
+  tut.on = true; tut.i = 0; tut.shots = []; tut.started = false; tut.lesson = LESSONS[lesson] ? lesson : 'shoot';
   cancelAnimationFrame(routineRaf); renderRoutineChip(); renderShootControls();
   $('coach').hidden = false; $('question').hidden = true; $('sessrow').hidden = true;
   showSessIdle(); runStep();
@@ -4080,7 +4093,7 @@ function startTut(lesson){
 }
 function endTut(thenBaseline){
   setTimeout(syncStreakPill, 0);   // the streak pill comes back after the lesson
-  tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf);
+  tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf); clearTimeout(tut.fadeT); $('tutfade').classList.remove('on');
   if(!settings.tut){ settings.tut = 1; saveSettings(); }
   settings.tutSeen = {...(settings.tutSeen || {}), [tut.lesson]: 1}; saveSettings();
   $('coach').hidden = true;
