@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 314;   // one per commit to main
+const BUILD = 315;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -2274,7 +2274,7 @@ function perspDyn(cam, s, reveal){
   let o = '';
   // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
   if(s.zone && !G3) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
-  if(isShooting() && !reveal && !s.anim && shootAid('path')){
+  if(isShooting() && !reveal && !s.anim && shootAid('path') && !(tut.on && tstep().ghostAt)){   // not in the close-ups, where the ghost ball is moved off this pocket's contact
     const pe = pocketEdge(s.ob, s.P, s.T);
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
@@ -3877,15 +3877,15 @@ const SL_SHOOT = [
    text:'Every shot has a <b>cue ball</b>, an <b>object ball</b> and a <b>pocket</b>, marked in gold. The cue ball hits the object ball into the pocket. The question is always the same: <b>how full</b> do you hit it?'},
   {aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
    text:'The <b>ghost ball</b> is where the cue ball has to be when it touches: right behind the object ball, in line with the pocket. The dotted <b>guide line</b> is the cue ball’s path to it, the yellow line the object ball’s path in.'},
-  {aids:{ghost:1}, zoom:true, overlap:true, next:true,
-   text:'From behind the cue ball, the ghost ball <b>overlaps</b> the object ball. <b>How much it covers is the fraction</b>, and that’s what you call. Here it covers half: a <b>½-ball</b> hit.'},
-  {shot:'full', aids:{ghost:1}, zoom:true, overlap:true, next:true,
-   text:'Straight in, it covers all of it: a <b>full</b> hit, right through the middle.'},
-  {shot:'34', aids:{ghost:1}, zoom:true, overlap:true, next:true,
-   text:'Three quarters covered: a <b>¾-ball</b> hit, a gentle cut.'},
-  {shot:'14', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {ghostAt:'full', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'From behind the cue ball, the ghost ball <b>overlaps</b> the object ball. <b>How much it covers is the fraction</b>, and that’s what you call. Here it covers all of it: a <b>full</b> hit, right through the middle.'},
+  {ghostAt:'34', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Move the ghost ball over a little and it covers three quarters: a <b>¾-ball</b> hit, a gentle cut.'},
+  {ghostAt:'12', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Half covered: a <b>½-ball</b> hit.'},
+  {ghostAt:'14', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'A quarter covered: a <b>¼-ball</b> hit. The cut is getting thin.'},
-  {shot:'18', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {ghostAt:'18', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'Just an eighth, barely touching: a <b>⅛-ball</b> hit, the thinnest you’ll call.'},
   {shot:'34', aids:{ghost:1, line:1}, ask:'34',
    text:'Your turn. <b>Your call takes the shot</b>: the cue ball is sent to that fraction’s contact, so the right call drops. Call this one with the buttons, or keys <b>1</b>–<b>5</b>.'},
@@ -4045,6 +4045,25 @@ function runStep(back){
   $('tutfade').classList.add('on');
   tut.fadeT = setTimeout(()=>{ if(tut.on){ cancelAnimationFrame(tut.zRaf); tut.zb = tut.zt = tstep().zoom ? 1 : 0; runStepNow(back); } $('tutfade').classList.remove('on'); }, 260);   // the new shot comes in already at its step's view
 }
+// the close-ups: one cue ball and object ball, the ghost ball moved round to each fraction's contact
+function ghostFor(s, phi){
+  const D = len(sub(s.ob, s.cb)), w = norm(sub(s.ob, s.cb)), al = Math.asin(Math.min(1, 2*R*Math.sin(phi*RAD)/D));
+  const v = rot(w, s.sign*al), t = D*Math.cos(al) - 2*R*Math.cos(phi*RAD);
+  return {gb: add(s.cb, mul(v, t)), v};
+}
+function setGhost(s, phi){ const g = ghostFor(s, phi); s.gb = g.gb; s.v = g.v; s.tphi = phi; }
+function glideGhost(s, to){
+  cancelAnimationFrame(tut.gRaf);
+  const from = s.tphi ?? s.theta, t0 = performance.now(), dur = 650;
+  if(Math.abs(from - to) < 1e-6){ setGhost(s, to); return; }
+  const step = now=>{
+    if(!tut.on || shot !== s) return;
+    const u = Math.min(1, (now - t0)/dur), e = u < .5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
+    setGhost(s, from + (to - from)*e); draw(answered);
+    if(u < 1) tut.gRaf = requestAnimationFrame(step);
+  };
+  tut.gRaf = requestAnimationFrame(step);
+}
 function runStepNow(back){
   tut.started = true;
   const st = tstep();
@@ -4055,6 +4074,10 @@ function runStepNow(back){
   }
   tut.shots[tut.i] = shot;
   freshCall();
+  if(!shot.gb0) { shot.gb0 = shot.gb; shot.v0 = shot.v; }
+  cancelAnimationFrame(tut.gRaf);
+  if(st.ghostAt) glideGhost(shot, ALL.find(r=>r.id === st.ghostAt).deg);
+  else { shot.gb = shot.gb0; shot.v = shot.v0; shot.tphi = null; }   // back on the shot as dealt
   if(st.play) setTimeout(()=>{   // the coach plays a stroke for you: aimed at the right contact, at a share of pocket speed
     if(!tut.on || tstep() !== st || answered) return;
     const p = st.play, ideal = strikeOf(shot), d1 = len(sub(shot.gb, shot.cb));
@@ -4093,7 +4116,7 @@ function startTut(lesson){
 }
 function endTut(thenBaseline){
   setTimeout(syncStreakPill, 0);   // the streak pill comes back after the lesson
-  tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf); clearTimeout(tut.fadeT); $('tutfade').classList.remove('on');
+  tut.on = false; tut.zb = tut.zt = 0; cancelAnimationFrame(tut.zRaf); cancelAnimationFrame(tut.gRaf); if(shot && shot.gb0){ shot.gb = shot.gb0; shot.v = shot.v0; } clearTimeout(tut.fadeT); $('tutfade').classList.remove('on');
   if(!settings.tut){ settings.tut = 1; saveSettings(); }
   settings.tutSeen = {...(settings.tutSeen || {}), [tut.lesson]: 1}; saveSettings();
   $('coach').hidden = true;
