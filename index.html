@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 317;   // one per commit to main
+const BUILD = 318;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -2274,7 +2274,7 @@ function perspDyn(cam, s, reveal){
   let o = '';
   // Shoot: the target zone for the cue ball, and (early steps) the object ball's path to the pocket
   if(s.zone && !G3) o += `<path d="${polyD(cam, circ3(s.zone.c, s.zone.r, .03, 48))}" fill="#5be0c8" fill-opacity=".16" stroke="#5be0c8" stroke-opacity=".9" stroke-width="1.2" stroke-dasharray="4 3"/>`;
-  if(isShooting() && !reveal && !s.anim && shootAid('path') && !(tut.on && tstep().ghostAt)){   // not in the close-ups, where the ghost ball is moved off this pocket's contact
+  if(isShooting() && !reveal && !s.anim && shootAid('path') && !(tut.on && (tstep().ghostAt || tstep().noPocket))){   // not in the close-ups, where the ghost ball is moved off this pocket's contact
     const pe = pocketEdge(s.ob, s.P, s.T);
     o += `<path d="${segD(cam,[s.ob[0],s.ob[1],.03],[pe[0],pe[1],.03])}" stroke="#ffd34d" stroke-width="${DASH_W}" stroke-linecap="round" stroke-dasharray="3 4"/>`;
   }
@@ -2579,7 +2579,7 @@ function perspTop(cam, s, reveal){
   const ringPts = ringArc3(s.P).map(cam.toCam).filter(c=>c[2]>NEAR).map(cam.proj);
   const ringVisible = ringPts.some(([x,y])=>x>=0 && x<=VW && y>=0 && y<=VH);
   o += tutLayer(cam, s, reveal);
-  if(!ringVisible && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0)){
+  if(!ringVisible && !(walk && walk.blend > 0) && !(tut.on && tut.zb > 0) && !noPocket()){
     const pc = cam.toCam([s.P.c[0], s.P.c[1], 1.6]);
     let dx = pc[0], dy = -pc[1];
     if(pc[2] <= NEAR){ dy = Math.abs(dy)+1; }
@@ -2641,7 +2641,7 @@ function drawInner(reveal){
 }
 // The arrow over the target pocket: it floats gently up and down (only the 3D canvas redraws for that, about 30 times a second).
 function arrowAt(){
-  if(!shot || !shot.P || settings.view === 'top' || (tut.on && tut.zb > .5)) return null;
+  if(!shot || !shot.P || settings.view === 'top' || (tut.on && tut.zb > .5) || noPocket()) return null;
   const E = engineTable().pockets[POCKETS.indexOf(shot.P)], t = performance.now()/1000;
   const mv = settings.gfxBob !== '0';   // Still: the arrows hold still
   return {p: E.hole, z: 4.2 + (mv ? .7*Math.sin(t*2*Math.PI/1.6) : 0), spin: mv ? t*.6 : 0};
@@ -3873,22 +3873,22 @@ const TSTEPS_THROW = [
 ];
 // ---------- Shoot lessons ----------
 const SL_SHOOT = [
-  {shot:'full', aids:{}, labels:['cb','ob','pocket'], next:true,
-   text:'Every shot has a <b>cue ball</b>, an <b>object ball</b> and a <b>pocket</b>, marked in gold. The cue ball hits the object ball into the pocket. The question is always the same: <b>how full</b> do you hit it?'},
-  {aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
-   text:'The <b>ghost ball</b> shows where the cue ball must be when it hits the object ball. The dotted <b>guide line</b> is the cue ball’s path. The yellow line is the object ball’s path to the pocket.'},
-  {ghostAt:'full', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {rail:true, noPocket:true, aids:{}, labels:['cb','ob'], next:true,
+   text:'The <b>cue ball</b> is the one you strike; it hits the <b>object ball</b>. The question is always the same: <b>how full</b> do you hit it?'},
+  {noPocket:true, aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
+   text:'The <b>ghost ball</b> shows where the cue ball must be when it hits the object ball. The dotted <b>guide line</b> is the cue ball’s path.'},
+  {noPocket:true, ghostAt:'full', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'From behind the cue ball, the ghost ball <b>overlaps</b> the object ball. <b>How much it covers is the fraction</b>, and that’s what you call. Here it covers all of it: a <b>full</b> hit, right through the middle.'},
-  {ghostAt:'34', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {noPocket:true, ghostAt:'34', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'Move the ghost ball over a little and it covers three quarters: a <b>¾-ball</b> hit, a gentle cut.'},
-  {ghostAt:'12', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {noPocket:true, ghostAt:'12', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'Half covered: a <b>½-ball</b> hit.'},
-  {ghostAt:'14', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {noPocket:true, ghostAt:'14', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'A quarter covered: a <b>¼-ball</b> hit. The cut is getting thin.'},
-  {ghostAt:'18', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+  {noPocket:true, ghostAt:'18', aids:{ghost:1}, zoom:true, overlap:true, next:true,
    text:'Just an eighth, barely touching: a <b>⅛-ball</b> hit, the thinnest you’ll call.'},
-  {shot:'34', aids:{ghost:1, line:1}, ask:'34',
-   text:'Your turn. <b>Your call takes the shot</b>: the cue ball is sent to that fraction’s contact, so the right call drops. Call this one with the buttons, or keys <b>1</b>–<b>5</b>.'},
+  {shot:'34', aids:{ghost:1, line:1}, labels:['pocket'], ask:'34',
+   text:'Now with a <b>pocket</b>, marked in gold; the yellow line is the object ball’s path into it. <b>Your call takes the shot</b>: the cue ball is sent to that fraction’s contact, so the right call drops. Call this one with the buttons, or keys <b>1</b>–<b>5</b>.'},
   {finish:true, aids:{},
    text:'That’s the whole game: picture the ghost ball, read how much it covers, call it. You can see this again under <b>?</b>.'},
 ];
@@ -4017,6 +4017,13 @@ function tutShotDeg(deg, mustMiss){   // a shot at an exact cut; mustMiss: a pla
   shot = s1; shot.t0 = performance.now();
   shot.color = pick([OB_COLORS[1], OB_COLORS[2], OB_COLORS[3], OB_COLORS[5]]);   // never yellow: the lit-up overlap is yellow
 }
+// the lesson's opening layout: no pocket in play, the object ball straight out from the cue ball toward the far short rail
+function tutRailShot(){
+  tutShot('full');
+  const s = shot, cb = [W/2, H*.3], ob = [W/2, H*.56], w = norm(sub(ob, cb));
+  Object.assign(s, {cb, ob, gb: sub(ob, mul(w, 2*R)), v: w, u: w, uC: w, n: w, sign: 1, theta: 0, pathDeg: 0, gbLook: null, strk: null, seq: null});
+}
+const noPocket = () => tut.on && !!tstep().noPocket;
 function freshCall(){   // same shot, ready to be called again
   if(anim){ cancelAnimationFrame(anim.raf); anim = null; }
   answered = false; shot.pick = null; shot.final = null; shot.anim = null; shot.t0 = performance.now();
@@ -4039,7 +4046,7 @@ function zoomTo(target){
 // a lesson step that brings a new shot fades the table to black and back, as a new shot would
 function runStep(back){
   const st = tstep(), want = back ? tut.shots[tut.i] : null;
-  const fresh = tut.started && (back ? want && want !== shot : st.shot || st.deg != null);
+  const fresh = tut.started && (back ? want && want !== shot : st.shot || st.rail || st.deg != null);
   clearTimeout(tut.fadeT);
   if(!fresh){ $('tutfade').classList.remove('on'); return runStepNow(back); }
   $('tutfade').classList.add('on');
@@ -4070,6 +4077,7 @@ function runStepNow(back){
   if(back && tut.shots[tut.i]){ if(anim){ cancelAnimationFrame(anim.raf); anim = null; } shot = tut.shots[tut.i]; }   // going back: the same shot that step had
   else {
     if(st.shot) tutShot(st.shot);
+    if(st.rail) tutRailShot();
     if(st.deg != null) tutShotDeg(st.deg, st.mustMiss);
   }
   tut.shots[tut.i] = shot;
