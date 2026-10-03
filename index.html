@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 321;   // one per commit to main
+const BUILD = 323;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -1655,7 +1655,7 @@ function overviewCam(s){
   return cam;
 }
 function setLook(on){
-  if(!shot || !isShooting() || tut.on || settings.view === 'top') return;
+  if(!shot || !isShooting() || settings.view === 'top' || (tut.on && tut.zb > 0)) return;
   look.target = on ? 1 : 0;
   const c = shot.cam;
   if(on && !answered && c && c.T && c.phase === 'down' && c.k > 0){ c.up = true; cancelAnimationFrame(featherRaf); riseCam(shot, 0); }
@@ -1695,7 +1695,7 @@ function camAlong(s, dir, c){
 function renderShootControls(){
   const box = $('shootctl'); if(!box) return;
   const on = isShooting() && !tut.on, c = ctrl();
-  box.hidden = !on; $('lookbtn').hidden = !on;
+  box.hidden = !on; $('lookbtn').hidden = !(isShooting() && settings.view !== 'top');   // the eye stays in lessons, so a shot that runs off the view can still be followed
   if(!on) return;
   $('speedbar').hidden = !c.speed;
   $('freebtns').hidden = !isFree();
@@ -2086,7 +2086,14 @@ function walkCam(s, view){
   const fh = rot([base.f[0], base.f[1]], a), p0 = Math.asin(base.f[2]), p1 = p0 - (el - el0), c1 = Math.cos(p1)/Math.hypot(fh[0], fh[1]);
   return camFrom(E, norm3([fh[0]*c1, fh[1]*c1, Math.sin(p1)]), base.hfov);
 }
+// in a lesson the eye works too: stepping back blends the lesson's camera with the whole-table view
 function makeCam(s, view){
+  const c = makeCam0(s, view);
+  if(!(tut.on && look.k > 0 && view !== 'top')) return c;
+  const o = overviewCam(s), k = ease(look.k), mix = (a, b) => a.map((x, i)=>x + (b[i]-x)*k);
+  return camFrom(mix(c.E, o.E), norm3(mix(c.f, o.f)), c.hfov + (o.hfov - c.hfov)*k);
+}
+function makeCam0(s, view){
   if(isShooting() && !tut.on && view !== 'top') return shootCam(s, view);
   const c0 = VIEWS[view];
   if(tut.on && tut.zb > 0){   // tutorial close-up, blended with the game view while the camera moves
@@ -4283,7 +4290,7 @@ $('sesscover').addEventListener('click', e=>e.stopPropagation());
 document.addEventListener('keydown', e=>{
   if(e.target.tagName==='INPUT') return;
   if((e.key==='m' || e.key==='M') && !e.metaKey && !e.ctrlKey){ const L = ['off','parlor','smoke','felt']; applySetting('music', L[(L.indexOf(settings.music) + 1) % L.length]); e.preventDefault(); return; }
-  if(e.key===' ' && isShooting() && !tut.on && settings.view !== 'top' && $('stancecover').hidden){ e.preventDefault(); if(!e.repeat) setLook(true); return; }
+  if(e.key===' ' && isShooting() && settings.view !== 'top' && $('stancecover').hidden){ e.preventDefault(); if(!e.repeat) setLook(true); return; }
   if(!$('stancecover').hidden){ if(e.key==='Enter'){ closeStance(); e.preventDefault(); } return; }
   if(tut.on && e.key==='Enter'){ tutNext(); e.preventDefault(); return; }
   if(tut.on && e.key==='Escape'){ endTut(); e.preventDefault(); return; }
