@@ -66,6 +66,8 @@ header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-be
 .coachbtns{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .coachbtns .link{color:#9fb3c1}
 .coachbtns .startbtn{font-size:17px;padding:7px 22px}
+.coachnav{display:flex;gap:8px;align-items:center}
+.coachback{font:600 15px var(--body);padding:7px 16px;border-radius:999px;border:1px solid #4a6275;background:transparent;color:#dfe8ef;cursor:pointer}
 .helpbtn{font:700 20px var(--display)}
 
 .progcard{max-height:calc(100dvh - 90px);overflow-y:auto}
@@ -612,7 +614,7 @@ kbd{font-family:var(--mono);font-size:11px;background:var(--chip);border-radius:
       <div class="coach" id="coach" hidden aria-live="polite">
         <small class="coachstep" id="coachstep"></small>
         <p id="coachtext"></p>
-        <div class="coachbtns"><button class="link" id="coachskip">Skip tutorial</button><button class="startbtn" id="coachnext">Next</button></div>
+        <div class="coachbtns"><button class="link" id="coachskip">Skip tutorial</button><span class="coachnav"><button class="coachback" id="coachback">Back</button><button class="startbtn" id="coachnext">Next</button></span></div>
       </div>
       <p class="q" id="question" hidden>How full do you hit the object ball?<small id="modehint"></small></p>
       <div class="sessrow" id="sessrow" hidden>
@@ -1023,7 +1025,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 311;   // one per commit to main
+const BUILD = 312;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -4036,10 +4038,14 @@ function zoomTo(target){
   };
   tut.zRaf = requestAnimationFrame(step);
 }
-function runStep(){
+function runStep(back){
   const st = tstep();
-  if(st.shot) tutShot(st.shot);
-  if(st.deg != null) tutShotDeg(st.deg, st.mustMiss);
+  if(back && tut.shots[tut.i]){ if(anim){ cancelAnimationFrame(anim.raf); anim = null; } shot = tut.shots[tut.i]; }   // going back: the same shot that step had
+  else {
+    if(st.shot) tutShot(st.shot);
+    if(st.deg != null) tutShotDeg(st.deg, st.mustMiss);
+  }
+  tut.shots[tut.i] = shot;
   freshCall();
   if(st.play) setTimeout(()=>{   // the coach plays a stroke for you: aimed at the right contact, at a share of pocket speed
     if(!tut.on || tstep() !== st || answered) return;
@@ -4064,13 +4070,14 @@ function runStep(){
   const nx = $('coachnext');
   nx.hidden = !(st.next || st.finish);
   nx.textContent = st.finish ? 'Done' : 'Next';
+  $('coachback').hidden = tut.i === 0;
   document.querySelectorAll('#answers button').forEach(b=>b.disabled = !st.ask);
   draw(false); scheduleFades(); updateControls();
 }
 function startTut(lesson){
   $('streakpill').hidden = true;
   endFlash(); $('sesscover').hidden = true; $('endcover').hidden = true; $('startcover').hidden = true;
-  tut.on = true; tut.i = 0; tut.lesson = LESSONS[lesson] ? lesson : 'shoot';
+  tut.on = true; tut.i = 0; tut.shots = []; tut.lesson = LESSONS[lesson] ? lesson : 'shoot';
   cancelAnimationFrame(routineRaf); renderRoutineChip(); renderShootControls();
   $('coach').hidden = false; $('question').hidden = true; $('sessrow').hidden = true;
   showSessIdle(); runStep();
@@ -4090,6 +4097,10 @@ function tutNext(){
   if(st.ask && !answered) return;
   if(st.finish) return endTut(true);
   tut.i++; runStep();
+}
+function tutBack(){
+  if(!tut.on || tut.i === 0) return;
+  tut.i--; runStep(true);
 }
 function tutAnswer(id){
   const st = tstep();
@@ -4160,6 +4171,7 @@ $('help').addEventListener('click', ()=>openTutMenu(true));
 $('tutmenuclose').addEventListener('click', ()=>openTutMenu(false));
 $('tutmenu').addEventListener('click', e=>{ const b = e.target.closest('[data-lesson]'); if(b){ openTutMenu(false); startTut(b.dataset.lesson); } else if(e.target === $('tutmenu')) openTutMenu(false); });
 $('coachnext').addEventListener('click', ()=>tutNext());
+$('coachback').addEventListener('click', ()=>tutBack());
 $('coachskip').addEventListener('click', ()=>endTut(false));
 
 $('cog').addEventListener('click', ()=>openMenu(true));
