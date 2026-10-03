@@ -1023,7 +1023,7 @@ const LADDER_TEXT = ['Guide line, ghost ball and aim-line stance all on', 'Guide
   'Any angle', 'Between fractions: call the nearest', '0.75 s Flash', 'Top of Read: Shoot and Free play open'];
 // Testing: open the site with #dev and tap any grade in the progress ladder to jump there.
 const DEV = /#dev\b/.test(location.href);
-const BUILD = 277;   // one per commit to main
+const BUILD = 311;   // one per commit to main
 document.querySelector('.table-box').insertAdjacentHTML('afterend', `<div class="buildtag">build ${BUILD}<span id="fpsmeter"></span></div>` );   // under the table, lined up with its left edge; always shown, so you can tell which build is live
 // #dev: frames per second, the slowest frame, and what the drawing costs, every half second
 // FPS and timings under the table: on in #dev, or with Settings > Graphics > Show FPS
@@ -3195,6 +3195,7 @@ function markPend(){
 }
 function pickFrac(id){
   if(!canCall()) return;
+  if(tut.on) return tutAnswer(id);   // in a lesson a call is the lesson's, not a scored shot
   const c = shot.cam;
   if(isShoot() && c && c.T){ callAim(id); return; }   // from Down on the shot: no shooting standing, a call gets you down first
   if(isShooting()) return takeShot(id);   // the call is the aim: the shot goes off with the stroke you've set
@@ -3844,26 +3845,6 @@ function openMenu(v){ $('menu').hidden = !v; if(v) $('menuclose').focus({prevent
 
 // ---------- tutorial: played on the real table, step by step ----------
 const tut = {on:false, i:0, zb:0, zt:0, zRaf:0};   // zb: how far the camera is into the close-up (0..1), eased toward zt
-const TSTEPS = [
-  {shot:'12', aids:{stance:1}, labels:['cb','ob','pocket'], next:true,
-   text:'Every shot has a <b>cue ball</b>, an <b>object ball</b> and a <b>pocket</b>, ringed in gold. Your job: say how full to hit the object ball.'},
-  {aids:{stance:1, ghost:1, line:1}, labels:['ghost','line'], next:true,
-   text:'The <b>ghost ball</b> is where the cue ball has to be when it hits. The dotted <b>guide line</b> is the path to it. You’re standing right behind that path.'},
-  {aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
-   text:'Up close: the ghost ball covers part of the object ball. <b>That covered part is the fraction.</b> Here it covers half, so this is a <b>½-ball</b> hit.'},
-  {aids:{stance:1, ghost:1, line:1}, ask:'12',
-   text:'Back to where you stand. Your turn: tap <b>½</b>.'},
-  {shot:'14', aids:{stance:1, ghost:1}, zoom:true, overlap:true, next:true,
-   text:'A new shot, up close. Here <b>¾ of the object ball is still showing</b>. Only a quarter is covered, so it’s a <b>¼-ball</b> hit.'},
-  {aids:{stance:1, ghost:1, line:1}, ask:'14',
-   text:'From where you stand: tap <b>¼</b>.'},
-  {shot:'34', aids:{stance:1, ghost:'fade'}, ask:'any',
-   text:'The ghost ball fades after a moment now: picture it yourself, then call it.'},
-  {aids:{}, labels:['drag'], next:true,
-   text:'Normally you stand behind the cue ball, not on its path, with no ghost ball. <b>Drag the table</b> to walk around the shot and look again.'},
-  {finish:true, aids:{},
-   text:'That’s it. The aids come and go as your grade climbs, and you can open this again with the <b>?</b> button.'},
-];
 // B+: cuts that sit between two fractions, called with thick / center / thin
 const BSTEPS = [
   {deg:35, mustMiss:30, aids:{stance:1, ghost:1, line:1}, next:true,
@@ -3892,12 +3873,24 @@ const TSTEPS_THROW = [
 ];
 // ---------- Shoot lessons ----------
 const SL_SHOOT = [
-  {deg:30, aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
-   text:'Every shot is now played out: <b>call the fraction</b> and the cue ball is struck at that contact. Get it right and it drops.'},
-  {aids:{ghost:1, line:1}, next:true,
-   text:'To start you get three aids: the <b>ghost ball</b> shows the right contact, the <b>guide line</b> runs to it, and the <b>yellow line</b> is the object ball’s path to the pocket.'},
+  {shot:'12', aids:{}, labels:['cb','ob','pocket'], next:true,
+   text:'Every shot has a <b>cue ball</b>, an <b>object ball</b> and a <b>pocket</b>, marked in gold. The cue ball hits the object ball into the pocket. The question is always the same: <b>how full</b> do you hit it?'},
+  {aids:{ghost:1, line:1}, labels:['ghost','line'], next:true,
+   text:'The <b>ghost ball</b> is where the cue ball has to be when it touches: right behind the object ball, in line with the pocket. The dotted <b>guide line</b> is the cue ball’s path to it, the yellow line the object ball’s path in.'},
+  {aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'From behind the cue ball, the ghost ball <b>overlaps</b> the object ball. <b>How much it covers is the fraction</b>, and that’s what you call. Here it covers half: a <b>½-ball</b> hit.'},
+  {shot:'full', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Straight in, it covers all of it: a <b>full</b> hit, right through the middle.'},
+  {shot:'34', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Three quarters covered: a <b>¾-ball</b> hit, a gentle cut.'},
+  {shot:'14', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'A quarter covered: a <b>¼-ball</b> hit. The cut is getting thin.'},
+  {shot:'18', aids:{ghost:1}, zoom:true, overlap:true, next:true,
+   text:'Just an eighth, barely touching: a <b>⅛-ball</b> hit, the thinnest you’ll call.'},
+  {shot:'34', aids:{ghost:1, line:1}, ask:'34',
+   text:'Your turn. <b>Your call takes the shot</b>: the cue ball is sent to that fraction’s contact, so the right call drops. Call this one with the buttons, or keys <b>1</b>–<b>5</b>.'},
   {finish:true, aids:{},
-   text:'They go one at a time as you climb: the path first, then the guide line, then the ghost ball. After that it’s your read.'},
+   text:'That’s the whole game: picture the ghost ball, read how much it covers, call it. You can see this again under <b>?</b>.'},
 ];
 const SL_DOWN = [
   {deg:30, aids:{}, next:true,
@@ -3973,8 +3966,7 @@ const SL_ALL = [
   {deg:30, aids:{}, finish:true, text:'Everything is yours: speed, top, back and side. Each zone can be reached more than one way: pick the stroke, then aim for what it does.'},
 ];
 const LESSONS = {
-  intro:   {name:'Calling the fraction', at:0, steps:TSTEPS},
-  shoot:   {name:'Shooting', at:0, track:'shoot', steps:SL_SHOOT},
+  shoot:   {name:'Calling the fraction', at:0, track:'shoot', steps:SL_SHOOT},
   down:    {name:'Cue and hand', at:SH.down, track:'shoot', steps:SL_DOWN},
   ownline: {name:'Your aim line', at:SH.ownLine, track:'shoot', steps:SL_OWNLINE},
   any:     {name:'Any angle', at:SH.any, track:'shoot', steps:SL_ANY},
@@ -3988,7 +3980,7 @@ const LESSONS = {
   all:     {name:'Everything', at:SH.all, track:'shoot', steps:SL_ALL},
   full:    {name:'Full-table position', at:SH.full, track:'shoot', steps:SL_FULL},
 };
-const tsteps = () => LESSONS[tut.lesson || 'intro'].steps;
+const tsteps = () => LESSONS[tut.lesson || 'shoot'].steps;
 const tstep = () => tsteps()[tut.i];
 const lessonsOpen = () => Object.entries(LESSONS).filter(([, L])=>{
   if(L.track === 'shoot') return L.at <= ladderBest();
@@ -4078,7 +4070,7 @@ function runStep(){
 function startTut(lesson){
   $('streakpill').hidden = true;
   endFlash(); $('sesscover').hidden = true; $('endcover').hidden = true; $('startcover').hidden = true;
-  tut.on = true; tut.i = 0; tut.lesson = LESSONS[lesson] ? lesson : 'intro';
+  tut.on = true; tut.i = 0; tut.lesson = LESSONS[lesson] ? lesson : 'shoot';
   cancelAnimationFrame(routineRaf); renderRoutineChip(); renderShootControls();
   $('coach').hidden = false; $('question').hidden = true; $('sessrow').hidden = true;
   showSessIdle(); runStep();
